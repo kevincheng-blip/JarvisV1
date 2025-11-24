@@ -15,6 +15,8 @@ from jgod.market.market_status import MarketStatus
 
 def cmd_status(args) -> int:
     """顯示系統狀態"""
+    import os
+    
     print("=== J-GOD 系統狀態 ===\n")
     
     # 市場狀態
@@ -35,6 +37,8 @@ def cmd_status(args) -> int:
         ("Execution Engine", "jgod/execution"),
         ("War Room Engine", "jgod/war_room"),
         ("Code Intelligence", "jgod/code_intel"),
+        ("Prediction Engine", "jgod/prediction"),
+        ("Diagnostics", "jgod/diagnostics"),
     ]
     
     for name, path in modules:
@@ -43,6 +47,42 @@ def cmd_status(args) -> int:
             print(f"  ✅ {name}")
         else:
             print(f"  ❌ {name} (未找到)")
+    
+    print()
+    
+    # 環境變數檢查
+    print("🔑 環境變數狀態：")
+    env_vars = {
+        "OPENAI_API_KEY": "OpenAI",
+        "ANTHROPIC_API_KEY": "Claude",
+        "GOOGLE_API_KEY": "Gemini",
+        "PERPLEXITY_API_KEY": "Perplexity",
+        "FINMIND_TOKEN": "FinMind",
+    }
+    
+    for env_var, name in env_vars.items():
+        exists = os.getenv(env_var) is not None and os.getenv(env_var).strip() != ""
+        status_icon = "✅" if exists else "❌"
+        print(f"  {status_icon} {name}: {'已設定' if exists else '未設定'}")
+    
+    print()
+    
+    # 系統地圖檢查
+    print("📄 文件狀態：")
+    system_map_path = Path("docs/JGOD_system_map.md")
+    if system_map_path.exists():
+        print(f"  ✅ 系統地圖：{system_map_path}")
+    else:
+        print(f"  ❌ 系統地圖：未找到")
+    
+    print()
+    
+    # 主要路徑
+    print("📂 主要路徑：")
+    project_root = Path.cwd()
+    print(f"  專案根目錄：{project_root}")
+    print(f"  Streamlit 入口：{project_root / 'jgod' / 'war_room' / 'war_room_app.py'}")
+    print(f"  CLI 入口：{project_root / 'jgod' / 'cli.py'}")
     
     return 0
 

@@ -408,6 +408,21 @@ def run_war_room(
 
         for provider_key in role_providers:
             content = _call_provider(provider_key, system_prompt_text, user_prompt)
+            
+            # 檢查是否為錯誤訊息
+            if content and content.startswith(f"[{provider_key}]"):
+                # 這是錯誤訊息，記錄但不加入正常意見
+                opinions.append({
+                    "role_id": role_id,
+                    "display_name": display_name,
+                    "provider": provider_key,
+                    "content": content,
+                    "stance": "錯誤",
+                    "confidence": 0.0,
+                    "is_error": True,
+                })
+                continue
+            
             # 後處理：最多 4 行，去空白行
             lines = [line.strip() for line in (content or "").strip().splitlines() if line.strip()]
             if not lines:
@@ -431,6 +446,7 @@ def run_war_room(
                 "content": content_final,
                 "stance": stance,
                 "confidence": 0.6,
+                "is_error": False,
             })
 
     # --- 股神總結（短版戰報） ---

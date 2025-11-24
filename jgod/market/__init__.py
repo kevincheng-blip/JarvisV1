@@ -6,11 +6,14 @@ from .data_loader import DataLoader
 from .price_cache import PriceCache
 from .indicators import TechnicalIndicators
 from .market_status import MarketStatus
+from .metadata import get_stock_display_name, get_stock_name_only
 
 __all__ = [
     "DataLoader",
     "PriceCache",
     "TechnicalIndicators",
     "MarketStatus",
+    "get_stock_display_name",
+    "get_stock_name_only",
 ]
 
