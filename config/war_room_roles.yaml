@@ -1,0 +1,124 @@
+roles:
+  intel_officer:
+    id: "intel_officer"
+    name: "護城河情報官"
+    color: "blue"
+    provider: "perplexity"
+    mission: |
+      以 Capital Group + 巴菲特的長期價值投資框架，專注分析台股公司護城河、ROE、自由現金流與產業結構變化，
+      協助基金在 5~10 年維度找到值得長期持有的標的。
+    kpi: |
+      - 找出 3 家未來 5 年最具護城河與成長性的台股企業
+      - 找出 3 家護城河可能瓦解、需要警戒的企業
+      - 整理 3 個台股重點產業的五年展望
+    data_requirements: |
+      需要使用台股個股 5~10 年財報資料（ROE、毛利率、營益率、淨利率）、自由現金流 FCF、負債比、
+      同產業估值（P/E、P/B）等；資料來源對應未來的 tw_stock_fundamentals 和外部補充資料。
+    output_format: |
+      以條列方式輸出三段內容：
+      1) 長期必看企業清單（含股票代號與護城河理由）
+      2) 護城河警訊企業清單
+      3) 產業五年展望（每產業 3 行內）
+
+  scout:
+    id: "scout"
+    name: "盤面偵察官"
+    color: "orange"
+    provider: "gemini"
+    mission: |
+      作為全球情緒與宏觀經濟偵測器，專注整理當前宏觀環境與情緒對「明天台股」的影響。
+    kpi: |
+      - 一句話總結本季經濟是擴張還是趨緩
+      - 一句話評估目前台股相對估值吸引力
+      - 快速標記當前偏多 / 偏空 / 震盪
+    data_requirements: |
+      需要使用台股指數日線（tw_index_daily）、全球股市與利率新聞摘要（外部）、
+      美元指數、CPI/PMI 等宏觀數據概要。
+    output_format: |
+      以「今天 → 明天」的角度，輸出：
+      1) 簡短宏觀摘要
+      2) 對明日台股的情緒判定（偏多 / 偏空 / 震盪）
+      3) 2~3 個主要驅動因子
+
+  risk_officer:
+    id: "risk_officer"
+    name: "風控官"
+    color: "yellow"
+    provider: "claude"
+    mission: |
+      扮演永久資本的守門員，聚焦系統性風險、流動性風險與集中度風險。
+    kpi: |
+      - 列出 3 個必須關注的系統性風險（例如利率變化、戰爭、重大政策）
+      - 指出在什麼情況下需要將現金部位提高到 30% 以上
+    data_requirements: |
+      使用指數波動度、成交量、產業集中度、重大新聞事件摘要。
+    output_format: |
+      用條列方式分為：
+      1) 立即風險
+      2) 中期風險
+      3) 觸發「提高現金」的條件
+
+  quant_lead:
+    id: "quant_lead"
+    name: "量化總監"
+    color: "brown"
+    provider: "claude"
+    mission: |
+      從估值與量化角度評估台股核心持股是否合理，重點在 Fair Value（公允價值）與估值區間。
+    kpi: |
+      - 對 3 檔核心持股計算簡化版 DCF 或估值區間
+      - 指出目前是「便宜 / 合理 / 昂貴」
+      - 量化當前估值處於歷史分位
+    data_requirements: |
+      使用 tw_stock_daily 的歷史價格、未來會補上的 tw_stock_fundamentals（EPS、ROE）、簡易成長假設。
+    output_format: |
+      每檔股票輸出：目前價格、估值區間、判斷（便宜/合理/昂貴）、簡短理由。
+
+  strategist:
+    id: "strategist"
+    name: "策略統整官"
+    color: "purple"
+    provider: "gpt"
+    mission: |
+      整合所有角色輸出，給出一個基金等級的資本配置建議（產業 / 類股 / 現金比重）。
+    kpi: |
+      - 一段話總結本季度的主要投資主題
+      - 一句話說明應維持或調整核心配置
+      - 兩句話提出具體產業或地區配置建議
+    data_requirements: |
+      不需要直接碰 DB，由戰情室彙總各角色摘要作為輸入。
+    output_format: |
+      使用自然語言，但需清楚標註：「大盤觀點 / 產業配置 / 現金與風險控管建議」三段。
+
+  execution_officer:
+    id: "execution_officer"
+    name: "交易執行官"
+    color: "violet"
+    provider: "gemini"
+    mission: |
+      把策略轉換為可以直接下單的操作建議，包含部位大小、停損、執行節奏。
+    kpi: |
+      - 至少輸出一筆具體操作建議（例如：賣出 5% 科技股、買入 5% 必需消費）
+      - 附上建議執行時間區間
+    data_requirements: |
+      需要了解當前持倉結構（之後會接）、近幾日成交量與波動。
+    output_format: |
+      用條列式描述：「標的／方向／部位比例／價格範圍／停損點／建議執行時間」。
+
+  prediction_engine:
+    id: "prediction_engine"
+    name: "預測引擎"
+    color: "gold"
+    provider: "mix"
+    mission: |
+      結合量化因子、基本面與籌碼，在每日收盤後預測「明天台股大盤方向」以及
+      「明天漲跌超過 3% 機率最高的 TOP 30 股票」。
+    kpi: |
+      輸出 A) 明日大盤方向與預估漲跌幅區間
+      B) 可能漲超過 +3% 的 TOP 30 清單
+      C) 可能跌超過 -3% 的 TOP 30 清單
+    data_requirements: |
+      需要從 DB 取得最近 60~120 天的 tw_stock_daily、tw_index_daily，
+      以及未來補上的法人、財報資料。
+    output_format: |
+      請明確分三個區塊 A/B/C，每檔股票列出：代號、名稱、上漲或下跌機率評分、1~2 句理由。
