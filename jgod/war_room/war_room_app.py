@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from api_clients.finmind_client import FinMindClient, build_market_context_text, build_candle_pattern_text
 from config.env_loader import load_env
 from jgod.war_room.ai_council import run_war_room, summarize_council_output, save_war_room_log
-from jgod.war_room.market_engine import get_taiwan_market_data
+from jgod.war_room.market_engine import get_taiwan_market_data, MarketEngine
 from api_clients.anthropic_client import ClaudeProvider
 from api_clients.openai_client import GPTProvider
 from api_clients.gemini_client import GeminiProvider
@@ -283,6 +283,57 @@ if st.button("測試 Perplexity 回覆（Debug 用）", key="test_perplexity_deb
 
 # ⬇️ 取得即時市場資料（市場引擎）
 jg_state = get_taiwan_market_data()
+
+# 初始化市場引擎（用於預測功能）
+market_engine = MarketEngine()
+
+# === 明日預測區塊 ===
+st.markdown("### 🔮 明日預測")
+st.write("使用規則型預測引擎，預測明日可能漲/跌最多的股票")
+
+col_pred_up, col_pred_down = st.columns(2)
+
+with col_pred_up:
+    if st.button("🔮 預測明日上漲 Top 20", key="predict_up_button"):
+        with st.spinner("正在分析上漲潛力股..."):
+            try:
+                results = market_engine.predict_top_movers(direction="up", top_n=20)
+                if results:
+                    st.success(f"找到 {len(results)} 檔潛力上漲股")
+                    for r in results:
+                        with st.expander(f"{r.symbol} | score={r.score:.2f} | prob={r.probability:.0%}", expanded=False):
+                            st.write(f"**分數**: {r.score:.2f}")
+                            st.write(f"**機率**: {r.probability:.0%}")
+                            st.write("**理由**:")
+                            for reason in r.reasons:
+                                st.write(f"- {reason}")
+                else:
+                    st.info("目前沒有符合條件的上漲潛力股")
+            except Exception as e:
+                st.error(f"預測失敗：{e}")
+                st.exception(e)
+
+with col_pred_down:
+    if st.button("⚠️ 預測明日下跌 Top 20", key="predict_down_button"):
+        with st.spinner("正在分析下跌風險股..."):
+            try:
+                results = market_engine.predict_top_movers(direction="down", top_n=20)
+                if results:
+                    st.warning(f"找到 {len(results)} 檔下跌風險股")
+                    for r in results:
+                        with st.expander(f"{r.symbol} | score={r.score:.2f} | prob={r.probability:.0%}", expanded=False):
+                            st.write(f"**分數**: {r.score:.2f}")
+                            st.write(f"**機率**: {r.probability:.0%}")
+                            st.write("**理由**:")
+                            for reason in r.reasons:
+                                st.write(f"- {reason}")
+                else:
+                    st.info("目前沒有符合條件的下跌風險股")
+            except Exception as e:
+                st.error(f"預測失敗：{e}")
+                st.exception(e)
+
+st.divider()
 
 # === AI 短線多空判斷按鈕 ===
 if st.button("🧭 用 AI 判斷短線多空"):
