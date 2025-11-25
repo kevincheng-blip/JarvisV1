@@ -28,16 +28,18 @@ export function StatusBar({
   };
 
   return (
-    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+    <div className="glass-panel border-2 border-titanium/50 rounded-xl p-4">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Badge variant="default">Mode: {mode === "god" ? "God" : "Custom"}</Badge>
+        <div className="flex items-center gap-4 flex-wrap">
+          <Badge variant="default" className="border-ai-blue/50 text-ai-blue">
+            Mode: {mode === "god" ? "⚔️ God" : "⚙️ Custom"}
+          </Badge>
           
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">Providers:</span>
+            <span className="text-xs text-gray-400 uppercase tracking-wide">Providers:</span>
             <div className="flex gap-1">
               {enabledProviders.map((provider) => (
-                <Badge key={provider} variant="default">
+                <Badge key={provider} variant="default" className="font-mono text-xs">
                   {PROVIDER_CONFIG[provider].label}
                 </Badge>
               ))}
@@ -46,8 +48,8 @@ export function StatusBar({
 
           {stockIds.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">股票:</span>
-              <span className="text-sm text-gray-300">{stockIds.join(", ")}</span>
+              <span className="text-xs text-gray-400 uppercase tracking-wide">股票:</span>
+              <span className="text-sm text-foreground font-mono font-semibold">{stockIds.join(", ")}</span>
             </div>
           )}
         </div>
@@ -56,10 +58,10 @@ export function StatusBar({
           {isRunning ? (
             <>
               <LoadingDots />
-              <span className="text-sm text-blue-400">戰情室運行中...</span>
+              <span className="text-sm text-ai-blue font-semibold">戰情室運行中...</span>
             </>
           ) : startedAt ? (
-            <span className="text-sm text-gray-400">
+            <span className="text-sm text-military-green font-mono font-semibold">
               Total: {getElapsedTime()}s
             </span>
           ) : null}
