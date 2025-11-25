@@ -2,6 +2,7 @@
 Provider 管理器：統一管理所有 Provider 的非同步執行
 """
 import asyncio
+import logging
 from typing import List, Dict, Optional, Callable, Any
 from datetime import datetime
 
@@ -10,6 +11,8 @@ from .claude_provider import ClaudeProviderAsync
 from .gemini_provider import GeminiProviderAsync
 from .perplexity_provider import PerplexityProviderAsync
 from .base_provider import BaseProviderAsync, ProviderResult
+
+logger = logging.getLogger("war_room")
 
 
 class ProviderManager:
@@ -37,8 +40,6 @@ class ProviderManager:
     def __init__(self):
         """初始化 Provider 管理器"""
         # 初始化時捕獲 API Key 錯誤，但不阻止初始化
-        import logging
-        logger = logging.getLogger("war_room.provider_manager")
         
         self.providers: Dict[str, BaseProviderAsync] = {}
         
@@ -254,9 +255,6 @@ class ProviderManager:
         Returns:
             角色名稱到結果的映射（只包含真正執行過的角色）
         """
-        import logging
-        logger = logging.getLogger("war_room.provider_manager")
-        
         # 記錄執行資訊
         logger.info(f"run_all_roles_streaming called with enabled_providers: {enabled_providers}")
         
@@ -390,8 +388,6 @@ class ProviderManager:
         Returns:
             角色名稱到結果的映射（只包含真正執行過的角色）
         """
-        import logging
-        logger = logging.getLogger("war_room.provider_manager")
         
         logger.info(f"run_all_roles called with enabled_providers: {enabled_providers}")
         

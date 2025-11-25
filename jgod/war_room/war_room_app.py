@@ -48,6 +48,9 @@ from jgod.war_room.utils.pseudo_live import (
     setup_autorefresh,
 )
 
+# === Logger 初始化 ===
+import logging
+logger = logging.getLogger("war_room")
 
 # === 初始化 ===
 # 確保專案根目錄在 Python 路徑中（用於載入 .env 等）
@@ -260,12 +263,10 @@ with tab1:
                 custom_providers = get_enabled_provider_keys(selected_providers_ui)
             
             # 記錄 Mode 和 Provider 選擇（用於 log）
-            import logging
             logging.basicConfig(
                 level=logging.INFO,
                 format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             )
-            logger = logging.getLogger("war_room")
             logger.info(f"=== War Room Engine v4.2 Execution ===")
             logger.info(f"Mode: {current_mode}")
             if custom_providers:

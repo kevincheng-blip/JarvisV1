@@ -22,3 +22,4 @@
 - auto-commit: Add new features
 - auto-commit: Update codebase
 - auto-commit: Improve war room core
+- auto-commit: Improve war room core

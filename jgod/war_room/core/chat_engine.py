@@ -20,7 +20,7 @@ from jgod.war_room.providers import ProviderManager
 from jgod.war_room.providers.base_provider import BaseProviderAsync, ProviderResult
 
 
-logger = logging.getLogger("war_room.chat_engine")
+logger = logging.getLogger("war_room")
 
 
 class WarRoomEngine:
@@ -34,7 +34,7 @@ class WarRoomEngine:
             provider_manager: Provider 管理器實例
         """
         self.provider_manager = provider_manager
-        self.logger = logging.getLogger("war_room.chat_engine")
+        self.logger = logging.getLogger("war_room")
     
     def _get_enabled_providers(self, mode: str, custom_providers: Optional[List[ProviderKey]]) -> List[ProviderKey]:
         """
