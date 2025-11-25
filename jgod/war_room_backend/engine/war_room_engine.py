@@ -126,42 +126,57 @@ class WarRoomEngineBackend:
             # 使用 as_completed 實現即時更新
             self.logger.info(f"Executing {len(tasks)} roles in parallel...")
             
-            # 持續監聽事件 queue 並 yield（使用 as_completed 實現即時更新）
+            # 持續監聽事件 queue 並 yield（實現真正的 streaming）
             completed_count = 0
-            role_done_flags = {role: False for role in RoleName if ROLE_PROVIDER_MAP.get(role) in enabled_providers}
+            max_events = 10000  # 防止無限循環
+            event_count = 0
             
-            # 使用 as_completed 監聽任務完成
-            for completed_task in asyncio.as_completed(tasks):
-                # 處理該任務的所有事件
-                while not event_queue.empty():
-                    try:
-                        event = event_queue.get_nowait()
-                        yield event
-                        
-                        # 如果是 done 事件，標記完成
-                        if isinstance(event, RoleDoneEvent):
-                            role_name = event.role
-                            for r in RoleName:
-                                if r.value.lower().replace(" ", "_") == role_name:
-                                    role_done_flags[r] = True
-                                    completed_count += 1
-                                    break
-                    except asyncio.QueueEmpty:
-                        break
-                
-                # 等待任務完成
+            # 持續監聽事件，直到所有任務完成
+            while completed_count < len(tasks) and event_count < max_events:
                 try:
-                    await completed_task
-                except Exception as e:
-                    self.logger.error(f"Task failed: {e}", exc_info=True)
+                    # 等待事件（最多 0.1 秒）
+                    event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
+                    yield event
+                    event_count += 1
+                    
+                    # 如果是 done 事件，增加完成計數
+                    if isinstance(event, RoleDoneEvent):
+                        completed_count += 1
+                        self.logger.info(f"Role {event.role} completed ({completed_count}/{len(tasks)})")
+                except asyncio.TimeoutError:
+                    # 檢查是否有任務完成（但事件可能還在 queue 中）
+                    done, pending = await asyncio.wait(tasks, timeout=0.01, return_when=asyncio.FIRST_COMPLETED)
+                    if done:
+                        # 處理所有剩餘事件
+                        processed_any = False
+                        while not event_queue.empty():
+                            try:
+                                event = event_queue.get_nowait()
+                                yield event
+                                event_count += 1
+                                processed_any = True
+                                
+                                if isinstance(event, RoleDoneEvent):
+                                    completed_count += 1
+                            except asyncio.QueueEmpty:
+                                break
+                        
+                        if not processed_any:
+                            # 如果沒有事件，等待一下再繼續
+                            await asyncio.sleep(0.05)
+                    continue
             
             # 確保所有剩餘事件都已發送
-            while not event_queue.empty():
+            remaining_events = 0
+            while not event_queue.empty() and remaining_events < 100:
                 try:
                     event = event_queue.get_nowait()
                     yield event
+                    remaining_events += 1
                 except asyncio.QueueEmpty:
                     break
+            
+            self.logger.info(f"War Room session {session_id} completed: {completed_count} roles, {event_count} events")
             
             # 發送總結
             yield SummaryEvent(
