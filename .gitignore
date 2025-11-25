@@ -68,3 +68,16 @@ telegram_chat_id.txt
 .DS_Store
 Thumbs.db
 
+# Streamlit / Cache
+.streamlit/
+.cache/
+
+# Temporary files
+tmp/
+*.tmp
+
+# Large data files (over 10MB, if not meant for repo)
+# *.csv
+# *.parquet
+# Add specific large files here if needed
+
