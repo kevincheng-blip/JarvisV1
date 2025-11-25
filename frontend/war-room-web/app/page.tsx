@@ -1,21 +1,20 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { WarRoomLayout } from "@/components/layout/WarRoomLayout";
+import { WarRoomLayoutPro } from "@/components/layout/WarRoomLayoutPro";
 import {
   WarRoomSessionState,
   createInitialSessionState,
   RoleKey,
-  RoleStatus,
   ProviderKey,
 } from "@/lib/types/warRoom";
-import { WarRoomWebSocketClient, createSession } from "@/lib/ws/warRoomClient";
+import { WarRoomWebSocketClientPro, createSession, WebSocketStatus } from "@/lib/ws/warRoomClientPro";
 import { WarRoomEvent } from "@/lib/types/warRoom";
 
 export default function Home() {
   const [state, setState] = useState<WarRoomSessionState>(createInitialSessionState());
-  const [wsClient, setWsClient] = useState<WarRoomWebSocketClient | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [wsClient, setWsClient] = useState<WarRoomWebSocketClientPro | null>(null);
+  const [wsStatus, setWsStatus] = useState<WebSocketStatus>("disconnected");
 
   const handleStart = useCallback(
     async (config: {
@@ -52,7 +51,7 @@ export default function Home() {
         setState(newState);
 
         // 3. 建立 WebSocket 連線
-        const client = new WarRoomWebSocketClient();
+        const client = new WarRoomWebSocketClientPro();
 
         client.onEvent((event: WarRoomEvent) => {
           setState((prev) => handleEvent(prev, event));
@@ -75,14 +74,8 @@ export default function Home() {
           }));
         });
 
-        client.onReconnecting(() => {
-          console.log("[WS] Reconnecting...");
-          setIsReconnecting(true);
-        });
-
-        client.onReconnected(() => {
-          console.log("[WS] Reconnected");
-          setIsReconnecting(false);
+        client.onStatusChange((status) => {
+          setWsStatus(status);
         });
 
         await client.connect(sessionId, {
@@ -185,6 +178,5 @@ export default function Home() {
     return newState;
   };
 
-  return <WarRoomLayout state={state} onStart={handleStart} isReconnecting={isReconnecting} />;
+  return <WarRoomLayoutPro state={state} onStart={handleStart} wsStatus={wsStatus} />;
 }
-

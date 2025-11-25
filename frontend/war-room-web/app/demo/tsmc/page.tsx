@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
-import { WarRoomLayout } from "@/components/layout/WarRoomLayout";
+import { useEffect, useState, useCallback } from "react";
+import { WarRoomLayoutPro } from "@/components/layout/WarRoomLayoutPro";
 import {
   WarRoomSessionState,
   createInitialSessionState,
   RoleKey,
   ProviderKey,
 } from "@/lib/types/warRoom";
-import { WarRoomWebSocketClient, createSession } from "@/lib/ws/warRoomClient";
+import { WarRoomWebSocketClientPro, createSession, WebSocketStatus } from "@/lib/ws/warRoomClientPro";
 import { WarRoomEvent } from "@/lib/types/warRoom";
 import { useState, useCallback } from "react";
 
 export default function DemoTsmcPage() {
   const [state, setState] = useState<WarRoomSessionState>(createInitialSessionState());
-  const [wsClient, setWsClient] = useState<WarRoomWebSocketClient | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [wsClient, setWsClient] = useState<WarRoomWebSocketClientPro | null>(null);
+  const [wsStatus, setWsStatus] = useState<WebSocketStatus>("disconnected");
   const [autoStarted, setAutoStarted] = useState(false);
 
   const handleStart = useCallback(
@@ -48,7 +48,7 @@ export default function DemoTsmcPage() {
 
         setState(newState);
 
-        const client = new WarRoomWebSocketClient();
+        const client = new WarRoomWebSocketClientPro();
 
         client.onEvent((event: WarRoomEvent) => {
           setState((prev) => handleEvent(prev, event));
@@ -70,12 +70,8 @@ export default function DemoTsmcPage() {
           }));
         });
 
-        client.onReconnecting(() => {
-          setIsReconnecting(true);
-        });
-
-        client.onReconnected(() => {
-          setIsReconnecting(false);
+        client.onStatusChange((status) => {
+          setWsStatus(status);
         });
 
         await client.connect(sessionId, {
@@ -181,12 +177,12 @@ export default function DemoTsmcPage() {
 
   return (
     <div>
-      <div className="bg-blue-500/10 border-b border-blue-500/30 px-6 py-2 text-center">
-        <p className="text-sm text-blue-400">
+      <div className="bg-ai-blue/10 border-b border-ai-blue/30 px-6 py-2 text-center">
+        <p className="text-sm text-ai-blue font-semibold">
           🎬 Demo 模式：自動執行台積電（2330）分析
         </p>
       </div>
-      <WarRoomLayout state={state} onStart={handleStart} isReconnecting={isReconnecting} />
+      <WarRoomLayoutPro state={state} onStart={handleStart} wsStatus={wsStatus} />
     </div>
   );
 }
