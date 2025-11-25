@@ -10,7 +10,6 @@ import {
 } from "@/lib/types/warRoom";
 import { WarRoomWebSocketClientPro, createSession, WebSocketStatus } from "@/lib/ws/warRoomClientPro";
 import { WarRoomEvent } from "@/lib/types/warRoom";
-import { useState, useCallback } from "react";
 
 export default function DemoTsmcPage() {
   const [state, setState] = useState<WarRoomSessionState>(createInitialSessionState());
