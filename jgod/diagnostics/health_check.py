@@ -30,11 +30,11 @@ class HealthChecker:
     """
     
     REQUIRED_ENV_VARS = {
-        "openai": "OPENAI_API_KEY",
-        "claude": "ANTHROPIC_API_KEY",
-        "gemini": "GOOGLE_API_KEY",
-        "perplexity": "PERPLEXITY_API_KEY",
-        "finmind": "FINMIND_TOKEN",
+        "openai": ["OPENAI_API_KEY"],
+        "claude": ["ANTHROPIC_API_KEY"],
+        "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],  # 支援兩個環境變數
+        "perplexity": ["PERPLEXITY_API_KEY"],
+        "finmind": ["FINMIND_TOKEN"],
     }
     
     def __init__(self):
@@ -51,12 +51,17 @@ class HealthChecker:
         Returns:
             True 表示環境變數存在
         """
-        env_var = self.REQUIRED_ENV_VARS.get(provider)
-        if not env_var:
+        env_vars = self.REQUIRED_ENV_VARS.get(provider, [])
+        if not env_vars:
             return False
         
-        value = os.getenv(env_var)
-        return value is not None and value.strip() != ""
+        # 檢查任一環境變數是否存在
+        for env_var in env_vars:
+            value = os.getenv(env_var)
+            if value is not None and value.strip() != "":
+                return True
+        
+        return False
     
     def check_openai(self) -> ProviderHealth:
         """檢查 OpenAI Provider"""
@@ -125,7 +130,7 @@ class HealthChecker:
             return ProviderHealth(
                 name="Gemini",
                 ok=False,
-                error="GOOGLE_API_KEY 未設定",
+                error="GEMINI_API_KEY 或 GOOGLE_API_KEY 未設定",
             )
         
         try:
@@ -181,7 +186,9 @@ class HealthChecker:
     
     def check_finmind(self) -> ProviderHealth:
         """檢查 FinMind Provider"""
-        if not self.check_env_var("finmind"):
+        # 檢查環境變數（支援 FINMIND_TOKEN 和 FINMIND_API_TOKEN）
+        finmind_token = os.getenv("FINMIND_TOKEN") or os.getenv("FINMIND_API_TOKEN")
+        if not finmind_token:
             return ProviderHealth(
                 name="FinMind",
                 ok=False,

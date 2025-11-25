@@ -44,3 +44,21 @@ class ClaudeProvider:
         except Exception as e:
             # 先簡單回傳錯誤字串，之後可加入 logging
             return f"[Claude 發生錯誤：{e}]"
+    
+    def ask_stream(self, system_prompt: str, user_prompt: str):
+        """
+        Streaming 版本
+        """
+        try:
+            with self.client.messages.stream(
+                model=self.model,
+                max_tokens=512,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ]
+            ) as stream:
+                for text in stream.text_stream:
+                    yield text
+        except Exception as e:
+            yield f"[Claude 發生錯誤：{e}]"

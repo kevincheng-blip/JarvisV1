@@ -158,9 +158,10 @@ load_dotenv(dotenv_path=DOTENV_PATH)
 
 class FinMindClient:
     def __init__(self, api_token: Optional[str] = None) -> None:
-        token = api_token or os.getenv("FINMIND_API_TOKEN")
+        # 統一使用 FINMIND_TOKEN（支援 FINMIND_API_TOKEN 作為 fallback）
+        token = api_token or os.getenv("FINMIND_TOKEN") or os.getenv("FINMIND_API_TOKEN")
         if not token:
-            raise ValueError("FINMIND_API_TOKEN not found in environment variables.")
+            raise ValueError("FINMIND_TOKEN not found in environment variables.")
 
         self.loader = DataLoader()
         self.loader.login_by_token(token)
