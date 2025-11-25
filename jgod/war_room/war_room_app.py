@@ -314,32 +314,22 @@ with tab1:
             else:
                 combined_market_context = market_context
             
-            # v4.2: 定義即時 streaming 回調（使用新的狀態管理器）
+            # v5.0: 定義即時 streaming 回調（每次 chunk 到達時立即寫入 session_state）
             def on_chunk(role: RoleName, chunk: str):
-                """Streaming chunk 回調 - 即時更新 session_state"""
+                """Streaming chunk 回調 - 立即更新 session_state"""
                 role_key = role.value
                 
-                # 更新 streaming_contents（向後兼容）
-                if role_key not in st.session_state["war_room_streaming_contents"]:
-                    st.session_state["war_room_streaming_contents"][role_key] = ""
-                st.session_state["war_room_streaming_contents"][role_key] += chunk
-                
-                # v4.2: 使用新的狀態管理器追加內容
+                # v5.0: 立即寫入 session_state（這是唯一資料來源）
                 append_role_content(role_key, chunk)
             
-            # v4.2: 準備日期字串
+            # v5.0: 準備日期字串
             start_date_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)
             end_date_str = end_date.strftime("%Y-%m-%d") if hasattr(end_date, "strftime") else str(end_date)
             
-            # v4.2: 使用 background task 執行（非阻塞）
-            import threading
-            import queue
-            
-            result_queue = queue.Queue()
-            exception_queue = queue.Queue()
-            
-            async def run_war_room_async():
-                """執行 War Room 分析（async 版本）"""
+            # v5.0: 使用 asyncio.create_task 非阻塞執行（Timer-based Async Refresh）
+            async def engine_runner():
+                """War Room Engine 執行器（非阻塞背景任務）"""
+                import time
                 try:
                     result = await engine.run_war_room(
                         mode=current_mode,
@@ -351,85 +341,9 @@ with tab1:
                         market_context=combined_market_context,
                         streaming_callback=on_chunk,
                     )
-                    result_queue.put(result)
-                except Exception as e:
-                    exception_queue.put(e)
-            
-            def run_in_thread():
-                """在背景執行緒中執行 async 函數"""
-                try:
-                    asyncio.run(run_war_room_async())
-                except Exception as e:
-                    exception_queue.put(e)
-            
-            # 啟動背景執行緒
-            thread = threading.Thread(target=run_in_thread, daemon=True)
-            thread.start()
-            
-            # v4.2: 設定自動刷新（每 300ms）
-            from jgod.war_room.utils.pseudo_live import setup_autorefresh
-            setup_autorefresh(interval_ms=300)
-            
-            # 等待執行完成（非阻塞，讓 UI 可以更新）
-            import time
-            max_wait_time = 120  # 最多等待 120 秒
-            start_wait = time.time()
-            war_room_result = None
-            
-            while time.time() - start_wait < max_wait_time:
-                if not result_queue.empty():
-                    war_room_result = result_queue.get()
-                    break
-                if not exception_queue.empty():
-                    exception = exception_queue.get()
-                    raise exception
-                
-                # 檢查是否所有角色都已完成
-                roles_state = st.session_state.get("war_room_roles", {})
-                all_done = all(
-                    role_state.get("status") in ["done", "error"]
-                    for role_state in roles_state.values()
-                ) if roles_state else False
-                
-                if all_done and thread.is_alive():
-                    # 等待執行緒完成
-                    thread.join(timeout=5)
-                    if not result_queue.empty():
-                        war_room_result = result_queue.get()
-                        break
-                
-                time.sleep(0.1)  # 短暫等待，避免 CPU 過載
-            
-            # 如果超時，顯示警告
-            if war_room_result is None:
-                if thread.is_alive():
-                    st.warning("⏱️ 分析時間較長，仍在執行中...")
-                    # 繼續等待
-                    thread.join(timeout=30)
-                    if not result_queue.empty():
-                        war_room_result = result_queue.get()
-            
-            # 執行 War Room 分析（使用新引擎）
-            try:
-                if war_room_result is None:
-                    st.error("❌ 分析超時或失敗")
-                    st.session_state["war_room_loading"] = False
-                    stop_war_room_session()
-                else:
-                    # 轉換結果格式（適配現有 UI）
-                    role_results_dict = {}
-                    for role, role_result in war_room_result.results.items():
-                        # 轉換為 ProviderResult 格式（適配現有 render_role_card）
-                        provider_result = ProviderResult(
-                            success=role_result.success,
-                            content=role_result.content,
-                            error=role_result.error,
-                            provider_name=role_result.provider_key,
-                            execution_time=role_result.execution_time,
-                        )
-                        role_results_dict[role.value] = provider_result
-                        
-                        # v4.2: 使用新的狀態管理器標記完成
+                    
+                    # 所有角色完成後，標記每個角色為 done
+                    for role, role_result in result.results.items():
                         role_key = role.value
                         mark_role_done(
                             role_key,
@@ -437,230 +351,393 @@ with tab1:
                             error_message=role_result.error if not role_result.success else None,
                         )
                     
-                    # 儲存結果到 session state
-                    st.session_state["war_room_role_results"] = role_results_dict
-                    st.session_state["war_room_loading"] = False
+                    # 儲存結果到 session_state（用於後續處理）
+                    st.session_state["_war_room_result"] = result
+                    st.session_state["_war_room_completed"] = True
                     
-                    # v4.2: 停止戰情室會話
+                    # 檢查是否所有角色都已完成
+                    roles_state = st.session_state.get("war_room_roles", {})
+                    all_done = all(
+                        role_state.get("status") in ["done", "error"]
+                        for role_state in roles_state.values()
+                    ) if roles_state else False
+                    
+                    if all_done:
+                        # 停止自動刷新
+                        stop_war_room_session()
+                        
+                        # 計算總耗時
+                        if "war_room_started_at" in st.session_state:
+                            total_time = time.time() - st.session_state["war_room_started_at"]
+                            st.session_state["war_room_total_time"] = total_time
+                        
+                        logger.info(f"War Room execution completed. Executed: {len(result.executed_roles)}, Failed: {len(result.failed_roles)}")
+                    
+                except Exception as e:
+                    logger.error(f"War Room execution error: {e}", exc_info=True)
+                    st.session_state["_war_room_error"] = str(e)
+                    st.session_state["_war_room_completed"] = True
                     stop_war_room_session()
-                    
-                    # 檢查結果
-                    if not war_room_result.results:
-                        logger.error("War Room execution returned no results!")
-                        st.error("❌ 戰情室執行失敗：沒有取得任何結果")
-                        st.info("請檢查 log 以了解詳細錯誤")
+            
+            # v5.0: 啟動非阻塞背景任務（使用 asyncio.create_task）
+            if "war_room_task" not in st.session_state or st.session_state.get("_war_room_completed", False):
+                # 重置完成標記
+                st.session_state["_war_room_completed"] = False
+                st.session_state["_war_room_result"] = None
+                st.session_state["_war_room_error"] = None
+                
+                # 建立並啟動背景任務（使用新的 event loop）
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                task = loop.create_task(engine_runner())
+                st.session_state["war_room_task"] = task
+                st.session_state["war_room_loop"] = loop
+                
+                # 在背景執行 loop（非阻塞）
+                import threading
+                def run_loop():
+                    loop.run_until_complete(task)
+                
+                thread = threading.Thread(target=run_loop, daemon=True)
+                thread.start()
+                st.session_state["war_room_thread"] = thread
+            
+            # v5.0: 設定自動刷新（每 300ms）- Timer-based Async Refresh
+            setup_autorefresh(interval_ms=300)
+            
+            # v5.0: 檢查執行結果（非阻塞檢查）
+            if st.session_state.get("_war_room_completed", False):
+                war_room_result = st.session_state.get("_war_room_result")
+                war_room_error = st.session_state.get("_war_room_error")
+                
+                # 清理任務
+                if "war_room_task" in st.session_state:
+                    try:
+                        st.session_state["war_room_task"].cancel()
+                    except Exception:
+                        pass
+                    del st.session_state["war_room_task"]
+                
+                try:
+                    if war_room_error:
+                        st.error(f"❌ 戰情室執行失敗：{war_room_error}")
+                        st.session_state["war_room_loading"] = False
+                        stop_war_room_session()
+                    elif war_room_result is None:
+                        st.error("❌ 分析超時或失敗")
+                        st.session_state["war_room_loading"] = False
+                        stop_war_room_session()
                     else:
-                        # 執行 Strategist 總結（使用現有邏輯）
-                        try:
-                            strategist_result = asyncio.run(
-                                provider_manager.run_strategist_summary(role_results_dict, question)
+                        # v5.0: 轉換結果格式（適配現有 UI）
+                        role_results_dict = {}
+                        for role, role_result in war_room_result.results.items():
+                            # 轉換為 ProviderResult 格式（適配現有 render_role_card）
+                            provider_result = ProviderResult(
+                                success=role_result.success,
+                                content=role_result.content,
+                                error=role_result.error,
+                                provider_name=role_result.provider_key,
+                                execution_time=role_result.execution_time,
                             )
-                            st.session_state["war_room_strategist_result"] = strategist_result
-                        except Exception as e:
-                            logger.error(f"Strategist summary failed: {e}")
-                            st.warning("⚠️ Strategist 總結失敗，但其他角色分析已完成")
+                            role_results_dict[role.value] = provider_result
                         
-                        # 儲存會議紀錄
-                        log_file = save_war_room_log(
-                            question,
-                            role_results_dict,
-                            st.session_state.get("war_room_strategist_result"),
-                            mode=current_mode,
-                            enabled_providers=engine._get_enabled_providers(current_mode, custom_providers),
-                        )
-                        st.session_state["war_room_log_file"] = log_file
+                        # 儲存結果到 session state（用於後續處理）
+                        st.session_state["war_room_role_results"] = role_results_dict
+                        st.session_state["war_room_loading"] = False
                         
-                        # 記錄完成
-                        logger.info(f"War Room execution completed. Executed: {len(war_room_result.executed_roles)}, Failed: {len(war_room_result.failed_roles)}")
-                        
-                        st.success(f"✅ 分析完成！執行 {len(war_room_result.executed_roles)} 個角色，{len(war_room_result.failed_roles)} 個失敗")
-                    
-            except Exception as e:
-                log_error(e, {
-                    "context": "war_room_execution",
-                    "mode": current_mode,
-                })
-                st.session_state["war_room_loading"] = False
-                st.error(f"❌ 戰情室執行失敗：{e}")
-                st.info("系統已記錄錯誤，詳細內容請查看 logs/error/")
+                        # v5.0: 檢查結果
+                        if not war_room_result.results:
+                            logger.error("War Room execution returned no results!")
+                            st.error("❌ 戰情室執行失敗：沒有取得任何結果")
+                            st.info("請檢查 log 以了解詳細錯誤")
+                        else:
+                            # v5.0: 執行 Strategist 總結（使用現有邏輯）
+                            try:
+                                strategist_result = asyncio.run(
+                                    provider_manager.run_strategist_summary(role_results_dict, question)
+                                )
+                                st.session_state["war_room_strategist_result"] = strategist_result
+                            except Exception as e:
+                                logger.error(f"Strategist summary failed: {e}")
+                                st.warning("⚠️ Strategist 總結失敗，但其他角色分析已完成")
+                            
+                            # v5.0: 儲存會議紀錄
+                            log_file = save_war_room_log(
+                                question,
+                                role_results_dict,
+                                st.session_state.get("war_room_strategist_result"),
+                                mode=current_mode,
+                                enabled_providers=engine._get_enabled_providers(current_mode, custom_providers),
+                            )
+                            st.session_state["war_room_log_file"] = log_file
+                            
+                            # v5.0: 顯示完成訊息與總耗時
+                            total_time = st.session_state.get("war_room_total_time", 0)
+                            st.success(f"✅ 分析完成！執行 {len(war_room_result.executed_roles)} 個角色，{len(war_room_result.failed_roles)} 個失敗（總耗時：{total_time:.2f} 秒）")
+                
+                except Exception as e:
+                    log_error(e, {
+                        "context": "war_room_execution",
+                        "mode": current_mode,
+                    })
+                    st.session_state["war_room_loading"] = False
+                    st.error(f"❌ 戰情室執行失敗：{e}")
+                    st.info("系統已記錄錯誤，詳細內容請查看 logs/error/")
+                    stop_war_room_session()
     
     st.divider()
     
-    # v4.1: 顯示結果（即時 streaming 模式）
-    role_results = st.session_state.get("war_room_role_results", {})
-    strategist_result = st.session_state.get("war_room_strategist_result")
-    is_loading = st.session_state.get("war_room_loading", False)
+    # v5.0: 顯示結果（完全以 session_state["war_room_roles"] 為唯一資料來源）
     roles_state = st.session_state.get("war_room_roles", {})
+    is_loading = st.session_state.get("war_room_loading", False)
+    is_running = is_war_room_running()
+    
+    # v5.0: 設定自動刷新（如果正在執行）
+    if is_running:
+        setup_autorefresh(interval_ms=300)
     
     # 角色卡片（固定顯示，即時更新）
     st.markdown("### 各角色意見")
     
-    # v4.1: 使用 roles_state 來顯示即時 streaming 內容
+    # v5.0: 完全以 roles_state 為唯一資料來源
     # 第一行：Intel Officer, Scout
     col1, col2 = st.columns(2)
     
     with col1:
         intel_state = roles_state.get("Intel Officer")
-        intel_result = role_results.get("Intel Officer")
         
-        # 如果有 streaming 內容，優先顯示
-        if intel_state and intel_state.get("status") == "running":
-            # 顯示 streaming 內容
-            streaming_content = intel_state.get("content", "")
-            if streaming_content:
-                render_role_card(
-                    "Intel Officer",
-                    "Perplexity Sonar",
-                    ProviderResult(
-                        success=True,
-                        content=streaming_content,
-                        provider_name="perplexity",
-                        execution_time=0.0,
-                    ),
-                    loading=False,
-                )
-            else:
+        # v5.0: 完全從 roles_state 讀取
+        if intel_state:
+            status = intel_state.get("status", "pending")
+            content = intel_state.get("content", "")
+            provider = intel_state.get("provider", "perplexity")
+            error_message = intel_state.get("error_message")
+            
+            if status == "pending":
                 render_role_card(
                     "Intel Officer",
                     "Perplexity Sonar",
                     None,
                     loading=True,
+                )
+            elif status == "running":
+                # 顯示 streaming 內容
+                render_role_card(
+                    "Intel Officer",
+                    "Perplexity Sonar",
+                    ProviderResult(
+                        success=True,
+                        content=content,
+                        provider_name=provider,
+                        execution_time=intel_state.get("execution_time", 0.0),
+                    ),
+                    loading=False,
+                )
+            elif status == "done":
+                render_role_card(
+                    "Intel Officer",
+                    "Perplexity Sonar",
+                    ProviderResult(
+                        success=True,
+                        content=content,
+                        provider_name=provider,
+                        execution_time=intel_state.get("execution_time", 0.0),
+                    ),
+                    loading=False,
+                )
+            elif status == "error":
+                render_role_card(
+                    "Intel Officer",
+                    "Perplexity Sonar",
+                    ProviderResult(
+                        success=False,
+                        content=content,
+                        error=error_message,
+                        provider_name=provider,
+                        execution_time=intel_state.get("execution_time", 0.0),
+                    ),
+                    loading=False,
                 )
         else:
             render_role_card(
                 "Intel Officer",
                 "Perplexity Sonar",
-                intel_result,
-                loading=is_loading and intel_result is None,
+                None,
+                loading=is_loading,
             )
     
     with col2:
         scout_state = roles_state.get("Scout")
-        scout_result = role_results.get("Scout")
         
-        if scout_state and scout_state.get("status") == "running":
-            streaming_content = scout_state.get("content", "")
-            if streaming_content:
+        # v5.0: 完全從 roles_state 讀取
+        if scout_state:
+            status = scout_state.get("status", "pending")
+            content = scout_state.get("content", "")
+            provider = scout_state.get("provider", "gemini")
+            error_message = scout_state.get("error_message")
+            
+            if status == "pending":
+                render_role_card("Scout", "Gemini Flash 2.5", None, loading=True)
+            elif status in ["running", "done"]:
                 render_role_card(
                     "Scout",
                     "Gemini Flash 2.5",
                     ProviderResult(
                         success=True,
-                        content=streaming_content,
-                        provider_name="gemini",
-                        execution_time=0.0,
+                        content=content,
+                        provider_name=provider,
+                        execution_time=scout_state.get("execution_time", 0.0),
                     ),
                     loading=False,
                 )
-            else:
+            elif status == "error":
                 render_role_card(
                     "Scout",
                     "Gemini Flash 2.5",
-                    None,
-                    loading=True,
+                    ProviderResult(
+                        success=False,
+                        content=content,
+                        error=error_message,
+                        provider_name=provider,
+                        execution_time=scout_state.get("execution_time", 0.0),
+                    ),
+                    loading=False,
                 )
         else:
-            render_role_card(
-                "Scout",
-                "Gemini Flash 2.5",
-                scout_result,
-                loading=is_loading and scout_result is None,
-            )
+            render_role_card("Scout", "Gemini Flash 2.5", None, loading=is_loading)
     
     # 第二行：Risk Officer, Quant Lead
     col3, col4 = st.columns(2)
     
     with col3:
         risk_state = roles_state.get("Risk Officer")
-        risk_result = role_results.get("Risk Officer")
         
-        if risk_state and risk_state.get("status") == "running":
-            streaming_content = risk_state.get("content", "")
-            if streaming_content:
+        # v5.0: 完全從 roles_state 讀取
+        if risk_state:
+            status = risk_state.get("status", "pending")
+            content = risk_state.get("content", "")
+            provider = risk_state.get("provider", "claude")
+            error_message = risk_state.get("error_message")
+            
+            if status == "pending":
+                render_role_card("Risk Officer", "Claude 3.5 Haiku", None, loading=True)
+            elif status in ["running", "done"]:
                 render_role_card(
                     "Risk Officer",
                     "Claude 3.5 Haiku",
                     ProviderResult(
                         success=True,
-                        content=streaming_content,
-                        provider_name="claude",
-                        execution_time=0.0,
+                        content=content,
+                        provider_name=provider,
+                        execution_time=risk_state.get("execution_time", 0.0),
                     ),
                     loading=False,
                 )
-            else:
+            elif status == "error":
                 render_role_card(
                     "Risk Officer",
                     "Claude 3.5 Haiku",
-                    None,
-                    loading=True,
+                    ProviderResult(
+                        success=False,
+                        content=content,
+                        error=error_message,
+                        provider_name=provider,
+                        execution_time=risk_state.get("execution_time", 0.0),
+                    ),
+                    loading=False,
                 )
         else:
-            render_role_card(
-                "Risk Officer",
-                "Claude 3.5 Haiku",
-                risk_result,
-                loading=is_loading and risk_result is None,
-            )
+            render_role_card("Risk Officer", "Claude 3.5 Haiku", None, loading=is_loading)
     
     with col4:
         quant_state = roles_state.get("Quant Lead")
-        quant_result = role_results.get("Quant Lead")
         
-        if quant_state and quant_state.get("status") == "running":
-            streaming_content = quant_state.get("content", "")
-            if streaming_content:
+        # v5.0: 完全從 roles_state 讀取
+        if quant_state:
+            status = quant_state.get("status", "pending")
+            content = quant_state.get("content", "")
+            provider = quant_state.get("provider", "claude")
+            error_message = quant_state.get("error_message")
+            
+            if status == "pending":
+                render_role_card("Quant Lead", "Claude 3.5 Haiku", None, loading=True)
+            elif status in ["running", "done"]:
                 render_role_card(
                     "Quant Lead",
                     "Claude 3.5 Haiku",
                     ProviderResult(
                         success=True,
-                        content=streaming_content,
-                        provider_name="claude",
-                        execution_time=0.0,
+                        content=content,
+                        provider_name=provider,
+                        execution_time=quant_state.get("execution_time", 0.0),
                     ),
                     loading=False,
                 )
-            else:
+            elif status == "error":
                 render_role_card(
                     "Quant Lead",
                     "Claude 3.5 Haiku",
-                    None,
-                    loading=True,
+                    ProviderResult(
+                        success=False,
+                        content=content,
+                        error=error_message,
+                        provider_name=provider,
+                        execution_time=quant_state.get("execution_time", 0.0),
+                    ),
+                    loading=False,
                 )
         else:
-            render_role_card(
-                "Quant Lead",
-                "Claude 3.5 Haiku",
-                quant_result,
-                loading=is_loading and quant_result is None,
-            )
+            render_role_card("Quant Lead", "Claude 3.5 Haiku", None, loading=is_loading)
     
     st.divider()
     
-    # Strategist 總結
+    # v5.0: Strategist 總結（從 session_state 讀取）
     st.markdown("### 🧭 Strategist 總結")
-    if strategist_result:
-        render_role_card(
-            "Strategist",
-            "GPT-4o-mini",
-            strategist_result,
-            loading=False,
-        )
-    elif is_loading:
-        render_role_card(
-            "Strategist",
-            "GPT-4o-mini",
-            None,
-            loading=True,
-        )
-    else:
-        render_role_card(
-            "Strategist",
-            "GPT-4o-mini",
-            None,
-            loading=False,
-        )
+    strategist_result = st.session_state.get("war_room_strategist_result")
+    strategist_state = roles_state.get("Strategist")
+    
+    # v5.0: 優先使用 roles_state，如果沒有則使用 strategist_result
+    if strategist_state:
+        status = strategist_state.get("status", "pending")
+        content = strategist_state.get("content", "")
+        provider = strategist_state.get("provider", "gpt")
+        error_message = strategist_state.get("error_message")
+        
+        if status == "pending":
+            render_role_card("Strategist", "GPT-4o-mini", None, loading=True)
+        elif status in ["running", "done"]:
+            render_role_card(
+                "Strategist",
+                "GPT-4o-mini",
+                ProviderResult(
+                    success=True,
+                    content=content,
+                    provider_name=provider,
+                    execution_time=strategist_state.get("execution_time", 0.0),
+                ),
+                loading=False,
+            )
+        elif status == "error":
+            render_role_card(
+                "Strategist",
+                "GPT-4o-mini",
+                ProviderResult(
+                    success=False,
+                    content=content,
+                    error=error_message,
+                    provider_name=provider,
+                    execution_time=strategist_state.get("execution_time", 0.0),
+                ),
+                loading=False,
+            )
+    elif strategist_result:
+        render_role_card("Strategist", "GPT-4o-mini", strategist_result, loading=False)
+    elif is_loading or is_running:
+        render_role_card("Strategist", "GPT-4o-mini", None, loading=True)
     
     # 下載會議紀錄
     log_file = st.session_state.get("war_room_log_file")
