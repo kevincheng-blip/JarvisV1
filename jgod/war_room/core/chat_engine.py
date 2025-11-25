@@ -95,12 +95,16 @@ class WarRoomEngine:
                 """內部 chunk 回調（v4.1: 即時更新）"""
                 nonlocal full_content
                 full_content += chunk
+                
+                # Debug log
+                self.logger.info(f"[ENGINE] Chunk received: role={role.value}, chunk={chunk[:50]}...")
+                
                 if on_chunk:
                     try:
                         # v4.1: 立即呼叫 callback 更新 UI
                         on_chunk(role, chunk)
                     except Exception as e:
-                        self.logger.error(f"Error in on_chunk callback for {role}: {e}")
+                        self.logger.error(f"Error in on_chunk callback for {role}: {e}", exc_info=True)
             
             # 呼叫 provider 的 streaming 方法
             result = await provider.run_stream(
@@ -110,6 +114,9 @@ class WarRoomEngine:
             )
             
             execution_time = time.time() - start_time
+            
+            # Debug log: 角色完成
+            self.logger.info(f"[ENGINE] Role done: {role.value}, success={result.success}")
             
             if result.success:
                 # 如果 streaming 有累積內容，使用累積內容；否則使用 result.content
@@ -189,7 +196,8 @@ class WarRoomEngine:
         
         for role in RoleName:
             provider_key = ROLE_PROVIDER_MAP.get(role)
-            self.logger.debug(f"Processing role: {role.value}, provider_key: {provider_key}")
+            self.logger.info(f"[ENGINE] Dispatching role: {role.value}")
+            self.logger.info(f"[ENGINE] Provider: {provider_key}")
             
             # 檢查此角色的 Provider 是否啟用
             if provider_key not in enabled_providers:

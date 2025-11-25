@@ -279,11 +279,14 @@ class ProviderManager:
                 # 建立 chunk 回調（如果有的話）
                 def make_chunk_callback(rn):
                     def chunk_callback(chunk: str):
+                        # Debug log
+                        logger.info(f"[PROVIDER] callback chunk: role={rn}, chunk={chunk[:40]}...")
+                        
                         if on_chunk:
                             try:
                                 on_chunk(rn, chunk)
                             except Exception as e:
-                                logger.error(f"Error in on_chunk callback for {rn}: {e}")
+                                logger.error(f"Error in on_chunk callback for {rn}: {e}", exc_info=True)
                     return chunk_callback
                 
                 # 建立 streaming coroutine
@@ -298,6 +301,7 @@ class ProviderManager:
                 tasks.append(task)
                 # 使用 task 的 id 作為 key（更可靠）
                 task_id_to_role[id(task)] = role_name
+                logger.info(f"[PROVIDER] start streaming: {provider_key}/{role_name}")
                 logger.info(f"Role {role_name} (provider: {provider_key}) will be executed")
             else:
                 # Provider 未啟用，跳過（不加入結果）
@@ -330,6 +334,7 @@ class ProviderManager:
                     role_results[role_name] = result
                     executed_roles.append(role_name)
                     status = "Success" if result.success else "Failed"
+                    logger.info(f"[PROVIDER] run_stream result from {provider_key}: {status}")
                     logger.info(f"Role {role_name} completed: {status} (execution_time={result.execution_time:.2f}s)")
                     
                     if not result.success:

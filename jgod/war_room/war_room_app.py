@@ -319,8 +319,16 @@ with tab1:
                 """Streaming chunk 回調 - 立即更新 session_state"""
                 role_key = role.value
                 
+                # Debug log
+                logger.info(f"[STREAMLIT] Chunk received for role: {role_key}, chunk: {chunk[:40]}...")
+                
                 # v5.0: 立即寫入 session_state（這是唯一資料來源）
                 append_role_content(role_key, chunk)
+                update_role_state(role_key, "status", "running")
+                
+                # Debug: 顯示當前狀態
+                roles_state = st.session_state.get("war_room_roles", {})
+                logger.debug(f"[STREAMLIT] roles_state after update: {list(roles_state.keys())}")
             
             # v5.0: 準備日期字串
             start_date_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)
@@ -343,8 +351,10 @@ with tab1:
                     )
                     
                     # 所有角色完成後，標記每個角色為 done
+                    logger.info(f"[STREAMLIT] All roles completed, marking as done...")
                     for role, role_result in result.results.items():
                         role_key = role.value
+                        logger.info(f"[STREAMLIT] Marking role {role_key} as done, success={role_result.success}")
                         mark_role_done(
                             role_key,
                             success=role_result.success,
@@ -362,14 +372,20 @@ with tab1:
                         for role_state in roles_state.values()
                     ) if roles_state else False
                     
+                    logger.info(f"[STREAMLIT] Checking completion: all_done={all_done}, roles_state keys={list(roles_state.keys())}")
+                    for role_name, state in roles_state.items():
+                        logger.info(f"[STREAMLIT] Role {role_name}: status={state.get('status')}")
+                    
                     if all_done:
                         # 停止自動刷新
+                        logger.info(f"[STREAMLIT] All roles done, stopping session...")
                         stop_war_room_session()
                         
                         # 計算總耗時
                         if "war_room_started_at" in st.session_state:
                             total_time = time.time() - st.session_state["war_room_started_at"]
                             st.session_state["war_room_total_time"] = total_time
+                            logger.info(f"[STREAMLIT] Total execution time: {total_time:.2f}s")
                         
                         logger.info(f"War Room execution completed. Executed: {len(result.executed_roles)}, Failed: {len(result.failed_roles)}")
                     
@@ -495,6 +511,12 @@ with tab1:
     roles_state = st.session_state.get("war_room_roles", {})
     is_loading = st.session_state.get("war_room_loading", False)
     is_running = is_war_room_running()
+    
+    # Debug log: 顯示當前狀態
+    if roles_state:
+        logger.debug(f"[STREAMLIT] roles_state keys: {list(roles_state.keys())}")
+        for role_name, state in roles_state.items():
+            logger.debug(f"[STREAMLIT] {role_name}: status={state.get('status')}, content_len={len(state.get('content', ''))}")
     
     # v5.0: 設定自動刷新（如果正在執行）
     if is_running:
