@@ -1,21 +1,22 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect } from "react";
 import { WarRoomLayout } from "@/components/layout/WarRoomLayout";
 import {
   WarRoomSessionState,
   createInitialSessionState,
   RoleKey,
-  RoleStatus,
   ProviderKey,
 } from "@/lib/types/warRoom";
 import { WarRoomWebSocketClient, createSession } from "@/lib/ws/warRoomClient";
 import { WarRoomEvent } from "@/lib/types/warRoom";
+import { useState, useCallback } from "react";
 
-export default function Home() {
+export default function DemoTsmcPage() {
   const [state, setState] = useState<WarRoomSessionState>(createInitialSessionState());
   const [wsClient, setWsClient] = useState<WarRoomWebSocketClient | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [autoStarted, setAutoStarted] = useState(false);
 
   const handleStart = useCallback(
     async (config: {
@@ -25,7 +26,6 @@ export default function Home() {
       userPrompt: string;
     }) => {
       try {
-        // 1. 建立 Session
         const sessionResponse = await createSession({
           stock_ids: config.stockIds,
           mode: config.mode,
@@ -35,8 +35,6 @@ export default function Home() {
         });
 
         const sessionId = sessionResponse.session_id;
-
-        // 2. 初始化狀態
         const newState = createInitialSessionState();
         newState.sessionId = sessionId;
         newState.isRunning = true;
@@ -44,14 +42,12 @@ export default function Home() {
         newState.enabledProviders = config.enabledProviders;
         newState.startedAt = Date.now();
 
-        // 設定所有角色為 pending
         Object.keys(newState.roles).forEach((key) => {
           newState.roles[key as RoleKey].status = "pending";
         });
 
         setState(newState);
 
-        // 3. 建立 WebSocket 連線
         const client = new WarRoomWebSocketClient();
 
         client.onEvent((event: WarRoomEvent) => {
@@ -67,7 +63,6 @@ export default function Home() {
         });
 
         client.onClose(() => {
-          console.log("[WS] Closed");
           setState((prev) => ({
             ...prev,
             isRunning: false,
@@ -76,12 +71,10 @@ export default function Home() {
         });
 
         client.onReconnecting(() => {
-          console.log("[WS] Reconnecting...");
           setIsReconnecting(true);
         });
 
         client.onReconnected(() => {
-          console.log("[WS] Reconnected");
           setIsReconnecting(false);
         });
 
@@ -96,11 +89,6 @@ export default function Home() {
         setWsClient(client);
       } catch (error) {
         console.error("Failed to start war room:", error);
-        alert(`啟動失敗: ${error instanceof Error ? error.message : "Unknown error"}`);
-        setState((prev) => ({
-          ...prev,
-          isRunning: false,
-        }));
       }
     },
     []
@@ -114,7 +102,6 @@ export default function Home() {
       case "session_start":
         newState.isRunning = true;
         break;
-
       case "role_start":
         if (event.role) {
           const role = newState.roles[event.role as RoleKey];
@@ -125,7 +112,6 @@ export default function Home() {
           }
         }
         break;
-
       case "role_chunk":
         if (event.role && event.chunk) {
           const role = newState.roles[event.role as RoleKey];
@@ -135,7 +121,6 @@ export default function Home() {
           }
         }
         break;
-
       case "role_done":
         if (event.role) {
           const role = newState.roles[event.role as RoleKey];
@@ -151,15 +136,12 @@ export default function Home() {
           }
         }
         break;
-
       case "summary":
-        // 將 summary 附加到 Strategist 角色
         const strategist = newState.roles["Strategist"];
         if (strategist && event.content) {
           strategist.content += "\n\n--- 總結 ---\n" + event.content;
         }
         break;
-
       case "error":
         if (event.role) {
           const role = newState.roles[event.role as RoleKey];
@@ -171,11 +153,8 @@ export default function Home() {
         break;
     }
 
-    // 檢查是否所有角色都完成
     const allRoles = Object.values(newState.roles);
-    const allDone = allRoles.every(
-      (r) => r.status === "done" || r.status === "error"
-    );
+    const allDone = allRoles.every((r) => r.status === "done" || r.status === "error");
 
     if (allDone && newState.isRunning) {
       newState.isRunning = false;
@@ -185,6 +164,30 @@ export default function Home() {
     return newState;
   };
 
-  return <WarRoomLayout state={state} onStart={handleStart} isReconnecting={isReconnecting} />;
+  // 自動啟動
+  useEffect(() => {
+    if (!autoStarted) {
+      setAutoStarted(true);
+      setTimeout(() => {
+        handleStart({
+          mode: "god",
+          enabledProviders: ["gpt", "claude", "gemini", "perplexity"],
+          stockIds: ["2330"],
+          userPrompt: "請分析台積電（TSMC）的短線投資建議，重點關注技術面與基本面",
+        });
+      }, 1000);
+    }
+  }, [autoStarted, handleStart]);
+
+  return (
+    <div>
+      <div className="bg-blue-500/10 border-b border-blue-500/30 px-6 py-2 text-center">
+        <p className="text-sm text-blue-400">
+          🎬 Demo 模式：自動執行台積電（2330）分析
+        </p>
+      </div>
+      <WarRoomLayout state={state} onStart={handleStart} isReconnecting={isReconnecting} />
+    </div>
+  );
 }
 

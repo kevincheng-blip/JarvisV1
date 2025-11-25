@@ -57,32 +57,54 @@ export function ControlPanel({ onStart, isRunning }: ControlPanelProps) {
   const canStart = !isRunning && parseStockIds(stockInput).length > 0 && (mode === "god" || enabledProviders.length > 0);
 
   return (
-    <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 space-y-6">
-      <h2 className="text-xl font-bold text-gray-200">控制面板</h2>
+    <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-950/90 border-2 border-gray-800/50 rounded-2xl p-6 space-y-6 shadow-[0_0_30px_rgba(0,0,0,0.5)] backdrop-blur-sm">
+      {/* Glow effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-blue-600/5 rounded-2xl pointer-events-none" />
       
-      <ModeSelector mode={mode} onChange={setMode} />
-      
-      <ProviderSelector
-        enabledProviders={enabledProviders}
-        mode={mode}
-        onChange={setEnabledProviders}
-      />
-      
-      <StockInput value={stockInput} onChange={setStockInput} />
-      
-      <PromptInput value={userPrompt} onChange={setUserPrompt} />
-      
-      <button
-        onClick={handleStart}
-        disabled={!canStart}
-        className={`w-full px-6 py-3 rounded-lg font-semibold transition-colors ${
-          canStart
-            ? "bg-blue-600 hover:bg-blue-700 text-white"
-            : "bg-gray-700 text-gray-500 cursor-not-allowed"
-        }`}
-      >
-        ⚔️ 啟動 J-GOD 戰情室
-      </button>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-gray-200 tracking-wide">
+            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              指揮面板
+            </span>
+          </h2>
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+        </div>
+        
+        <ModeSelector mode={mode} onChange={setMode} />
+        
+        <ProviderSelector
+          enabledProviders={enabledProviders}
+          mode={mode}
+          onChange={setEnabledProviders}
+        />
+        
+        <StockInput value={stockInput} onChange={setStockInput} />
+        
+        <PromptInput value={userPrompt} onChange={setUserPrompt} />
+        
+        <button
+          onClick={handleStart}
+          disabled={!canStart}
+          className={`w-full px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 relative overflow-hidden ${
+            canStart
+              ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] transform hover:scale-[1.02]"
+              : "bg-gray-800/50 text-gray-500 cursor-not-allowed border border-gray-700"
+          }`}
+        >
+          {canStart ? (
+            <>
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                <span>⚔️</span>
+                <span>啟動 J-GOD 戰情室</span>
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-white/10 to-purple-600/0 animate-shimmer" />
+            </>
+          ) : (
+            "⚔️ 啟動 J-GOD 戰情室"
+          )}
+        </button>
+      </div>
     </div>
   );
 }

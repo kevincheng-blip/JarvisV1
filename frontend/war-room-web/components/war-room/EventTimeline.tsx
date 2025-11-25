@@ -49,25 +49,66 @@ export function EventTimeline({ events }: EventTimelineProps) {
     }
   };
 
+  const getEventIcon = (type: WarRoomEvent["type"]) => {
+    switch (type) {
+      case "session_start":
+        return "🚀";
+      case "role_start":
+        return "▶️";
+      case "role_chunk":
+        return "💬";
+      case "role_done":
+        return "✅";
+      case "summary":
+        return "📋";
+      case "error":
+        return "❌";
+      default:
+        return "•";
+    }
+  };
+
   return (
-    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 h-64 overflow-y-auto" ref={timelineRef}>
-      <h3 className="text-sm font-semibold text-gray-300 mb-3">事件時間軸</h3>
-      <div className="space-y-1">
+    <div className="bg-gradient-to-br from-gray-900/80 to-gray-950/80 border-2 border-gray-800/50 rounded-xl p-4 h-80 overflow-y-auto custom-scrollbar" ref={timelineRef}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+          戰情時間軸
+        </h3>
+        <span className="text-xs text-gray-500">{events.length} 事件</span>
+      </div>
+      <div className="space-y-2">
         {events.length === 0 ? (
-          <div className="text-gray-500 text-sm">等待事件...</div>
+          <div className="text-gray-500 text-sm text-center py-8">等待事件...</div>
         ) : (
           events.map((event, index) => (
             <div
               key={index}
-              className={`text-xs font-mono ${
+              className={`flex items-start gap-3 p-2 rounded-lg transition-colors ${
                 event.type === "error"
-                  ? "text-red-400"
+                  ? "bg-red-500/10 border-l-2 border-red-500"
                   : event.type === "summary"
-                  ? "text-green-400"
-                  : "text-gray-400"
+                  ? "bg-green-500/10 border-l-2 border-green-500"
+                  : event.type === "session_start"
+                  ? "bg-blue-500/10 border-l-2 border-blue-500"
+                  : "bg-gray-800/30 border-l-2 border-gray-700 hover:bg-gray-800/50"
               }`}
             >
-              {getEventDisplay(event)}
+              <span className="text-lg flex-shrink-0">{getEventIcon(event.type)}</span>
+              <div className="flex-1 min-w-0">
+                <div
+                  className={`text-xs font-mono ${
+                    event.type === "error"
+                      ? "text-red-400"
+                      : event.type === "summary"
+                      ? "text-green-400"
+                      : event.type === "session_start"
+                      ? "text-blue-400"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {getEventDisplay(event)}
+                </div>
+              </div>
             </div>
           ))
         )}

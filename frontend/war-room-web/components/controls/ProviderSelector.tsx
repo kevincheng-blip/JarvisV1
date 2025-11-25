@@ -1,6 +1,7 @@
 "use client";
 
-import { ProviderKey, PROVIDER_CONFIG } from "@/lib/types/warRoom";
+import { ProviderKey } from "@/lib/types/warRoom";
+import { ProviderIndicator } from "../common/ProviderIndicator";
 
 interface ProviderSelectorProps {
   enabledProviders: ProviderKey[];
@@ -28,11 +29,12 @@ export function ProviderSelector({
   };
 
   return (
-    <div className="space-y-2">
-      <label className="text-sm font-medium text-gray-300">Provider</label>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-3">
+      <label className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+        AI Provider 狀態
+      </label>
+      <div className="grid grid-cols-2 gap-3">
         {allProviders.map((provider) => {
-          const config = PROVIDER_CONFIG[provider];
           const isEnabled = enabledProviders.includes(provider);
           const isDisabled = mode === "god";
 
@@ -42,17 +44,16 @@ export function ProviderSelector({
               type="button"
               onClick={() => handleToggle(provider)}
               disabled={isDisabled}
-              className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
-                isEnabled
-                  ? "bg-blue-500/20 border-blue-500 text-blue-400"
-                  : "bg-gray-800/50 border-gray-700 text-gray-400"
-              } ${isDisabled ? "opacity-60 cursor-not-allowed" : "hover:border-gray-600"}`}
+              className={isDisabled ? "cursor-not-allowed" : "cursor-pointer"}
             >
-              {config.displayName}
+              <ProviderIndicator provider={provider} isActive={isEnabled} />
             </button>
           );
         })}
       </div>
+      {mode === "god" && (
+        <p className="text-xs text-gray-500 italic">God 模式：四家 Provider 全開</p>
+      )}
     </div>
   );
 }
