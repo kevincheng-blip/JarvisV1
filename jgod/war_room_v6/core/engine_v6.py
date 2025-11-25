@@ -226,7 +226,7 @@ class WarRoomEngineV6:
                     nonlocal full_content
                     full_content += chunk
                     
-                    # 將 chunk 事件放入佇列（使用 create_task 確保非阻塞）
+                    # 將 chunk 事件放入佇列（使用 call_soon 確保非阻塞）
                     chunk_event = WarRoomEvent(
                         type="role_chunk",
                         session_id=request.session_id,
@@ -235,14 +235,26 @@ class WarRoomEngineV6:
                         provider=provider_key,
                         chunk=chunk,
                     )
-                    # 使用 asyncio.create_task 將同步 callback 轉為異步
+                    # 使用 call_soon 將同步 callback 轉為異步（在當前 event loop 中執行）
                     try:
                         loop = asyncio.get_event_loop()
-                        loop.call_soon_threadsafe(
-                            lambda: asyncio.create_task(event_queue.put(chunk_event))
-                        )
-                    except Exception as e:
-                        self.logger.error(f"[ENGINE_V6] Error putting chunk event: {e}")
+                        if loop.is_running():
+                            # 如果 loop 正在運行，使用 call_soon_threadsafe
+                            loop.call_soon_threadsafe(
+                                lambda: asyncio.create_task(event_queue.put(chunk_event))
+                            )
+                        else:
+                            # 如果 loop 未運行，直接 create_task
+                            asyncio.create_task(event_queue.put(chunk_event))
+                    except RuntimeError:
+                        # 如果沒有 event loop，使用線程安全方式
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.call_soon_threadsafe(
+                                lambda: asyncio.create_task(event_queue.put(chunk_event))
+                            )
+                        except Exception as e:
+                            self.logger.error(f"[ENGINE_V6] Error putting chunk event: {e}")
                 
                 # 5.5 呼叫 ProviderManager 執行角色
                 result = await self.provider_manager.run_role_streaming(
