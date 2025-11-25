@@ -32,6 +32,20 @@ from jgod.error_engine import log_error, attempt_auto_fix
 from jgod.market.metadata import get_stock_display_name
 from jgod.war_room.core.chat_engine import WarRoomEngine
 from jgod.war_room.core.models import RoleName, ProviderKey
+from jgod.war_room.utils.role_state_manager import (
+    initialize_roles_state,
+    update_role_state,
+    append_role_content,
+    mark_role_done,
+    get_role_state,
+    ROLE_CHINESE_NAMES,
+)
+from jgod.war_room.utils.pseudo_live import (
+    start_war_room_session,
+    stop_war_room_session,
+    is_war_room_running,
+    should_autorefresh,
+)
 
 
 # === 初始化 ===
@@ -251,39 +265,23 @@ with tab1:
                 format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             )
             logger = logging.getLogger("war_room")
-            logger.info(f"=== War Room Engine v4.1 Execution ===")
+            logger.info(f"=== War Room Engine v4.2 Execution ===")
             logger.info(f"Mode: {current_mode}")
             if custom_providers:
                 logger.info(f"Custom Providers: {custom_providers}")
             
-            # 初始化結果狀態（v4.1: 即時 streaming 模式）
+            # v4.2: 初始化結果狀態（Pseudo-Live 模式）
             st.session_state["war_room_role_results"] = {}
             st.session_state["war_room_strategist_result"] = None
             st.session_state["war_room_loading"] = True
             st.session_state["war_room_streaming_contents"] = {}  # 用於 streaming 內容
             
-            # v4.1: 初始化角色狀態（用於即時 UI 更新）
-            if "war_room_roles" not in st.session_state:
-                st.session_state["war_room_roles"] = {}
-            
-            # 根據 enabled_providers 初始化角色狀態
+            # v4.2: 使用新的角色狀態管理器初始化
             enabled_provider_keys = engine._get_enabled_providers(current_mode, custom_providers)
-            role_provider_map = {
-                "Intel Officer": "perplexity",
-                "Scout": "gemini",
-                "Risk Officer": "claude",
-                "Quant Lead": "claude",
-                "Strategist": "gpt",
-            }
+            st.session_state["war_room_roles"] = initialize_roles_state(enabled_provider_keys)
             
-            for role_name, provider_key in role_provider_map.items():
-                if provider_key in enabled_provider_keys:
-                    st.session_state["war_room_roles"][role_name] = {
-                        "status": "pending",
-                        "provider": provider_key,
-                        "content": "",
-                        "error": None,
-                    }
+            # v4.2: 啟動戰情室會話（用於 Pseudo-Live）
+            start_war_room_session()
             
             # 提前取得市場資料（非阻塞，避免阻塞 AI Provider）
             market_context = ""
@@ -315,7 +313,7 @@ with tab1:
             else:
                 combined_market_context = market_context
             
-            # v4.1: 定義即時 streaming 回調（更新 session_state）
+            # v4.2: 定義即時 streaming 回調（使用新的狀態管理器）
             def on_chunk(role: RoleName, chunk: str):
                 """Streaming chunk 回調 - 即時更新 session_state"""
                 role_key = role.value
@@ -325,20 +323,8 @@ with tab1:
                     st.session_state["war_room_streaming_contents"][role_key] = ""
                 st.session_state["war_room_streaming_contents"][role_key] += chunk
                 
-                # v4.1: 更新角色狀態（用於即時 UI 更新）
-                if "war_room_roles" in st.session_state:
-                    if role_key not in st.session_state["war_room_roles"]:
-                        st.session_state["war_room_roles"][role_key] = {
-                            "status": "running",
-                            "provider": "",
-                            "content": "",
-                            "error": None,
-                        }
-                    
-                    role_state = st.session_state["war_room_roles"][role_key]
-                    role_state["status"] = "running"
-                    role_state["content"] += chunk
-                    st.session_state["war_room_roles"][role_key] = role_state
+                # v4.2: 使用新的狀態管理器追加內容
+                append_role_content(role_key, chunk)
             
             # 執行 War Room 分析（使用新引擎）
             try:
@@ -360,7 +346,7 @@ with tab1:
                     )
                     return result
                 
-                # v4.1: 執行分析（callback 會即時更新 session_state）
+                # v4.2: 執行分析（callback 會即時更新 session_state）
                 # 注意：Streamlit 是同步的，但 callback 會更新 session_state
                 # UI 會在下次 rerun 時反映更新（透過檢查 session_state）
                 war_room_result = asyncio.run(run_war_room())
@@ -378,18 +364,20 @@ with tab1:
                     )
                     role_results_dict[role.value] = provider_result
                     
-                    # v4.1: 更新角色狀態為完成
+                    # v4.2: 使用新的狀態管理器標記完成
                     role_key = role.value
-                    if "war_room_roles" in st.session_state and role_key in st.session_state["war_room_roles"]:
-                        role_state = st.session_state["war_room_roles"][role_key]
-                        role_state["status"] = "done" if role_result.success else "error"
-                        role_state["content"] = role_result.content if role_result.success else ""
-                        role_state["error"] = role_result.error
-                        st.session_state["war_room_roles"][role_key] = role_state
+                    mark_role_done(
+                        role_key,
+                        success=role_result.success,
+                        error_message=role_result.error if not role_result.success else None,
+                    )
                 
                 # 儲存結果到 session state
                 st.session_state["war_room_role_results"] = role_results_dict
                 st.session_state["war_room_loading"] = False
+                
+                # v4.2: 停止戰情室會話
+                stop_war_room_session()
                 
                 # 檢查結果
                 if not war_room_result.results:
