@@ -1,31 +1,41 @@
 """
 Pseudo-Live 機制 - v4.2
-使用 Streamlit 的 auto-refresh 實現類即時更新
+使用 Streamlit 的 Timer-based Async Refresh 實現類即時更新
 """
 import time
 import streamlit as st
 from typing import Optional
+import threading
 
 
-def setup_autorefresh(interval_ms: int = 500) -> None:
+def setup_autorefresh(interval_ms: int = 300) -> None:
     """
-    設定自動刷新（如果可用）
+    設定自動刷新（Timer-based）
     
     Args:
-        interval_ms: 刷新間隔（毫秒）
+        interval_ms: 刷新間隔（毫秒），預設 300ms
     """
     # 檢查是否正在執行
     if not st.session_state.get("war_room_running", False):
         return
     
-    # 使用 st_autorefresh（如果已安裝）或手動 rerun
+    # 使用 st_autorefresh（如果已安裝）
     try:
         from streamlit_autorefresh import st_autorefresh
         st_autorefresh(interval=interval_ms, key="war_room_autorefresh")
     except ImportError:
-        # 如果沒有安裝 streamlit-autorefresh，使用手動方式
-        # 注意：這需要在適當的地方呼叫
-        pass
+        # 如果沒有安裝 streamlit-autorefresh，使用手動 timer
+        # 透過檢查時間戳記來決定是否 rerun
+        last_refresh = st.session_state.get("_last_autorefresh", 0)
+        current_time = time.time() * 1000  # 轉換為毫秒
+        
+        if current_time - last_refresh >= interval_ms:
+            st.session_state["_last_autorefresh"] = current_time
+            # 使用 st.rerun() 觸發重新執行
+            try:
+                st.rerun()
+            except Exception:
+                pass  # 忽略 rerun 錯誤
 
 
 def start_war_room_session() -> None:

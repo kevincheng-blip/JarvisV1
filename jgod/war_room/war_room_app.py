@@ -45,6 +45,7 @@ from jgod.war_room.utils.pseudo_live import (
     stop_war_room_session,
     is_war_room_running,
     should_autorefresh,
+    setup_autorefresh,
 )
 
 
@@ -326,14 +327,20 @@ with tab1:
                 # v4.2: 使用新的狀態管理器追加內容
                 append_role_content(role_key, chunk)
             
-            # 執行 War Room 分析（使用新引擎）
-            try:
-                # 準備日期字串
-                start_date_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)
-                end_date_str = end_date.strftime("%Y-%m-%d") if hasattr(end_date, "strftime") else str(end_date)
-                
-                async def run_war_room():
-                    """執行 War Room 分析"""
+            # v4.2: 準備日期字串
+            start_date_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)
+            end_date_str = end_date.strftime("%Y-%m-%d") if hasattr(end_date, "strftime") else str(end_date)
+            
+            # v4.2: 使用 background task 執行（非阻塞）
+            import threading
+            import queue
+            
+            result_queue = queue.Queue()
+            exception_queue = queue.Queue()
+            
+            async def run_war_room_async():
+                """執行 War Room 分析（async 版本）"""
+                try:
                     result = await engine.run_war_room(
                         mode=current_mode,
                         custom_providers=custom_providers,
@@ -344,14 +351,72 @@ with tab1:
                         market_context=combined_market_context,
                         streaming_callback=on_chunk,
                     )
-                    return result
+                    result_queue.put(result)
+                except Exception as e:
+                    exception_queue.put(e)
+            
+            def run_in_thread():
+                """在背景執行緒中執行 async 函數"""
+                try:
+                    asyncio.run(run_war_room_async())
+                except Exception as e:
+                    exception_queue.put(e)
+            
+            # 啟動背景執行緒
+            thread = threading.Thread(target=run_in_thread, daemon=True)
+            thread.start()
+            
+            # v4.2: 設定自動刷新（每 300ms）
+            from jgod.war_room.utils.pseudo_live import setup_autorefresh
+            setup_autorefresh(interval_ms=300)
+            
+            # 等待執行完成（非阻塞，讓 UI 可以更新）
+            import time
+            max_wait_time = 120  # 最多等待 120 秒
+            start_wait = time.time()
+            war_room_result = None
+            
+            while time.time() - start_wait < max_wait_time:
+                if not result_queue.empty():
+                    war_room_result = result_queue.get()
+                    break
+                if not exception_queue.empty():
+                    exception = exception_queue.get()
+                    raise exception
                 
-                # v4.2: 執行分析（callback 會即時更新 session_state）
-                # 注意：Streamlit 是同步的，但 callback 會更新 session_state
-                # UI 會在下次 rerun 時反映更新（透過檢查 session_state）
-                war_room_result = asyncio.run(run_war_room())
+                # 檢查是否所有角色都已完成
+                roles_state = st.session_state.get("war_room_roles", {})
+                all_done = all(
+                    role_state.get("status") in ["done", "error"]
+                    for role_state in roles_state.values()
+                ) if roles_state else False
                 
-                # 轉換結果格式（適配現有 UI）
+                if all_done and thread.is_alive():
+                    # 等待執行緒完成
+                    thread.join(timeout=5)
+                    if not result_queue.empty():
+                        war_room_result = result_queue.get()
+                        break
+                
+                time.sleep(0.1)  # 短暫等待，避免 CPU 過載
+            
+            # 如果超時，顯示警告
+            if war_room_result is None:
+                if thread.is_alive():
+                    st.warning("⏱️ 分析時間較長，仍在執行中...")
+                    # 繼續等待
+                    thread.join(timeout=30)
+                    if not result_queue.empty():
+                        war_room_result = result_queue.get()
+            
+            # 執行 War Room 分析（使用新引擎）
+            try:
+                if war_room_result is None:
+                    st.error("❌ 分析超時或失敗")
+                    st.session_state["war_room_loading"] = False
+                    stop_war_room_session()
+                else:
+                    # 轉換結果格式（適配現有 UI）
                 role_results_dict = {}
                 for role, role_result in war_room_result.results.items():
                     # 轉換為 ProviderResult 格式（適配現有 render_role_card）
