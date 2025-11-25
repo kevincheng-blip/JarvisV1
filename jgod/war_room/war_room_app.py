@@ -251,16 +251,39 @@ with tab1:
                 format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             )
             logger = logging.getLogger("war_room")
-            logger.info(f"=== War Room Engine v4.0 Execution ===")
+            logger.info(f"=== War Room Engine v4.1 Execution ===")
             logger.info(f"Mode: {current_mode}")
             if custom_providers:
                 logger.info(f"Custom Providers: {custom_providers}")
             
-            # 初始化結果狀態
+            # 初始化結果狀態（v4.1: 即時 streaming 模式）
             st.session_state["war_room_role_results"] = {}
             st.session_state["war_room_strategist_result"] = None
             st.session_state["war_room_loading"] = True
             st.session_state["war_room_streaming_contents"] = {}  # 用於 streaming 內容
+            
+            # v4.1: 初始化角色狀態（用於即時 UI 更新）
+            if "war_room_roles" not in st.session_state:
+                st.session_state["war_room_roles"] = {}
+            
+            # 根據 enabled_providers 初始化角色狀態
+            enabled_provider_keys = engine._get_enabled_providers(current_mode, custom_providers)
+            role_provider_map = {
+                "Intel Officer": "perplexity",
+                "Scout": "gemini",
+                "Risk Officer": "claude",
+                "Quant Lead": "claude",
+                "Strategist": "gpt",
+            }
+            
+            for role_name, provider_key in role_provider_map.items():
+                if provider_key in enabled_provider_keys:
+                    st.session_state["war_room_roles"][role_name] = {
+                        "status": "pending",
+                        "provider": provider_key,
+                        "content": "",
+                        "error": None,
+                    }
             
             # 提前取得市場資料（非阻塞，避免阻塞 AI Provider）
             market_context = ""
@@ -292,13 +315,30 @@ with tab1:
             else:
                 combined_market_context = market_context
             
-            # 定義 streaming 回調
+            # v4.1: 定義即時 streaming 回調（更新 session_state）
             def on_chunk(role: RoleName, chunk: str):
-                """Streaming chunk 回調"""
+                """Streaming chunk 回調 - 即時更新 session_state"""
                 role_key = role.value
+                
+                # 更新 streaming_contents（向後兼容）
                 if role_key not in st.session_state["war_room_streaming_contents"]:
                     st.session_state["war_room_streaming_contents"][role_key] = ""
                 st.session_state["war_room_streaming_contents"][role_key] += chunk
+                
+                # v4.1: 更新角色狀態（用於即時 UI 更新）
+                if "war_room_roles" in st.session_state:
+                    if role_key not in st.session_state["war_room_roles"]:
+                        st.session_state["war_room_roles"][role_key] = {
+                            "status": "running",
+                            "provider": "",
+                            "content": "",
+                            "error": None,
+                        }
+                    
+                    role_state = st.session_state["war_room_roles"][role_key]
+                    role_state["status"] = "running"
+                    role_state["content"] += chunk
+                    st.session_state["war_room_roles"][role_key] = role_state
             
             # 執行 War Room 分析（使用新引擎）
             try:
@@ -320,7 +360,9 @@ with tab1:
                     )
                     return result
                 
-                # 執行分析
+                # v4.1: 執行分析（callback 會即時更新 session_state）
+                # 注意：Streamlit 是同步的，但 callback 會更新 session_state
+                # UI 會在下次 rerun 時反映更新（透過檢查 session_state）
                 war_room_result = asyncio.run(run_war_room())
                 
                 # 轉換結果格式（適配現有 UI）
@@ -335,6 +377,15 @@ with tab1:
                         execution_time=role_result.execution_time,
                     )
                     role_results_dict[role.value] = provider_result
+                    
+                    # v4.1: 更新角色狀態為完成
+                    role_key = role.value
+                    if "war_room_roles" in st.session_state and role_key in st.session_state["war_room_roles"]:
+                        role_state = st.session_state["war_room_roles"][role_key]
+                        role_state["status"] = "done" if role_result.success else "error"
+                        role_state["content"] = role_result.content if role_result.success else ""
+                        role_state["error"] = role_result.error
+                        st.session_state["war_room_roles"][role_key] = role_state
                 
                 # 儲存結果到 session state
                 st.session_state["war_room_role_results"] = role_results_dict
@@ -382,55 +433,155 @@ with tab1:
     
     st.divider()
     
-    # 顯示結果（固定卡片，即時更新）
+    # v4.1: 顯示結果（即時 streaming 模式）
     role_results = st.session_state.get("war_room_role_results", {})
     strategist_result = st.session_state.get("war_room_strategist_result")
     is_loading = st.session_state.get("war_room_loading", False)
+    roles_state = st.session_state.get("war_room_roles", {})
     
-    # 角色卡片（固定顯示，不使用下拉選單）
+    # 角色卡片（固定顯示，即時更新）
     st.markdown("### 各角色意見")
     
+    # v4.1: 使用 roles_state 來顯示即時 streaming 內容
     # 第一行：Intel Officer, Scout
     col1, col2 = st.columns(2)
     
     with col1:
+        intel_state = roles_state.get("Intel Officer")
         intel_result = role_results.get("Intel Officer")
-        render_role_card(
-            "Intel Officer",
-            "Perplexity Sonar",
-            intel_result,
-            loading=is_loading and intel_result is None,
-        )
+        
+        # 如果有 streaming 內容，優先顯示
+        if intel_state and intel_state.get("status") == "running":
+            # 顯示 streaming 內容
+            streaming_content = intel_state.get("content", "")
+            if streaming_content:
+                render_role_card(
+                    "Intel Officer",
+                    "Perplexity Sonar",
+                    ProviderResult(
+                        success=True,
+                        content=streaming_content,
+                        provider_name="perplexity",
+                        execution_time=0.0,
+                    ),
+                    loading=False,
+                )
+            else:
+                render_role_card(
+                    "Intel Officer",
+                    "Perplexity Sonar",
+                    None,
+                    loading=True,
+                )
+        else:
+            render_role_card(
+                "Intel Officer",
+                "Perplexity Sonar",
+                intel_result,
+                loading=is_loading and intel_result is None,
+            )
     
     with col2:
+        scout_state = roles_state.get("Scout")
         scout_result = role_results.get("Scout")
-        render_role_card(
-            "Scout",
-            "Gemini Flash 2.5",
-            scout_result,
-            loading=is_loading and scout_result is None,
-        )
+        
+        if scout_state and scout_state.get("status") == "running":
+            streaming_content = scout_state.get("content", "")
+            if streaming_content:
+                render_role_card(
+                    "Scout",
+                    "Gemini Flash 2.5",
+                    ProviderResult(
+                        success=True,
+                        content=streaming_content,
+                        provider_name="gemini",
+                        execution_time=0.0,
+                    ),
+                    loading=False,
+                )
+            else:
+                render_role_card(
+                    "Scout",
+                    "Gemini Flash 2.5",
+                    None,
+                    loading=True,
+                )
+        else:
+            render_role_card(
+                "Scout",
+                "Gemini Flash 2.5",
+                scout_result,
+                loading=is_loading and scout_result is None,
+            )
     
     # 第二行：Risk Officer, Quant Lead
     col3, col4 = st.columns(2)
     
     with col3:
+        risk_state = roles_state.get("Risk Officer")
         risk_result = role_results.get("Risk Officer")
-        render_role_card(
-            "Risk Officer",
-            "Claude 3.5 Haiku",
-            risk_result,
-            loading=is_loading and risk_result is None,
-        )
+        
+        if risk_state and risk_state.get("status") == "running":
+            streaming_content = risk_state.get("content", "")
+            if streaming_content:
+                render_role_card(
+                    "Risk Officer",
+                    "Claude 3.5 Haiku",
+                    ProviderResult(
+                        success=True,
+                        content=streaming_content,
+                        provider_name="claude",
+                        execution_time=0.0,
+                    ),
+                    loading=False,
+                )
+            else:
+                render_role_card(
+                    "Risk Officer",
+                    "Claude 3.5 Haiku",
+                    None,
+                    loading=True,
+                )
+        else:
+            render_role_card(
+                "Risk Officer",
+                "Claude 3.5 Haiku",
+                risk_result,
+                loading=is_loading and risk_result is None,
+            )
     
     with col4:
+        quant_state = roles_state.get("Quant Lead")
         quant_result = role_results.get("Quant Lead")
-        render_role_card(
-            "Quant Lead",
-            "Claude 3.5 Haiku",
-            quant_result,
-            loading=is_loading and quant_result is None,
-        )
+        
+        if quant_state and quant_state.get("status") == "running":
+            streaming_content = quant_state.get("content", "")
+            if streaming_content:
+                render_role_card(
+                    "Quant Lead",
+                    "Claude 3.5 Haiku",
+                    ProviderResult(
+                        success=True,
+                        content=streaming_content,
+                        provider_name="claude",
+                        execution_time=0.0,
+                    ),
+                    loading=False,
+                )
+            else:
+                render_role_card(
+                    "Quant Lead",
+                    "Claude 3.5 Haiku",
+                    None,
+                    loading=True,
+                )
+        else:
+            render_role_card(
+                "Quant Lead",
+                "Claude 3.5 Haiku",
+                quant_result,
+                loading=is_loading and quant_result is None,
+            )
     
     st.divider()
     
