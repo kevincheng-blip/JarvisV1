@@ -38,7 +38,6 @@ class TestWarRoomEngine:
         ))
         
         mock_provider_manager.providers = {"gpt": mock_provider}
-        mock_provider_manager.providers.get = lambda k: mock_provider if k == "gpt" else None
         
         # 執行測試
         result = await engine.run_war_room(
@@ -71,7 +70,6 @@ class TestWarRoomEngine:
             mock_providers[provider_key] = mock_provider
         
         mock_provider_manager.providers = mock_providers
-        mock_provider_manager.providers.get = lambda k: mock_providers.get(k)
         
         # 執行測試（God 模式）
         result = await engine.run_war_room(
@@ -94,7 +92,6 @@ class TestWarRoomEngine:
         """測試 provider_key 空值時自動 fallback"""
         # 模擬沒有 Provider 的情況
         mock_provider_manager.providers = {}
-        mock_provider_manager.providers.get = lambda k: None
         
         # 執行測試
         result = await engine.run_war_room(
@@ -125,7 +122,6 @@ class TestWarRoomEngine:
         ))
         
         mock_provider_manager.providers = {"gpt": mock_provider}
-        mock_provider_manager.providers.get = lambda k: mock_provider if k == "gpt" else None
         
         # 執行測試
         result = await engine.run_war_room(
@@ -157,7 +153,6 @@ class TestWarRoomEngine:
         ))
         
         mock_provider_manager.providers = {"gpt": mock_provider}
-        mock_provider_manager.providers.get = lambda k: mock_provider if k == "gpt" else None
         
         # 執行測試
         result = await engine.run_war_room(

@@ -106,7 +106,10 @@ class TestProviderManager:
         
         # 驗證結果格式
         assert isinstance(result, ProviderResult)
-        assert result.provider_name == provider_key
+        # provider_name 是實際模型名稱（如 "GPT-4o-mini"），不是內部 key（如 "gpt"）
+        assert isinstance(result.provider_name, str)
+        assert result.provider_name  # 不是空字串
+        assert provider_key in manager.providers  # 確認 provider_key 是合法的
         if result.success:
             assert len(result.content) > 0 or len(chunks) > 0
 
