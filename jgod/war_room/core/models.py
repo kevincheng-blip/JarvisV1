@@ -11,12 +11,8 @@ from jgod.war_room.config.roles import (
     ROLE_PROVIDER_MAP as CONFIG_ROLE_PROVIDER_MAP,
     ROLE_SYSTEM_PROMPTS as CONFIG_ROLE_SYSTEM_PROMPTS,
     MODE_PROVIDER_MAP as CONFIG_MODE_PROVIDER_MAP,
-    ProviderKey,
+    ProviderKey,  # 直接使用集中設定的 ProviderKey
 )
-
-
-# Provider 內部鍵值（重新匯出以保持向後兼容）
-ProviderKey = ProviderKey
 
 
 # 角色名稱
