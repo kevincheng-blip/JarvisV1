@@ -92,11 +92,12 @@ class WarRoomEngine:
             full_content = ""
             
             def chunk_callback(chunk: str):
-                """內部 chunk 回調"""
+                """內部 chunk 回調（v4.1: 即時更新）"""
                 nonlocal full_content
                 full_content += chunk
                 if on_chunk:
                     try:
+                        # v4.1: 立即呼叫 callback 更新 UI
                         on_chunk(role, chunk)
                     except Exception as e:
                         self.logger.error(f"Error in on_chunk callback for {role}: {e}")
