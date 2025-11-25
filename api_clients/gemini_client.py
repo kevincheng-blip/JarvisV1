@@ -40,22 +40,36 @@ class GeminiProvider:
     
     def ask_stream(self, system_prompt: str, user_prompt: str):
         """
-        Streaming 版本（真正的 token-level streaming）
+        Streaming 版本（改為一次性取得完整結果，但仍維持 generator 介面）
+        注意：google-genai SDK 不支援 stream=True，所以改為一次性取得完整結果
         """
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
         
         try:
-            # 使用 stream=True 啟用 streaming
+            # 不使用 stream 參數，一次性取得完整結果
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=prompt,
-                stream=True,
             )
             
-            # 逐個 chunk 輸出
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+            # 從 response 中萃取出完整文字
+            full_text = ""
+            if hasattr(response, 'text') and response.text:
+                full_text = response.text
+            elif hasattr(response, 'candidates') and response.candidates:
+                # 如果 response.text 不存在，嘗試從 candidates 中提取
+                for candidate in response.candidates:
+                    if hasattr(candidate, 'content') and candidate.content:
+                        if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                            for part in candidate.content.parts:
+                                if hasattr(part, 'text') and part.text:
+                                    full_text += part.text
+            
+            if not full_text:
+                full_text = "[Gemini returned empty content]"
+            
+            # 一次性 yield 完整文字（維持 generator 介面）
+            yield full_text
         except APIError as e:
             yield f"[Gemini API 錯誤：{e}]"
         except Exception as e:
