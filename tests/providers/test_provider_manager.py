@@ -51,7 +51,8 @@ class TestProviderManager:
         else:
             assert manager is not None
     
-    def test_missing_api_key_handling(self):
+    @pytest.mark.asyncio
+    async def test_missing_api_key_handling(self):
         """測試任一 provider 未設定 API Key 時應回傳合理錯誤，不應 crash"""
         # 暫時移除所有 API Key
         original_keys = {}
@@ -65,13 +66,12 @@ class TestProviderManager:
             manager = ProviderManager()
             assert manager is not None
             
-            # 嘗試執行一個角色
-            import asyncio
-            result = asyncio.run(manager.run_role(
+            # 嘗試執行一個角色（使用 await）
+            result = await manager.run_role(
                 role_name="Strategist",
                 prompt="測試問題",
                 enabled_providers=["gpt"],
-            ))
+            )
             
             # 應該回傳錯誤，而不是 crash
             assert isinstance(result, ProviderResult)

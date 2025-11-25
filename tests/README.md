@@ -16,7 +16,11 @@ tests/
 
 ### 安裝依賴
 ```bash
+# 安裝所有依賴（包含 pytest 和 pytest-asyncio）
 pip install -r requirements.txt
+
+# 或僅安裝測試相關依賴
+pip install pytest pytest-asyncio
 ```
 
 ### 執行所有測試
