@@ -95,7 +95,8 @@ class WarRoomEngineBackend:
                 role_sequences[role] = 0
                 
                 # 建立任務（會透過 event_queue 發送 chunk 和 done 事件）
-                async def create_role_task(r: RoleName, p, pk: ProviderKey, sp: str, prompt: str):
+                # 使用 lambda 確保閉包正確捕獲變數
+                async def create_role_task(r: RoleName, p, pk: ProviderKey, sp: str, prompt: str, seq_dict, eq):
                     """建立角色任務（透過 event_queue 發送事件）"""
                     await self._run_single_role_streaming(
                         role=r,
@@ -104,12 +105,12 @@ class WarRoomEngineBackend:
                         provider=p,
                         provider_key=pk,
                         session_id=session_id,
-                        role_sequences=role_sequences,
-                        event_queue=event_queue,
+                        role_sequences=seq_dict,
+                        event_queue=eq,
                     )
                 
                 task = asyncio.create_task(
-                    create_role_task(role, provider, provider_key, system_prompt, full_prompt)
+                    create_role_task(role, provider, provider_key, system_prompt, full_prompt, role_sequences, event_queue)
                 )
                 tasks.append(task)
                 task_to_role[task] = role
@@ -125,33 +126,36 @@ class WarRoomEngineBackend:
             # 使用 as_completed 實現即時更新
             self.logger.info(f"Executing {len(tasks)} roles in parallel...")
             
-            # 持續監聽事件 queue 並 yield
+            # 持續監聽事件 queue 並 yield（使用 as_completed 實現即時更新）
             completed_count = 0
-            while completed_count < len(tasks):
-                try:
-                    # 等待事件（最多 0.1 秒）
-                    event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
-                    yield event
-                    
-                    # 如果是 done 事件，增加完成計數
-                    if isinstance(event, RoleDoneEvent):
-                        completed_count += 1
-                except asyncio.TimeoutError:
-                    # 檢查是否有任務完成
-                    done, pending = await asyncio.wait(tasks, timeout=0.01, return_when=asyncio.FIRST_COMPLETED)
-                    if done:
-                        # 處理剩餘事件
-                        while not event_queue.empty():
-                            try:
-                                event = event_queue.get_nowait()
-                                yield event
-                                if isinstance(event, RoleDoneEvent):
-                                    completed_count += 1
-                            except asyncio.QueueEmpty:
-                                break
-                    continue
+            role_done_flags = {role: False for role in RoleName if ROLE_PROVIDER_MAP.get(role) in enabled_providers}
             
-            # 確保所有事件都已發送
+            # 使用 as_completed 監聽任務完成
+            for completed_task in asyncio.as_completed(tasks):
+                # 處理該任務的所有事件
+                while not event_queue.empty():
+                    try:
+                        event = event_queue.get_nowait()
+                        yield event
+                        
+                        # 如果是 done 事件，標記完成
+                        if isinstance(event, RoleDoneEvent):
+                            role_name = event.role
+                            for r in RoleName:
+                                if r.value.lower().replace(" ", "_") == role_name:
+                                    role_done_flags[r] = True
+                                    completed_count += 1
+                                    break
+                    except asyncio.QueueEmpty:
+                        break
+                
+                # 等待任務完成
+                try:
+                    await completed_task
+                except Exception as e:
+                    self.logger.error(f"Task failed: {e}", exc_info=True)
+            
+            # 確保所有剩餘事件都已發送
             while not event_queue.empty():
                 try:
                     event = event_queue.get_nowait()
