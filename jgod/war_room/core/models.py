@@ -1,13 +1,22 @@
 """
-War Room Engine v4.0 - 共用型別定義
+War Room Engine v5.0 - 共用型別定義
+注意：角色與 Provider 設定已移至 jgod/war_room/config/roles.py
 """
 from dataclasses import dataclass
 from typing import Literal, Dict, List, Optional
 from enum import Enum
 
+# 從集中設定模組匯入
+from jgod.war_room.config.roles import (
+    ROLE_PROVIDER_MAP as CONFIG_ROLE_PROVIDER_MAP,
+    ROLE_SYSTEM_PROMPTS as CONFIG_ROLE_SYSTEM_PROMPTS,
+    MODE_PROVIDER_MAP as CONFIG_MODE_PROVIDER_MAP,
+    ProviderKey,
+)
 
-# Provider 內部鍵值
-ProviderKey = Literal["gpt", "claude", "gemini", "perplexity"]
+
+# Provider 內部鍵值（重新匯出以保持向後兼容）
+ProviderKey = ProviderKey
 
 
 # 角色名稱
@@ -21,33 +30,28 @@ class RoleName(str, Enum):
     EXECUTION_OFFICER = "Execution Officer"
 
 
-# 角色到 Provider 的映射
+# 角色到 Provider 的映射（從集中設定匯入）
 ROLE_PROVIDER_MAP: Dict[RoleName, ProviderKey] = {
-    RoleName.INTEL_OFFICER: "perplexity",
-    RoleName.SCOUT: "gemini",
-    RoleName.RISK_OFFICER: "claude",
-    RoleName.QUANT_LEAD: "claude",
-    RoleName.STRATEGIST: "gpt",
-    RoleName.EXECUTION_OFFICER: "gpt",
+    RoleName.INTEL_OFFICER: CONFIG_ROLE_PROVIDER_MAP["Intel Officer"],
+    RoleName.SCOUT: CONFIG_ROLE_PROVIDER_MAP["Scout"],
+    RoleName.RISK_OFFICER: CONFIG_ROLE_PROVIDER_MAP["Risk Officer"],
+    RoleName.QUANT_LEAD: CONFIG_ROLE_PROVIDER_MAP["Quant Lead"],
+    RoleName.STRATEGIST: CONFIG_ROLE_PROVIDER_MAP["Strategist"],
+    RoleName.EXECUTION_OFFICER: CONFIG_ROLE_PROVIDER_MAP["Execution Officer"],
 }
 
-# 角色系統提示
+# 角色系統提示（從集中設定匯入）
 ROLE_SYSTEM_PROMPTS: Dict[RoleName, str] = {
-    RoleName.INTEL_OFFICER: "你是 J-GOD 戰情室的情報官（Intel Officer），負責蒐集與整理市場資訊。",
-    RoleName.SCOUT: "你是 J-GOD 戰情室的偵察兵（Scout），負責快速摘要與輔助分析。",
-    RoleName.RISK_OFFICER: "你是 J-GOD 戰情室的風險官（Risk Officer），負責評估風險與提供風險建議。",
-    RoleName.QUANT_LEAD: "你是 J-GOD 戰情室的量化主管（Quant Lead），負責技術分析與量化策略。",
-    RoleName.STRATEGIST: "你是 J-GOD 戰情室的策略師（Strategist），負責統整所有意見並給出最終建議。",
-    RoleName.EXECUTION_OFFICER: "你是 J-GOD 戰情室的執行官（Execution Officer），負責提供具體操作建議。",
+    RoleName.INTEL_OFFICER: CONFIG_ROLE_SYSTEM_PROMPTS["Intel Officer"],
+    RoleName.SCOUT: CONFIG_ROLE_SYSTEM_PROMPTS["Scout"],
+    RoleName.RISK_OFFICER: CONFIG_ROLE_SYSTEM_PROMPTS["Risk Officer"],
+    RoleName.QUANT_LEAD: CONFIG_ROLE_SYSTEM_PROMPTS["Quant Lead"],
+    RoleName.STRATEGIST: CONFIG_ROLE_SYSTEM_PROMPTS["Strategist"],
+    RoleName.EXECUTION_OFFICER: CONFIG_ROLE_SYSTEM_PROMPTS["Execution Officer"],
 }
 
-# Mode 對應 Provider
-MODE_PROVIDER_MAP: Dict[str, List[ProviderKey]] = {
-    "Lite": ["gpt"],
-    "Pro": ["gpt", "claude"],
-    "God": ["gpt", "claude", "gemini", "perplexity"],
-    "Custom": [],  # Custom 由 UI 決定 enabled_providers
-}
+# Mode 對應 Provider（從集中設定匯入）
+MODE_PROVIDER_MAP: Dict[str, List[ProviderKey]] = CONFIG_MODE_PROVIDER_MAP
 
 
 @dataclass
