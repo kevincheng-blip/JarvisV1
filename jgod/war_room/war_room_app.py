@@ -745,8 +745,8 @@ with tab1:
         st.divider()
         render_log_download_button(log_file)
     
-    # 如果沒有任何結果且不在載入中，顯示提示
-    if not role_results and not is_loading:
+    # v5.0: 如果沒有任何結果且不在載入中，顯示提示
+    if not roles_state and not is_loading and not is_running:
         st.info("👆 點擊上方「啟動戰情室分析」按鈕開始分析")
 
 # === Tab 2: 預測面板 ===
