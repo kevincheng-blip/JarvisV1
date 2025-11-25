@@ -147,10 +147,32 @@ def update_release_notes(summary):
     
     if date_header in content:
         # 在同一天的區塊中追加
-        # 找到日期標題後，在下一行插入新的 bullet
-        pattern = f"(## {today}\\n)"
-        replacement = f"\\1- auto-commit: {summary}\n"
-        content = re.sub(pattern, replacement, content)
+        # 找到日期標題後，在該區塊內追加新的 bullet
+        # 找到日期標題的位置
+        lines = content.split('\n')
+        new_lines = []
+        date_found = False
+        date_section_started = False
+        
+        for i, line in enumerate(lines):
+            if line == date_header:
+                new_lines.append(line)
+                date_found = True
+                date_section_started = True
+            elif date_found and line.startswith('## '):
+                # 遇到下一個日期標題，先插入新的 bullet
+                new_lines.append(f"- auto-commit: {summary}")
+                new_lines.append("")
+                new_lines.append(line)
+                date_section_started = False
+            else:
+                new_lines.append(line)
+        
+        # 如果日期區塊在檔案末尾，在最後追加
+        if date_section_started:
+            new_lines.append(f"- auto-commit: {summary}")
+        
+        content = '\n'.join(new_lines)
     else:
         # 建立新的日期區塊（插入在標題後、第一個日期區塊前）
         if "## " in content:
