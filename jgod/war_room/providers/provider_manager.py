@@ -37,28 +37,37 @@ class ProviderManager:
     def __init__(self):
         """初始化 Provider 管理器"""
         # 初始化時捕獲 API Key 錯誤，但不阻止初始化
+        import logging
+        logger = logging.getLogger("war_room.provider_manager")
+        
         self.providers: Dict[str, BaseProviderAsync] = {}
         
         try:
             self.providers["gpt"] = GPTProviderAsync()
+            logger.info("GPT Provider initialized successfully")
         except Exception as e:
             # API Key 未設定，稍後在 run 時會處理
-            pass
+            logger.warning(f"GPT Provider initialization failed: {e}")
         
         try:
             self.providers["claude"] = ClaudeProviderAsync()
+            logger.info("Claude Provider initialized successfully")
         except Exception as e:
-            pass
+            logger.warning(f"Claude Provider initialization failed: {e}")
         
         try:
             self.providers["gemini"] = GeminiProviderAsync()
+            logger.info("Gemini Provider initialized successfully")
         except Exception as e:
-            pass
+            logger.warning(f"Gemini Provider initialization failed: {e}")
         
         try:
             self.providers["perplexity"] = PerplexityProviderAsync()
+            logger.info("Perplexity Provider initialized successfully")
         except Exception as e:
-            pass
+            logger.warning(f"Perplexity Provider initialization failed: {e}")
+        
+        logger.info(f"ProviderManager initialized with providers: {list(self.providers.keys())}")
     
     async def run_role(
         self,

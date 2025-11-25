@@ -174,6 +174,7 @@ class WarRoomEngine:
         # 取得啟用的 Provider
         enabled_providers = self._get_enabled_providers(mode, custom_providers)
         self.logger.info(f"Enabled Providers: {enabled_providers}")
+        self.logger.info(f"Available Providers in manager: {list(self.provider_manager.providers.keys())}")
         
         # 組合完整提示
         if market_context:
@@ -187,6 +188,7 @@ class WarRoomEngine:
         
         for role in RoleName:
             provider_key = ROLE_PROVIDER_MAP.get(role)
+            self.logger.debug(f"Processing role: {role.value}, provider_key: {provider_key}")
             
             # 檢查此角色的 Provider 是否啟用
             if provider_key not in enabled_providers:
@@ -196,7 +198,28 @@ class WarRoomEngine:
             # 取得 Provider 實例
             provider = self.provider_manager.providers.get(provider_key)
             if not provider:
-                self.logger.warning(f"Provider {provider_key} not found for role {role.value}")
+                # 檢查是否因為 API Key 未設定而導致 Provider 未初始化
+                import os
+                api_key_env_map = {
+                    "gpt": ["OPENAI_API_KEY"],
+                    "claude": ["ANTHROPIC_API_KEY"],
+                    "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+                    "perplexity": ["PERPLEXITY_API_KEY"],
+                }
+                api_key_envs = api_key_env_map.get(provider_key, [])
+                has_key = any(os.getenv(k) for k in api_key_envs) if api_key_envs else False
+                
+                if not has_key:
+                    env_names = " 或 ".join(api_key_envs)
+                    self.logger.warning(
+                        f"Provider {provider_key} not initialized for role {role.value}: "
+                        f"API Key not set ({env_names})"
+                    )
+                else:
+                    self.logger.warning(
+                        f"Provider {provider_key} not initialized for role {role.value}: "
+                        f"Initialization failed (check logs)"
+                    )
                 continue
             
             # 取得系統提示

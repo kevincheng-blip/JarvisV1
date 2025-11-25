@@ -5,3 +5,4 @@
 - auto-commit: Add auto Git pipeline
 
 - auto-commit: Add auto Git pipeline
+- auto-commit: Improve war room core
