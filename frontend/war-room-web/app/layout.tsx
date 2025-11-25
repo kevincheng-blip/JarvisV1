@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "../styles/globals.css";
+import { ThemeScript } from "@/components/common/ThemeScript";
 
 export const metadata: Metadata = {
-  title: "J-GOD War Room v6",
-  description: "Multi-AI War Room Console",
+  title: "J-GOD War Room v6 PRO",
+  description: "Professional Multi-AI War Room Console",
 };
 
 export default function RootLayout({
@@ -13,6 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW">
+      <head>
+        <ThemeScript />
+      </head>
       <body>{children}</body>
     </html>
   );
