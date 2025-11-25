@@ -26,3 +26,4 @@
 - auto-commit: Enhance war room functionality
 - auto-commit: Improve war room core
 - auto-commit: Enhance war room functionality
+- auto-commit: Add new features
