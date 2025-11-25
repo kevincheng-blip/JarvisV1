@@ -78,7 +78,7 @@ export function WarRoomLayoutPro({ state, onStart, wsStatus = "disconnected" }: 
         <div className="grid grid-cols-12 gap-6">
           {/* Left: Command Panel (25%) */}
           <div className="col-span-12 lg:col-span-3">
-            <CommandPanelPro onStart={onStart} isRunning={state.isRunning} />
+            <CommandPanelPro onStart={onStart} isRunning={state.status === "running"} wsStatus={wsStatus} />
           </div>
 
           {/* Right: War Room (75%) */}

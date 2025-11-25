@@ -5,6 +5,7 @@ import { WarRoomLayoutPro } from "@/components/layout/WarRoomLayoutPro";
 import {
   WarRoomSessionState,
   createInitialSessionState,
+  resetForNextRun,
   RoleKey,
   ProviderKey,
 } from "@/lib/types/warRoom";
@@ -35,9 +36,15 @@ export default function Home() {
 
         const sessionId = sessionResponse.session_id;
 
-        // 2. 初始化狀態
-        const newState = createInitialSessionState();
+        // 2. 初始化狀態（如果是新一輪，先重置）
+        const currentState = state.status === "finished" ? resetForNextRun(state) : state;
+        const newState = {
+          ...createInitialSessionState(),
+          // 保留上一輪的 events（如果有的話）
+          events: currentState.status === "finished" ? currentState.events : [],
+        };
         newState.sessionId = sessionId;
+        newState.status = "running";
         newState.isRunning = true;
         newState.mode = config.mode;
         newState.enabledProviders = config.enabledProviders;
@@ -61,6 +68,7 @@ export default function Home() {
           console.error("[WS] Error:", error);
           setState((prev) => ({
             ...prev,
+            status: "finished",
             isRunning: false,
           }));
         });
@@ -69,6 +77,7 @@ export default function Home() {
           console.log("[WS] Closed");
           setState((prev) => ({
             ...prev,
+            status: "finished",
             isRunning: false,
             finishedAt: Date.now(),
           }));
@@ -92,6 +101,7 @@ export default function Home() {
         alert(`啟動失敗: ${error instanceof Error ? error.message : "Unknown error"}`);
         setState((prev) => ({
           ...prev,
+          status: "finished",
           isRunning: false,
         }));
       }
@@ -105,6 +115,7 @@ export default function Home() {
 
     switch (event.type) {
       case "session_start":
+        newState.status = "running";
         newState.isRunning = true;
         break;
 
@@ -123,6 +134,10 @@ export default function Home() {
         if (event.role && event.chunk) {
           const role = newState.roles[event.role as RoleKey];
           if (role) {
+            // 追蹤首響時間
+            if (!role.firstChunkAt && role.content.length === 0) {
+              role.firstChunkAt = Date.now();
+            }
             role.content += event.chunk;
             role.status = "running";
           }
@@ -147,10 +162,14 @@ export default function Home() {
 
       case "summary":
         // 將 summary 附加到 Strategist 角色
-        const strategist = newState.roles["Strategist"];
+        const strategist = newState.roles["strategist"];
         if (strategist && event.content) {
           strategist.content += "\n\n--- 總結 ---\n" + event.content;
         }
+        // Summary 事件表示所有角色完成，重置狀態以允許下一輪
+        newState.status = "finished";
+        newState.isRunning = false;
+        newState.finishedAt = Date.now();
         break;
 
       case "error":
@@ -170,7 +189,10 @@ export default function Home() {
       (r) => r.status === "done" || r.status === "error"
     );
 
-    if (allDone && newState.isRunning) {
+    if (allDone && newState.isRunning && newState.status === "running") {
+      // 所有角色完成，但還沒收到 summary，先標記為 finished
+      // 如果之後收到 summary，會再次更新
+      newState.status = "finished";
       newState.isRunning = false;
       newState.finishedAt = Date.now();
     }

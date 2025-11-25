@@ -13,9 +13,10 @@ interface CommandPanelProProps {
     userPrompt: string;
   }) => void;
   isRunning: boolean;
+  wsStatus?: "disconnected" | "connecting" | "connected" | "reconnecting";
 }
 
-export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
+export function CommandPanelPro({ onStart, isRunning, wsStatus = "disconnected" }: CommandPanelProProps) {
   const [mode, setMode] = useState<"god" | "custom">("god");
   const [enabledProviders, setEnabledProviders] = useState<ProviderKey[]>([
     "gpt",
@@ -86,7 +87,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
       {/* Mode Selector */}
       <div className="space-y-3">
         <label className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-          作戰模式
+          選擇戰情模式
         </label>
         <div className="relative bg-titanium border-2 border-titanium rounded-xl p-1 flex">
           <motion.button
@@ -101,7 +102,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            ⚔️ God Mode
+            ⚔️ God 模式（全 AI 啟動）
             {mode === "god" && (
               <motion.div
                 className="absolute inset-0 bg-gradient-to-r from-ai-blue/20 to-military-green/20 rounded-lg"
@@ -122,7 +123,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            ⚙️ Custom
+            ⚙️ 自訂模式
             {mode === "custom" && (
               <motion.div
                 className="absolute inset-0 bg-gradient-to-r from-metal-gold/20 to-command-red/20 rounded-lg"
@@ -207,7 +208,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
       {/* Stock Input */}
       <div className="space-y-3">
         <label className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-          股票代碼
+          股票代號（可輸入多檔，以逗號或空白分隔）
         </label>
         <div className="relative">
           <input
@@ -253,7 +254,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
           <textarea
             value={userPrompt}
             onChange={(e) => setUserPrompt(e.target.value)}
-            placeholder="請描述你要戰情室分析的重點，例如：『短線留意 1 週內的反轉風險』"
+            placeholder="請輸入你要 J-GOD 幫你判斷的盤勢 / 策略問題…"
             rows={6}
             className="w-full px-4 py-3 bg-titanium/50 border-2 border-titanium rounded-xl text-foreground placeholder-gray-500 focus:outline-none focus:border-ai-blue/50 focus:ring-2 focus:ring-ai-blue/20 resize-none transition-all font-mono text-sm leading-relaxed"
           />
@@ -263,7 +264,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
       {/* Start Button */}
       <motion.button
         onClick={handleStart}
-        disabled={!canStart}
+        disabled={!canStart || isRunning || wsStatus === "connecting"}
         className={clsx(
           "w-full px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 relative overflow-hidden",
           canStart
@@ -277,7 +278,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
           <>
             <span className="relative z-10 flex items-center justify-center gap-2">
               <span>⚔️</span>
-              <span>啟動 J-GOD 作戰分析</span>
+              <span>啟動 J-GOD 戰情室</span>
             </span>
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
@@ -286,7 +287,7 @@ export function CommandPanelPro({ onStart, isRunning }: CommandPanelProProps) {
             />
           </>
         ) : (
-          "⚔️ 啟動 J-GOD 作戰分析"
+          "⚔️ 啟動 J-GOD 戰情室"
         )}
       </motion.button>
     </div>

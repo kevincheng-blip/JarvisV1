@@ -36,6 +36,7 @@ export default function DemoTsmcPage() {
         const sessionId = sessionResponse.session_id;
         const newState = createInitialSessionState();
         newState.sessionId = sessionId;
+        newState.status = "running";
         newState.isRunning = true;
         newState.mode = config.mode;
         newState.enabledProviders = config.enabledProviders;
@@ -95,6 +96,7 @@ export default function DemoTsmcPage() {
 
     switch (event.type) {
       case "session_start":
+        newState.status = "running";
         newState.isRunning = true;
         break;
       case "role_start":
@@ -111,6 +113,10 @@ export default function DemoTsmcPage() {
         if (event.role && event.chunk) {
           const role = newState.roles[event.role as RoleKey];
           if (role) {
+            // 追蹤首響時間
+            if (!role.firstChunkAt && role.content.length === 0) {
+              role.firstChunkAt = Date.now();
+            }
             role.content += event.chunk;
             role.status = "running";
           }
@@ -132,10 +138,13 @@ export default function DemoTsmcPage() {
         }
         break;
       case "summary":
-        const strategist = newState.roles["Strategist"];
+        const strategist = newState.roles["strategist"];
         if (strategist && event.content) {
           strategist.content += "\n\n--- 總結 ---\n" + event.content;
         }
+        newState.status = "finished";
+        newState.isRunning = false;
+        newState.finishedAt = Date.now();
         break;
       case "error":
         if (event.role) {
@@ -151,7 +160,8 @@ export default function DemoTsmcPage() {
     const allRoles = Object.values(newState.roles);
     const allDone = allRoles.every((r) => r.status === "done" || r.status === "error");
 
-    if (allDone && newState.isRunning) {
+    if (allDone && newState.isRunning && newState.status === "running") {
+      newState.status = "finished";
       newState.isRunning = false;
       newState.finishedAt = Date.now();
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { RoleState } from "@/lib/types/warRoom";
+import { RoleState, ROLE_DISPLAY_NAME_ZH, ROLE_DISPLAY_NAME_EN } from "@/lib/types/warRoom";
 import { ProviderTag } from "../common/ProviderTag";
 import { LoadingDots } from "../common/LoadingDots";
 import { motion } from "framer-motion";
@@ -47,10 +47,20 @@ export function RoleCardPro({ role }: RoleCardProProps) {
 
   const getExecutionTime = () => {
     if (role.finishedAt && role.startedAt) {
-      return ((role.finishedAt - role.startedAt) / 1000).toFixed(2);
+      const totalTime = ((role.finishedAt - role.startedAt) / 1000).toFixed(1);
+      if (role.firstChunkAt) {
+        const firstChunkTime = ((role.firstChunkAt - role.startedAt) / 1000).toFixed(1);
+        return `首響：${firstChunkTime}s｜總耗時：${totalTime}s`;
+      }
+      return `總耗時：${totalTime}s`;
     }
     if (role.startedAt) {
-      return ((Date.now() - role.startedAt) / 1000).toFixed(1);
+      const elapsed = ((Date.now() - role.startedAt) / 1000).toFixed(1);
+      if (role.firstChunkAt) {
+        const firstChunkTime = ((role.firstChunkAt - role.startedAt) / 1000).toFixed(1);
+        return `首響：${firstChunkTime}s｜進行中：${elapsed}s`;
+      }
+      return `進行中：${elapsed}s`;
     }
     return null;
   };
@@ -65,11 +75,16 @@ export function RoleCardPro({ role }: RoleCardProProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-foreground mb-2 tracking-wide">
-            <span className="bg-gradient-to-r from-ai-blue to-military-green bg-clip-text text-transparent">
-              {role.label}
+          <div className="flex items-baseline gap-2 mb-2">
+            <h3 className="text-lg font-bold text-foreground tracking-wide">
+              <span className="bg-gradient-to-r from-ai-blue to-military-green bg-clip-text text-transparent">
+                {ROLE_DISPLAY_NAME_ZH[role.key]}
+              </span>
+            </h3>
+            <span className="text-xs text-gray-500">
+              {ROLE_DISPLAY_NAME_EN[role.key]}
             </span>
-          </h3>
+          </div>
           {role.provider && (
             <div className="mt-1">
               <ProviderTag provider={role.provider} />

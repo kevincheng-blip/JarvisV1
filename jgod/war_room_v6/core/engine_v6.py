@@ -211,11 +211,16 @@ class WarRoomEngineV6:
                 ))
                 self.logger.info(f"[ENGINE_V6] Role started: {role_name} (provider: {provider_key})")
                 
-                # 5.2 取得系統提示
-                system_prompt = self.role_system_prompts.get(
+                # 5.2 取得系統提示並加上簡短回答指示
+                base_system_prompt = self.role_system_prompts.get(
                     role_name,
                     "你是一個專業的股市分析師。"
                 )
+                # 除 Strategist 外，其他角色要求簡短回答
+                if role_name != "Strategist":
+                    system_prompt = f"{base_system_prompt}\n\n請用 2～4 句話給出最關鍵的觀點與建議，不要寫長篇大論。"
+                else:
+                    system_prompt = base_system_prompt
                 
                 # 5.3 建立 chunk 累積器
                 full_content = ""
@@ -256,12 +261,20 @@ class WarRoomEngineV6:
                         except Exception as e:
                             self.logger.error(f"[ENGINE_V6] Error putting chunk event: {e}")
                 
-                # 5.5 呼叫 ProviderManager 執行角色
+                # 5.5 根據角色決定 max_tokens
+                # Strategist 維持 512，其他角色使用 256 以加速回應
+                if role_name == "Strategist":
+                    role_max_tokens = request.max_tokens  # 預設 512
+                else:
+                    role_max_tokens = min(256, request.max_tokens)  # 其他角色限制為 256
+                
+                # 5.6 呼叫 ProviderManager 執行角色
                 result = await self.provider_manager.run_role_streaming(
                     role_name=role_name,
                     prompt=full_prompt,
                     enabled_providers=request.enabled_providers,
                     on_chunk=on_chunk,
+                    max_tokens=role_max_tokens,
                 )
                 
                 execution_time = time.time() - role_start_time

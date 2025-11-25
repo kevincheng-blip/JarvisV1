@@ -8,12 +8,12 @@ interface RoleGridProps {
 }
 
 const ROLE_ORDER: RoleKey[] = [
-  "Intel Officer",
-  "Scout",
-  "Risk Officer",
-  "Quant Lead",
-  "Strategist",
-  "Execution Officer",
+  "intel_officer",
+  "scout",
+  "risk_officer",
+  "quant_lead",
+  "strategist",
+  "execution_officer",
 ];
 
 export function RoleGrid({ roles }: RoleGridProps) {

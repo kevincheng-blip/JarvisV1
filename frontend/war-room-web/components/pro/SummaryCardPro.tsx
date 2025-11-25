@@ -21,10 +21,10 @@ export function SummaryCardPro({ state }: SummaryCardProProps) {
   }
 
   // 從各角色內容中提取關鍵資訊
-  const strategist = state.roles["Strategist"];
-  const riskOfficer = state.roles["Risk Officer"];
-  const quantLead = state.roles["Quant Lead"];
-  const intelOfficer = state.roles["Intel Officer"];
+  const strategist = state.roles["strategist"];
+  const riskOfficer = state.roles["risk_officer"];
+  const quantLead = state.roles["quant_lead"];
+  const intelOfficer = state.roles["intel_officer"];
 
   const getConsensus = () => {
     const successfulRoles = Object.values(state.roles).filter((r) => r.status === "done");
