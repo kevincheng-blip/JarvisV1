@@ -40,7 +40,8 @@ class BaseProviderAsync(ABC):
         self, 
         prompt: str, 
         system_prompt: Optional[str] = None,
-        on_chunk: Optional[Callable[[str], None]] = None
+        on_chunk: Optional[Callable[[str], None]] = None,
+        max_tokens: Optional[int] = None
     ) -> ProviderResult:
         """
         執行 Provider 請求（Streaming 模式）

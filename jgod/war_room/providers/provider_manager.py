@@ -158,6 +158,7 @@ class ProviderManager:
         prompt: str,
         enabled_providers: Optional[List[str]] = None,
         on_chunk: Optional[Callable[[str], None]] = None,
+        max_tokens: Optional[int] = None,
     ) -> ProviderResult:
         """
         執行特定角色的分析（Streaming 版本）
@@ -218,7 +219,7 @@ class ProviderManager:
         system_prompt = self.ROLE_SYSTEM_PROMPTS.get(role_name, "你是一個專業的股市分析師。")
         
         # 執行 Provider（Streaming 模式）
-        result = await provider.run_stream(prompt, system_prompt, on_chunk=on_chunk)
+        result = await provider.run_stream(prompt, system_prompt, on_chunk=on_chunk, max_tokens=max_tokens)
         
         # 如果錯誤已經標記過，直接返回
         if result.error and (result.error.startswith("API_KEY_MISSING:") or 
