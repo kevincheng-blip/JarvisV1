@@ -417,63 +417,63 @@ with tab1:
                     stop_war_room_session()
                 else:
                     # 轉換結果格式（適配現有 UI）
-                role_results_dict = {}
-                for role, role_result in war_room_result.results.items():
-                    # 轉換為 ProviderResult 格式（適配現有 render_role_card）
-                    provider_result = ProviderResult(
-                        success=role_result.success,
-                        content=role_result.content,
-                        error=role_result.error,
-                        provider_name=role_result.provider_key,
-                        execution_time=role_result.execution_time,
-                    )
-                    role_results_dict[role.value] = provider_result
-                    
-                    # v4.2: 使用新的狀態管理器標記完成
-                    role_key = role.value
-                    mark_role_done(
-                        role_key,
-                        success=role_result.success,
-                        error_message=role_result.error if not role_result.success else None,
-                    )
-                
-                # 儲存結果到 session state
-                st.session_state["war_room_role_results"] = role_results_dict
-                st.session_state["war_room_loading"] = False
-                
-                # v4.2: 停止戰情室會話
-                stop_war_room_session()
-                
-                # 檢查結果
-                if not war_room_result.results:
-                    logger.error("War Room execution returned no results!")
-                    st.error("❌ 戰情室執行失敗：沒有取得任何結果")
-                    st.info("請檢查 log 以了解詳細錯誤")
-                else:
-                    # 執行 Strategist 總結（使用現有邏輯）
-                    try:
-                        strategist_result = asyncio.run(
-                            provider_manager.run_strategist_summary(role_results_dict, question)
+                    role_results_dict = {}
+                    for role, role_result in war_room_result.results.items():
+                        # 轉換為 ProviderResult 格式（適配現有 render_role_card）
+                        provider_result = ProviderResult(
+                            success=role_result.success,
+                            content=role_result.content,
+                            error=role_result.error,
+                            provider_name=role_result.provider_key,
+                            execution_time=role_result.execution_time,
                         )
-                        st.session_state["war_room_strategist_result"] = strategist_result
-                    except Exception as e:
-                        logger.error(f"Strategist summary failed: {e}")
-                        st.warning("⚠️ Strategist 總結失敗，但其他角色分析已完成")
+                        role_results_dict[role.value] = provider_result
+                        
+                        # v4.2: 使用新的狀態管理器標記完成
+                        role_key = role.value
+                        mark_role_done(
+                            role_key,
+                            success=role_result.success,
+                            error_message=role_result.error if not role_result.success else None,
+                        )
                     
-                    # 儲存會議紀錄
-                    log_file = save_war_room_log(
-                        question,
-                        role_results_dict,
-                        st.session_state.get("war_room_strategist_result"),
-                        mode=current_mode,
-                        enabled_providers=engine._get_enabled_providers(current_mode, custom_providers),
-                    )
-                    st.session_state["war_room_log_file"] = log_file
+                    # 儲存結果到 session state
+                    st.session_state["war_room_role_results"] = role_results_dict
+                    st.session_state["war_room_loading"] = False
                     
-                    # 記錄完成
-                    logger.info(f"War Room execution completed. Executed: {len(war_room_result.executed_roles)}, Failed: {len(war_room_result.failed_roles)}")
+                    # v4.2: 停止戰情室會話
+                    stop_war_room_session()
                     
-                    st.success(f"✅ 分析完成！執行 {len(war_room_result.executed_roles)} 個角色，{len(war_room_result.failed_roles)} 個失敗")
+                    # 檢查結果
+                    if not war_room_result.results:
+                        logger.error("War Room execution returned no results!")
+                        st.error("❌ 戰情室執行失敗：沒有取得任何結果")
+                        st.info("請檢查 log 以了解詳細錯誤")
+                    else:
+                        # 執行 Strategist 總結（使用現有邏輯）
+                        try:
+                            strategist_result = asyncio.run(
+                                provider_manager.run_strategist_summary(role_results_dict, question)
+                            )
+                            st.session_state["war_room_strategist_result"] = strategist_result
+                        except Exception as e:
+                            logger.error(f"Strategist summary failed: {e}")
+                            st.warning("⚠️ Strategist 總結失敗，但其他角色分析已完成")
+                        
+                        # 儲存會議紀錄
+                        log_file = save_war_room_log(
+                            question,
+                            role_results_dict,
+                            st.session_state.get("war_room_strategist_result"),
+                            mode=current_mode,
+                            enabled_providers=engine._get_enabled_providers(current_mode, custom_providers),
+                        )
+                        st.session_state["war_room_log_file"] = log_file
+                        
+                        # 記錄完成
+                        logger.info(f"War Room execution completed. Executed: {len(war_room_result.executed_roles)}, Failed: {len(war_room_result.failed_roles)}")
+                        
+                        st.success(f"✅ 分析完成！執行 {len(war_room_result.executed_roles)} 個角色，{len(war_room_result.failed_roles)} 個失敗")
                     
             except Exception as e:
                 log_error(e, {

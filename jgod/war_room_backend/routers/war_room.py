@@ -31,14 +31,25 @@ async def create_session():
 
 @router.websocket("/ws/war-room/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
-    """WebSocket 端點"""
+    """WebSocket 端點 - 真正即時串流版本"""
     connection_id = str(uuid.uuid4())
     
     await manager.connect(websocket, connection_id, session_id)
+    logger.info(f"WebSocket connected: {connection_id} for session {session_id}")
     
     try:
-        # 等待客戶端發送啟動參數
-        data = await websocket.receive_json()
+        # 等待客戶端發送啟動參數（最多等待 30 秒）
+        import asyncio
+        try:
+            data = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
+        except asyncio.TimeoutError:
+            await websocket.send_json({
+                "type": "error",
+                "session_id": session_id,
+                "error_type": "TIMEOUT",
+                "message": "等待啟動參數超時",
+            })
+            return
         
         mode = data.get("mode", "Lite")
         custom_providers = data.get("custom_providers")
@@ -48,7 +59,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         user_question = data.get("question", "")
         market_context = data.get("market_context", "")
         
-        # 執行 War Room 分析並發送事件
+        logger.info(f"Starting War Room session {session_id}: mode={mode}, stock_id={stock_id}")
+        
+        # 執行 War Room 分析並即時發送事件
         async for event in engine.run_war_room(
             session_id=session_id,
             mode=mode,
@@ -59,18 +72,28 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             user_question=user_question,
             market_context=market_context,
         ):
-            await manager.send_to_session(session_id, event.dict())
+            # 即時發送事件到 WebSocket
+            try:
+                await websocket.send_json(event.dict())
+                logger.debug(f"Sent event: {event.type} for session {session_id}")
+            except Exception as send_error:
+                logger.error(f"Failed to send event: {send_error}")
+                break  # 如果發送失敗，停止 streaming
     
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {connection_id}")
     except Exception as e:
         logger.error(f"WebSocket error: {e}", exc_info=True)
-        await manager.send_to_session(session_id, {
-            "type": "error",
-            "session_id": session_id,
-            "error_type": "WEBSOCKET_ERROR",
-            "message": str(e),
-        })
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "session_id": session_id,
+                "error_type": "WEBSOCKET_ERROR",
+                "message": str(e),
+            })
+        except Exception:
+            pass  # 如果連線已斷開，忽略發送錯誤
     finally:
         manager.disconnect(connection_id, session_id)
+        logger.info(f"WebSocket connection closed: {connection_id}")
 

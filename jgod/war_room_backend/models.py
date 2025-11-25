@@ -31,6 +31,7 @@ class RoleChunkEvent(WarRoomEvent):
     chunk: str
     sequence: int
     is_final: bool = False
+    mode: Optional[str] = None  # 可選：模式資訊
 
 
 class RoleDoneEvent(WarRoomEvent):
