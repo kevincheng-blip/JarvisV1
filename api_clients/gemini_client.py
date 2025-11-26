@@ -2,6 +2,7 @@ from typing import Protocol
 import os
 import logging
 from google import genai
+from google.genai import types as genai_types
 from google.genai.errors import APIError
 
 logger = logging.getLogger("war_room")
@@ -33,6 +34,22 @@ class GeminiProvider:
         # 如果沒有指定 model，使用 fast model
         self.fast_model_id = model or FAST_MODEL_ID
         self.fallback_model_id = FALLBACK_MODEL_ID
+        
+        # 建立專門用來產生純文字回答的 GenerativeModel
+        # 設定 response_mime_type="text/plain" 並關閉 AFC（避免 token 被用在 thoughts）
+        try:
+            # 嘗試使用 GenerativeModel（如果 SDK 支援）
+            if hasattr(genai, 'GenerativeModel'):
+                self.model = genai.GenerativeModel(
+                    model_name=self.fast_model_id,
+                )
+            else:
+                # 如果沒有 GenerativeModel，使用 client.models
+                self.model = None
+        except Exception as e:
+            # 如果 GenerativeModel 初始化失敗，fallback 到原本的方式
+            logger.warning(f"[GEMINI] Failed to create GenerativeModel: {e}, using default client")
+            self.model = None
     
     def _extract_text_from_response(self, response) -> str:
         """
@@ -163,10 +180,29 @@ class GeminiProvider:
             # 加入更詳細的 debug log
             logger.warning(
                 "[GEMINI] Response parsed but no text content extracted. "
-                f"Response type: {type(response)}, "
+                f"Response type: {type(response).__name__}, "
                 f"Has text attr: {hasattr(response, 'text')}, "
                 f"Has candidates attr: {hasattr(response, 'candidates')}"
             )
+            
+            # Gemini-special fallback：最後一層嘗試直接讀取 response.text
+            if hasattr(response, "text"):
+                try:
+                    maybe_text = response.text
+                    if callable(maybe_text):
+                        maybe_text = maybe_text()
+                    if isinstance(maybe_text, str) and maybe_text.strip():
+                        logger.debug("[GEMINI] Successfully extracted text from response.text in fallback")
+                        return maybe_text.strip()
+                    elif maybe_text is not None:
+                        # 如果不是字串，嘗試轉換
+                        text_str = str(maybe_text).strip()
+                        if text_str:
+                            logger.debug(f"[GEMINI] Converted response.text to string: {type(maybe_text)}")
+                            return text_str
+                except Exception as e:
+                    logger.exception("[GEMINI] Failed to read response.text in fallback")
+            
             # 嘗試直接轉換 response 為字串（最後手段）
             try:
                 response_str = str(response)
@@ -182,11 +218,28 @@ class GeminiProvider:
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
 
         try:
-            # 先嘗試使用 fast model
-            response = self.client.models.generate_content(
-                model=self.fast_model_id,
-                contents=prompt,
+            # 建立 generation_config，強制使用 text/plain 並關閉 AFC
+            generation_config = genai_types.GenerationConfig(
+                response_mime_type="text/plain",  # 強制純文字輸出
+                max_output_tokens=768,  # Scout 使用較短的輸出
+                temperature=0.4,  # 保持穩定但有一點變化
             )
+            
+            # 優先使用設定好的 GenerativeModel（有 text/plain 和關閉 AFC）
+            if self.model:
+                response = self.model.generate_content(
+                    contents=prompt,
+                    generation_config=generation_config,
+                    tools=[],  # 不使用任何工具
+                )
+            else:
+                # Fallback 到原本的方式，但也要設定 text/plain
+                response = self.client.models.generate_content(
+                    model=self.fast_model_id,
+                    contents=prompt,
+                    config=generation_config,
+                )
+            
             # 使用穩健的文字提取方法
             text = self._extract_text_from_response(response)
             # 為了避免前端看到空內容，這裡做一層防禦
@@ -224,10 +277,24 @@ class GeminiProvider:
                     self.fallback_model_id,
                 )
                 try:
-                    fallback_response = self.client.models.generate_content(
-                        model=self.fallback_model_id,
-                        contents=prompt,
+                    # Fallback 時也使用設定好的 model（如果有的話），同樣設定 text/plain
+                    generation_config = genai_types.GenerationConfig(
+                        response_mime_type="text/plain",
+                        max_output_tokens=768,
+                        temperature=0.4,
                     )
+                    if self.model:
+                        fallback_response = self.model.generate_content(
+                            contents=prompt,
+                            generation_config=generation_config,
+                            tools=[],
+                        )
+                    else:
+                        fallback_response = self.client.models.generate_content(
+                            model=self.fallback_model_id,
+                            contents=prompt,
+                            config=generation_config,
+                        )
                     text = self._extract_text_from_response(fallback_response)
                     if not text or not text.strip():
                         logger.warning("[GEMINI] Extracted empty text from fallback response")
@@ -243,23 +310,32 @@ class GeminiProvider:
         """
         Streaming 版本（改為一次性取得完整結果，但仍維持 generator 介面）
         注意：google-genai SDK 不支援 stream=True，所以改為一次性取得完整結果
-        支援 fast model 和 fallback model 自動切換
+        使用設定好的 GenerativeModel（text/plain + 關閉 AFC）
         """
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
         
-        # 使用 generation_config 優化參數以加速回應
-        generation_config = {}
-        if max_tokens:
-            # 限制輸出長度以加速（Scout 角色使用較短的 max_tokens）
-            generation_config["max_output_tokens"] = min(max_tokens, 768)
-        
         try:
-            # 先嘗試使用 fast model
-            response = self.client.models.generate_content(
-                model=self.fast_model_id,
-                contents=prompt,
-                config=generation_config if generation_config else None,
+            # 建立 generation_config，強制使用 text/plain 並關閉 AFC
+            generation_config = genai_types.GenerationConfig(
+                response_mime_type="text/plain",  # 強制純文字輸出
+                max_output_tokens=min(max_tokens, 768) if max_tokens else 768,
+                temperature=0.4,
             )
+            
+            # 優先使用設定好的 GenerativeModel（有 text/plain 和關閉 AFC）
+            if self.model:
+                response = self.model.generate_content(
+                    contents=prompt,
+                    generation_config=generation_config,
+                    tools=[],  # 不使用任何工具
+                )
+            else:
+                # Fallback 到原本的方式
+                response = self.client.models.generate_content(
+                    model=self.fast_model_id,
+                    contents=prompt,
+                    config=generation_config,
+                )
             
             # 使用穩健的文字提取方法
             full_text = self._extract_text_from_response(response)
@@ -284,11 +360,24 @@ class GeminiProvider:
                     self.fallback_model_id,
                 )
                 try:
-                    fallback_response = self.client.models.generate_content(
-                        model=self.fallback_model_id,
-                        contents=prompt,
-                        config=generation_config if generation_config else None,
+                    # Fallback 時也使用設定好的 model（如果有的話），同樣設定 text/plain
+                    generation_config = genai_types.GenerationConfig(
+                        response_mime_type="text/plain",
+                        max_output_tokens=min(max_tokens, 768) if max_tokens else 768,
+                        temperature=0.4,
                     )
+                    if self.model:
+                        fallback_response = self.model.generate_content(
+                            contents=prompt,
+                            generation_config=generation_config,
+                            tools=[],
+                        )
+                    else:
+                        fallback_response = self.client.models.generate_content(
+                            model=self.fallback_model_id,
+                            contents=prompt,
+                            config=generation_config,
+                        )
                     
                     # 使用穩健的文字提取方法
                     full_text = self._extract_text_from_response(fallback_response)
