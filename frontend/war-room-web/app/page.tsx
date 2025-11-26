@@ -12,11 +12,29 @@ import {
 } from "@/lib/types/warRoom";
 import { WarRoomWebSocketClientPro, createSession, WebSocketStatus } from "@/lib/ws/warRoomClientPro";
 import { WarRoomEvent } from "@/lib/types/warRoom";
+import { Quote } from "@/lib/types/quotes";
 
 export default function Home() {
   const [state, setState] = useState<WarRoomSessionState>(createInitialSessionState());
   const [wsClient, setWsClient] = useState<WarRoomWebSocketClientPro | null>(null);
   const [wsStatus, setWsStatus] = useState<WebSocketStatus>("disconnected");
+
+  // Mock quotes 資料
+  const mockQuotes: Quote[] = [
+    { symbol: "2330", name: "台積電", price: 580.5, change: 1.23, volume: 12500000 },
+    { symbol: "2317", name: "鴻海", price: 105.2, change: -0.45, volume: 8500000 },
+    { symbol: "2454", name: "聯發科", price: 920.0, change: 2.15, volume: 3200000 },
+    { symbol: "2308", name: "台達電", price: 285.5, change: 0.85, volume: 2100000 },
+    { symbol: "2412", name: "中華電", price: 128.0, change: 0.0, volume: 1500000 },
+    { symbol: "2886", name: "兆豐金", price: 32.8, change: -0.61, volume: 9800000 },
+    { symbol: "2891", name: "中信金", price: 28.5, change: 1.07, volume: 12000000 },
+    { symbol: "2882", name: "國泰金", price: 56.2, change: -0.35, volume: 7500000 },
+  ];
+
+  const handleSelectSymbol = useCallback((symbol: string) => {
+    console.log("[QUOTE] Selected symbol:", symbol);
+    // 可以在這裡處理選取股票的事件，例如更新輸入欄位
+  }, []);
 
   const handleStart = useCallback(
     async (config: {
@@ -228,5 +246,13 @@ export default function Home() {
     return newState;
   };
 
-  return <WarRoomLayoutPro state={state} onStart={handleStart} wsStatus={wsStatus} />;
+  return (
+    <WarRoomLayoutPro 
+      state={state} 
+      onStart={handleStart} 
+      wsStatus={wsStatus}
+      quotes={mockQuotes}
+      onSelectSymbol={handleSelectSymbol}
+    />
+  );
 }

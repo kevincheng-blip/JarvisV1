@@ -6,8 +6,10 @@ import { StatusBar } from "../war-room/StatusBar";
 import { TimelinePro } from "../pro/TimelinePro";
 import { SummaryCardPro } from "../pro/SummaryCardPro";
 import { ThemeToggle } from "../common/ThemeToggle";
+import { NasdaqStyleQuoteList } from "../quotes/NasdaqStyleQuoteList";
 import { WarRoomSessionState, ProviderKey } from "@/lib/types/warRoom";
 import { WebSocketStatus } from "@/lib/ws/warRoomClientPro";
+import { Quote } from "@/lib/types/quotes";
 
 interface WarRoomLayoutProProps {
   state: WarRoomSessionState;
@@ -18,9 +20,17 @@ interface WarRoomLayoutProProps {
     userPrompt: string;
   }) => void;
   wsStatus?: WebSocketStatus;
+  quotes?: Quote[];
+  onSelectSymbol?: (symbol: string) => void;
 }
 
-export function WarRoomLayoutPro({ state, onStart, wsStatus = "disconnected" }: WarRoomLayoutProProps) {
+export function WarRoomLayoutPro({ 
+  state, 
+  onStart, 
+  wsStatus = "disconnected",
+  quotes = [],
+  onSelectSymbol,
+}: WarRoomLayoutProProps) {
   const stockIds = state.events
     .find((e) => e.type === "session_start")
     ?.meta?.stock_ids as string[] || [];
@@ -82,25 +92,41 @@ export function WarRoomLayoutPro({ state, onStart, wsStatus = "disconnected" }: 
           </div>
 
           {/* Right: War Room (75%) */}
-          <div className="col-span-12 lg:col-span-9 space-y-6">
-            {/* Status Bar */}
-            <StatusBar
-              mode={state.mode}
-              enabledProviders={state.enabledProviders}
-              stockIds={stockIds}
-              isRunning={state.isRunning}
-              startedAt={state.startedAt}
-              finishedAt={state.finishedAt}
-            />
+          <div className="col-span-12 lg:col-span-9">
+            <div className="grid grid-cols-12 gap-6">
+              {/* Main War Room Content (75%) */}
+              <div className="col-span-12 xl:col-span-9 space-y-6">
+                {/* Status Bar */}
+                <StatusBar
+                  mode={state.mode}
+                  enabledProviders={state.enabledProviders}
+                  stockIds={stockIds}
+                  isRunning={state.isRunning}
+                  startedAt={state.startedAt}
+                  finishedAt={state.finishedAt}
+                />
 
-            {/* Role Grid */}
-            <RoleGrid roles={state.roles} />
+                {/* Role Grid */}
+                <RoleGrid roles={state.roles} />
 
-            {/* Summary Card */}
-            <SummaryCardPro state={state} />
+                {/* Summary Card */}
+                <SummaryCardPro state={state} />
 
-            {/* Event Timeline */}
-            <TimelinePro events={state.events} />
+                {/* Event Timeline */}
+                <TimelinePro events={state.events} />
+              </div>
+
+              {/* Right Sidebar: Quote List (25%) */}
+              <div className="col-span-12 xl:col-span-3">
+                <div className="sticky top-6">
+                  <h2 className="text-lg font-semibold text-gray-800 mb-4">即時報價</h2>
+                  <NasdaqStyleQuoteList 
+                    quotes={quotes} 
+                    onSelectSymbol={onSelectSymbol}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
