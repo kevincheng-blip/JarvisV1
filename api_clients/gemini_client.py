@@ -47,8 +47,15 @@ class GeminiProvider:
             )
             return response.text
         except APIError as e:
-            # 如果是 404 或其他 HTTP 錯誤，嘗試 fallback model
-            if hasattr(e, 'status_code') and e.status_code == 404:
+            # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
+            error_str = str(e).lower()
+            is_404 = (
+                (hasattr(e, 'status_code') and e.status_code == 404) or
+                "404" in error_str or
+                "not found" in error_str
+            )
+            
+            if is_404:
                 logger.warning(
                     "[GEMINI] Fast model %s returned 404, falling back to %s",
                     self.fast_model_id,
@@ -107,8 +114,15 @@ class GeminiProvider:
             # 一次性 yield 完整文字（維持 generator 介面）
             yield full_text
         except APIError as e:
-            # 如果是 404 或其他 HTTP 錯誤，嘗試 fallback model
-            if hasattr(e, 'status_code') and e.status_code == 404:
+            # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
+            error_str = str(e).lower()
+            is_404 = (
+                (hasattr(e, 'status_code') and e.status_code == 404) or
+                "404" in error_str or
+                "not found" in error_str
+            )
+            
+            if is_404:
                 logger.warning(
                     "[GEMINI] Fast model %s returned 404, falling back to %s",
                     self.fast_model_id,
