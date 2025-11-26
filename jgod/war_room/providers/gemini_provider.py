@@ -71,7 +71,8 @@ class GeminiProviderAsync(BaseProviderAsync):
         self, 
         prompt: str, 
         system_prompt: Optional[str] = None,
-        on_chunk: Optional[Callable[[str], None]] = None
+        on_chunk: Optional[Callable[[str], None]] = None,
+        max_tokens: Optional[int] = None
     ) -> ProviderResult:
         """
         執行 Gemini 請求（改為一次性取得完整結果，但仍維持 streaming 介面）
@@ -87,10 +88,14 @@ class GeminiProviderAsync(BaseProviderAsync):
             def get_full_response():
                 nonlocal full_content
                 try:
+                    # 使用傳入的 max_tokens，如果為 None 則使用預設值 512
+                    # 注意：Gemini 目前不支援 max_tokens，但保留參數以維持介面一致性
+                    effective_max_tokens = max_tokens if max_tokens is not None else 512
                     # ask_stream 現在會一次性返回完整文字（但仍維持 generator 介面）
                     for chunk in self._provider.ask_stream(
                         system_prompt=system_prompt or "你是一個專業的股市分析師。",
                         user_prompt=prompt,
+                        max_tokens=effective_max_tokens,
                     ):
                         if chunk:
                             full_content += chunk

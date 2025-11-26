@@ -45,14 +45,14 @@ class ClaudeProvider:
             # 先簡單回傳錯誤字串，之後可加入 logging
             return f"[Claude 發生錯誤：{e}]"
     
-    def ask_stream(self, system_prompt: str, user_prompt: str):
+    def ask_stream(self, system_prompt: str, user_prompt: str, max_tokens: int = 512):
         """
         Streaming 版本
         """
         try:
             with self.client.messages.stream(
                 model=self.model,
-                max_tokens=512,
+                max_tokens=max_tokens,
                 system=system_prompt,
                 messages=[
                     {"role": "user", "content": user_prompt}

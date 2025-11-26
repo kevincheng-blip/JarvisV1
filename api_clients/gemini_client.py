@@ -38,10 +38,11 @@ class GeminiProvider:
         except Exception as e:
             return f"[Gemini 呼叫失敗：{e}]"
     
-    def ask_stream(self, system_prompt: str, user_prompt: str):
+    def ask_stream(self, system_prompt: str, user_prompt: str, max_tokens: int = 512):
         """
         Streaming 版本（改為一次性取得完整結果，但仍維持 generator 介面）
         注意：google-genai SDK 不支援 stream=True，所以改為一次性取得完整結果
+        max_tokens 參數目前不支援（google-genai SDK 限制），但保留參數以維持介面一致性
         """
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
         

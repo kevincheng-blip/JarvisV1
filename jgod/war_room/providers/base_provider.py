@@ -50,6 +50,7 @@ class BaseProviderAsync(ABC):
             prompt: 使用者提示
             system_prompt: 系統提示（可選）
             on_chunk: 每收到一個 chunk 時的回調函數 (chunk: str) -> None
+            max_tokens: （選填）要求模型限制最大輸出長度
         
         Returns:
             ProviderResult（content 為完整內容）

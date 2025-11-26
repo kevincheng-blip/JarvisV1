@@ -73,7 +73,8 @@ class PerplexityProviderAsync(BaseProviderAsync):
         self, 
         prompt: str, 
         system_prompt: Optional[str] = None,
-        on_chunk: Optional[Callable[[str], None]] = None
+        on_chunk: Optional[Callable[[str], None]] = None,
+        max_tokens: Optional[int] = None
     ) -> ProviderResult:
         """執行 Perplexity 請求（Streaming 模式 - 模擬 SSE 分段流式）"""
         start_time = time.time()
@@ -86,9 +87,12 @@ class PerplexityProviderAsync(BaseProviderAsync):
             def process_stream():
                 nonlocal full_content
                 try:
+                    # 使用傳入的 max_tokens，如果為 None 則使用預設值 512
+                    effective_max_tokens = max_tokens if max_tokens is not None else 512
                     for chunk in self._provider.ask_stream(
                         system_prompt=system_prompt or "你是一個專業的股市分析師。",
                         user_prompt=prompt,
+                        max_tokens=effective_max_tokens,
                     ):
                         if chunk:
                             full_content += chunk

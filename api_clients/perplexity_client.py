@@ -76,7 +76,7 @@ class PerplexityProvider:
         except Exception as e:
             raise RuntimeError(f"Perplexity 回傳內容解析失敗：{e}") from e
     
-    def ask_stream(self, system_prompt: str, user_prompt: str):
+    def ask_stream(self, system_prompt: str, user_prompt: str, max_tokens: int = 512):
         """
         Streaming 版本（模擬 SSE 分段流式）
         Perplexity 目前不支援真正的 streaming，我們模擬逐句輸出
@@ -95,6 +95,7 @@ class PerplexityProvider:
             "model": self.model,
             "messages": messages,
             "stream": True,  # 啟用 streaming（如果 API 支援）
+            "max_tokens": max_tokens,  # 支援 max_tokens 參數
         }
         
         try:

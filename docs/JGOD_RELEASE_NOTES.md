@@ -1,5 +1,8 @@
 # J-GOD Release Notes
 
+## 2025-11-26
+- auto-commit: Add new features
+
 
 ## 2025-11-25
 - auto-commit: Add auto Git pipeline

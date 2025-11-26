@@ -41,6 +41,7 @@ class GPTProvider:
         self,
         system_prompt: str,
         user_prompt: str,
+        max_tokens: int = 512,
     ) -> Generator[str, None, None]:
         """Streaming 版本"""
         try:
@@ -51,7 +52,7 @@ class GPTProvider:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.4,
-                max_tokens=512,
+                max_tokens=max_tokens,
                 stream=True,
             )
             for chunk in stream:
