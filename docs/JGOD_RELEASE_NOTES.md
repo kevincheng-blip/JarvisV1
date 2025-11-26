@@ -4,6 +4,8 @@
 - auto-commit: Add new features
 
 
+- auto-commit: Enhance war room functionality
+
 ## 2025-11-25
 - auto-commit: Add auto Git pipeline
 

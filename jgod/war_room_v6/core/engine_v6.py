@@ -222,16 +222,19 @@ class WarRoomEngineV6:
                 else:
                     system_prompt = base_system_prompt
                 
-                # 5.3 建立 chunk 累積器
+                # 5.3 在 async context 中取得 event loop（不要在 callback 裡再抓）
+                loop = asyncio.get_running_loop()
+                
+                # 5.4 建立 chunk 累積器
                 full_content = ""
                 
-                # 5.4 定義 chunk callback（同步函式，需要轉換為異步）
+                # 5.5 定義 chunk callback（同步函式，使用外層的 loop）
                 def on_chunk(chunk: str):
                     """Chunk 回調函式（同步）"""
                     nonlocal full_content
                     full_content += chunk
                     
-                    # 將 chunk 事件放入佇列（使用 call_soon 確保非阻塞）
+                    # 將 chunk 事件放入佇列（使用外層已取得的 loop）
                     chunk_event = WarRoomEvent(
                         type="role_chunk",
                         session_id=request.session_id,
@@ -240,35 +243,20 @@ class WarRoomEngineV6:
                         provider=provider_key,
                         chunk=chunk,
                     )
-                    # 使用 call_soon 將同步 callback 轉為異步（在當前 event loop 中執行）
-                    try:
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            # 如果 loop 正在運行，使用 call_soon_threadsafe
-                            loop.call_soon_threadsafe(
-                                lambda: asyncio.create_task(event_queue.put(chunk_event))
-                            )
-                        else:
-                            # 如果 loop 未運行，直接 create_task
-                            asyncio.create_task(event_queue.put(chunk_event))
-                    except RuntimeError:
-                        # 如果沒有 event loop，使用線程安全方式
-                        try:
-                            loop = asyncio.get_running_loop()
-                            loop.call_soon_threadsafe(
-                                lambda: asyncio.create_task(event_queue.put(chunk_event))
-                            )
-                        except Exception as e:
-                            self.logger.error(f"[ENGINE_V6] Error putting chunk event: {e}")
+                    # 使用 call_soon_threadsafe 將同步 callback 轉為異步
+                    # 這裡只使用外層已經抓好的 loop，不再呼叫 get_running_loop()
+                    loop.call_soon_threadsafe(
+                        lambda: asyncio.create_task(event_queue.put(chunk_event))
+                    )
                 
-                # 5.5 根據角色決定 max_tokens
+                # 5.6 根據角色決定 max_tokens
                 # Strategist 維持 512，其他角色使用 256 以加速回應
                 if role_name == "Strategist":
                     role_max_tokens = request.max_tokens  # 預設 512
                 else:
                     role_max_tokens = min(256, request.max_tokens)  # 其他角色限制為 256
                 
-                # 5.6 呼叫 ProviderManager 執行角色
+                # 5.7 呼叫 ProviderManager 執行角色
                 result = await self.provider_manager.run_role_streaming(
                     role_name=role_name,
                     prompt=full_prompt,

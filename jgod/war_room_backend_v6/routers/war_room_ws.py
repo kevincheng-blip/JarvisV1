@@ -3,6 +3,7 @@ War Room WebSocket 路由 - v6.0
 提供 WebSocket API 供 Next.js 前端訂閱戰情室事件流
 """
 import uuid
+import asyncio
 import logging
 from typing import Dict, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
@@ -140,20 +141,64 @@ async def war_room_websocket(websocket: WebSocket, session_id: str):
         # 啟動引擎並推送事件
         logger.info(f"[WS] Starting engine for session {session_id}")
         
-        async for event in engine.run_session(war_room_request):
-            # 將事件轉為字典並推送給前端
-            event_dict = event.dict()
-            await websocket_manager.send_json(session_id, event_dict)
-            logger.debug(f"[WS] Event sent: {event.type} for session {session_id}")
+        # 建立一個獨立的 task 來執行 engine 並廣播事件
+        async def run_engine_and_broadcast():
+            """執行 engine 並廣播事件給所有連線"""
+            try:
+                async for event in engine.run_session(war_room_request):
+                    # 檢查是否還有連線（如果沒有連線，就不需要繼續推送）
+                    if not websocket_manager.has_connections(session_id):
+                        logger.info(f"[WS] No connections for session {session_id}, stopping engine")
+                        break
+                    
+                    # 將事件轉為字典並推送給前端
+                    event_dict = event.dict()
+                    await websocket_manager.send_json(session_id, event_dict)
+                    logger.debug(f"[WS] Event sent: {event.type} for session {session_id}")
+                
+                logger.info(f"[WS] Session completed: {session_id}")
+            except asyncio.CancelledError:
+                logger.info(f"[WS] Engine task cancelled for session {session_id}")
+                raise
+            except Exception as e:
+                logger.error(f"[WS] Engine error for session {session_id}: {e}", exc_info=True)
         
-        logger.info(f"[WS] Session completed: {session_id}")
+        engine_task = asyncio.create_task(run_engine_and_broadcast())
         
-        # 保持連線開啟（前端可以選擇關閉）
-        # 如果需要，可以在這裡發送一個 "session_complete" 事件
-        
-    except WebSocketDisconnect:
-        logger.info(f"[WS] Client disconnected: session={session_id}")
-        websocket_manager.disconnect(session_id, websocket)
+        try:
+            # 監聽 WebSocket 訊息（目前可能只是心跳或握手）
+            while True:
+                try:
+                    # 設定較短的 timeout，以便定期檢查連線狀態
+                    msg = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                    # 可以處理心跳或其他訊息
+                    logger.debug(f"[WS] Received message from session {session_id}: {msg[:50]}")
+                except asyncio.TimeoutError:
+                    # Timeout 是正常的，繼續檢查連線狀態
+                    if not websocket_manager.has_connections(session_id):
+                        logger.info(f"[WS] No connections for session {session_id}, cancelling engine")
+                        break
+                    # 檢查 engine task 是否已完成
+                    if engine_task.done():
+                        break
+                    continue
+        except WebSocketDisconnect:
+            logger.info(f"[WS] Client disconnected: session={session_id}")
+        finally:
+            # 斷線處理
+            websocket_manager.disconnect(session_id, websocket)
+            
+            # 如果這個 session 已經沒有任何連線，就取消 engine 任務
+            if not websocket_manager.has_connections(session_id):
+                if not engine_task.done():
+                    logger.info(f"[WS] Cancelling engine task for session {session_id}")
+                    engine_task.cancel()
+                    try:
+                        await engine_task
+                    except asyncio.CancelledError:
+                        logger.info(f"[WS] Engine task cancelled successfully for session {session_id}")
+                    except Exception as e:
+                        logger.error(f"[WS] Error while cancelling engine task: {e}")
     except Exception as e:
         logger.error(f"[WS] Error in session {session_id}: {e}", exc_info=True)
         

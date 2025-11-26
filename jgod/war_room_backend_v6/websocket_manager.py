@@ -117,4 +117,17 @@ class WebSocketManager:
             Session ID 列表
         """
         return list(self.active_connections.keys())
+    
+    def has_connections(self, session_id: str) -> bool:
+        """
+        檢查指定 session 是否還有連線
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            如果該 session 還有連線則返回 True，否則返回 False
+        """
+        conns = self.active_connections.get(session_id)
+        return bool(conns)
 
