@@ -370,10 +370,6 @@ class GeminiProvider:
                 
                 return ""
             return text
-        except Exception as e:
-            # 記錄錯誤但回傳空字串，讓 provider 層處理
-            logger.exception("[GEMINI] generate_content failed in ask(): %s", e)
-            return ""
         except APIError as e:
             # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
             error_str = str(e).lower()
