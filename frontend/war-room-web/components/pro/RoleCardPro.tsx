@@ -1,6 +1,6 @@
 "use client";
 
-import { RoleState, ROLE_DISPLAY_NAME_ZH, ROLE_DISPLAY_NAME_EN } from "@/lib/types/warRoom";
+import { RoleState, ROLE_NAME_MAP } from "@/lib/types/warRoom";
 import { ProviderTag } from "../common/ProviderTag";
 import { LoadingDots } from "../common/LoadingDots";
 import { motion } from "framer-motion";
@@ -78,11 +78,11 @@ export function RoleCardPro({ role }: RoleCardProProps) {
           <div className="flex items-baseline gap-2 mb-2">
             <h3 className="text-lg font-bold text-foreground tracking-wide">
               <span className="bg-gradient-to-r from-ai-blue to-military-green bg-clip-text text-transparent">
-                {ROLE_DISPLAY_NAME_ZH[role.key]}
+                {ROLE_NAME_MAP[role.key]?.labelZh || role.key}
               </span>
             </h3>
             <span className="text-xs text-gray-500">
-              {ROLE_DISPLAY_NAME_EN[role.key]}
+              {ROLE_NAME_MAP[role.key]?.labelEn || role.key}
             </span>
           </div>
           {role.provider && (

@@ -8,6 +8,7 @@ import {
   resetForNextRun,
   RoleKey,
   ProviderKey,
+  resolveRoleKeyFromBackendName,
 } from "@/lib/types/warRoom";
 import { WarRoomWebSocketClientPro, createSession, WebSocketStatus } from "@/lib/ws/warRoomClientPro";
 import { WarRoomEvent } from "@/lib/types/warRoom";
@@ -113,6 +114,19 @@ export default function Home() {
     const newState = { ...prev };
     newState.events = [...prev.events, event];
 
+    // 解析後端角色名稱為前端 RoleKey
+    const resolvedRoleKey = event.role ? resolveRoleKeyFromBackendName(event.role) : null;
+    
+    // Debug log（開發模式）
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[WS_EVENT]", event.type, event.role, resolvedRoleKey, resolvedRoleKey ? newState.roles[resolvedRoleKey] : null);
+    }
+
+    // 如果無法解析角色名稱，發出警告
+    if (event.role && !resolvedRoleKey) {
+      console.warn(`[WS_EVENT] Unknown role name from backend: "${event.role}"`);
+    }
+
     switch (event.type) {
       case "session_start":
         newState.status = "running";
@@ -120,8 +134,8 @@ export default function Home() {
         break;
 
       case "role_start":
-        if (event.role) {
-          const role = newState.roles[event.role as RoleKey];
+        if (resolvedRoleKey) {
+          const role = newState.roles[resolvedRoleKey];
           if (role) {
             role.status = "running";
             role.provider = event.provider || null;
@@ -131,8 +145,8 @@ export default function Home() {
         break;
 
       case "role_chunk":
-        if (event.role && event.chunk) {
-          const role = newState.roles[event.role as RoleKey];
+        if (resolvedRoleKey && event.chunk) {
+          const role = newState.roles[resolvedRoleKey];
           if (role) {
             // 追蹤首響時間
             if (!role.firstChunkAt && role.content.length === 0) {
@@ -145,8 +159,8 @@ export default function Home() {
         break;
 
       case "role_done":
-        if (event.role) {
-          const role = newState.roles[event.role as RoleKey];
+        if (resolvedRoleKey) {
+          const role = newState.roles[resolvedRoleKey];
           if (role) {
             role.status = event.error ? "error" : "done";
             role.finishedAt = Date.now();
@@ -173,8 +187,8 @@ export default function Home() {
         break;
 
       case "error":
-        if (event.role) {
-          const role = newState.roles[event.role as RoleKey];
+        if (resolvedRoleKey) {
+          const role = newState.roles[resolvedRoleKey];
           if (role) {
             role.status = "error";
             role.error = event.error || "Unknown error";
