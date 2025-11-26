@@ -51,6 +51,67 @@ class GeminiProvider:
             logger.warning(f"[GEMINI] Failed to create GenerativeModel: {e}, using default client")
             self.model = None
     
+    def _build_config(self, max_output_tokens: int, temperature: float = 0.4):
+        """
+        建立一個適用於 generate_content 的 config，
+        優先使用 GenerateContentConfig，如無則退回 GenerationConfig。
+        若 config 支援 tools 屬性，則設為空列表以關閉 AFC/tools。
+        
+        Args:
+            max_output_tokens: 最大輸出 token 數
+            temperature: 溫度參數（預設 0.4）
+            
+        Returns:
+            config 物件，若無法建立則返回 None
+        """
+        # 1. 選擇可用的 config 類別
+        ConfigCls = getattr(genai_types, "GenerateContentConfig", None) or getattr(
+            genai_types, "GenerationConfig", None
+        )
+        
+        if ConfigCls is None:
+            # 極端狀況：types 裡沒有這兩個類別，退回最保守模式
+            logger.debug("[GEMINI] No suitable config class found, using dict fallback")
+            return {
+                "response_mime_type": "text/plain",
+                "max_output_tokens": max_output_tokens,
+                "temperature": temperature,
+            }
+        
+        # 2. 先建立基本 config（不直接塞 tools，避免不支援時報錯）
+        try:
+            config = ConfigCls(
+                response_mime_type="text/plain",
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+            )
+        except Exception as e:
+            # 如果建構失敗（例如沒有 response_mime_type 參數），嘗試不帶 response_mime_type
+            logger.debug(f"[GEMINI] Failed to create config with response_mime_type: {e}, trying without")
+            try:
+                config = ConfigCls(
+                    max_output_tokens=max_output_tokens,
+                    temperature=temperature,
+                )
+            except Exception as e2:
+                logger.debug(f"[GEMINI] Failed to create config: {e2}, using dict fallback")
+                return {
+                    "response_mime_type": "text/plain",
+                    "max_output_tokens": max_output_tokens,
+                    "temperature": temperature,
+                }
+        
+        # 3. 若 config 物件本身有 tools 屬性，再動態關閉 tools / AFC
+        try:
+            if hasattr(config, "tools"):
+                setattr(config, "tools", [])
+                logger.debug("[GEMINI] Successfully set tools=[] in config")
+        except Exception as e:
+            # 若設置失敗就忽略，不要讓整個 call 崩潰
+            logger.debug(f"[GEMINI] Failed to set tools in config: {e}")
+        
+        return config
+    
     def _extract_text_from_response(self, response) -> str:
         """
         從 Gemini API response 中穩健地提取文字內容
@@ -233,47 +294,35 @@ class GeminiProvider:
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
 
         try:
-            # 建立 generation_config，強制使用 text/plain
-            # 使用 dict 或正確的 config 型別（避免 GenerationConfig 沒有 tools 屬性的問題）
-            # 先嘗試使用 GenerateContentConfig（如果有的話），否則使用 dict
-            try:
-                if hasattr(genai_types, 'GenerateContentConfig'):
-                    generation_config = genai_types.GenerateContentConfig(
-                        response_mime_type="text/plain",  # 強制純文字輸出
-                        max_output_tokens=2048,  # 確保有足夠 token 產生實際內容（避免被 thoughts 耗光）
-                        temperature=0.4,  # 保持穩定但有一點變化
-                    )
-                else:
-                    # Fallback 到 dict（SDK 應該會自動轉換）
-                    generation_config = {
-                        "response_mime_type": "text/plain",
-                        "max_output_tokens": 2048,
-                        "temperature": 0.4,
-                    }
-            except Exception as config_error:
-                logger.debug(f"[GEMINI] Failed to create config object: {config_error}, using dict")
-                generation_config = {
-                    "response_mime_type": "text/plain",
-                    "max_output_tokens": 2048,
-                    "temperature": 0.4,
-                }
+            # 使用共用的 config 建構邏輯（支援 tools，沒支援就忽略）
+            generation_config = self._build_config(max_output_tokens=2048, temperature=0.4)
             
             # 優先使用設定好的 GenerativeModel（有 text/plain）
-            # 顯性關掉 tools / AFC（放在頂層參數，不在 config 裡）
             if self.model:
-                response = self.model.generate_content(
-                    contents=prompt,
-                    tools=[],  # 關鍵：顯性禁止 tools / AFC
-                    generation_config=generation_config,
-                )
+                if generation_config is not None:
+                    response = self.model.generate_content(
+                        contents=prompt,
+                        generation_config=generation_config,
+                    )
+                else:
+                    # 萬一沒有可用的 config 類別，退回最簡單呼叫
+                    response = self.model.generate_content(
+                        contents=prompt,
+                    )
             else:
                 # Fallback 到原本的方式，但也要設定 text/plain
-                response = self.client.models.generate_content(
-                    model=self.fast_model_id,
-                    contents=prompt,
-                    tools=[],  # 關鍵：顯性禁止 tools / AFC
-                    config=generation_config,
-                )
+                if generation_config is not None:
+                    response = self.client.models.generate_content(
+                        model=self.fast_model_id,
+                        contents=prompt,
+                        config=generation_config,
+                    )
+                else:
+                    # 萬一沒有可用的 config 類別，退回最簡單呼叫
+                    response = self.client.models.generate_content(
+                        model=self.fast_model_id,
+                        contents=prompt,
+                    )
             
             # 使用穩健的文字提取方法
             text = self._extract_text_from_response(response)
@@ -321,6 +370,10 @@ class GeminiProvider:
                 
                 return ""
             return text
+        except Exception as e:
+            # 記錄錯誤但回傳空字串，讓 provider 層處理
+            logger.exception("[GEMINI] generate_content failed in ask(): %s", e)
+            return ""
         except APIError as e:
             # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
             error_str = str(e).lower()
@@ -338,38 +391,29 @@ class GeminiProvider:
                 )
                 try:
                     # Fallback 時也使用設定好的 model（如果有的話），同樣設定 text/plain
-                    try:
-                        if hasattr(genai_types, 'GenerateContentConfig'):
-                            generation_config = genai_types.GenerateContentConfig(
-                                response_mime_type="text/plain",
-                                max_output_tokens=2048,
-                                temperature=0.4,
+                    fallback_config = self._build_config(max_output_tokens=2048, temperature=0.4)
+                    if self.model:
+                        if fallback_config is not None:
+                            fallback_response = self.model.generate_content(
+                                contents=prompt,
+                                generation_config=fallback_config,
                             )
                         else:
-                            generation_config = {
-                                "response_mime_type": "text/plain",
-                                "max_output_tokens": 2048,
-                                "temperature": 0.4,
-                            }
-                    except Exception:
-                        generation_config = {
-                            "response_mime_type": "text/plain",
-                            "max_output_tokens": 2048,
-                            "temperature": 0.4,
-                        }
-                    if self.model:
-                        fallback_response = self.model.generate_content(
-                            contents=prompt,
-                            tools=[],  # 關鍵：顯性禁止 tools / AFC
-                            generation_config=generation_config,
-                        )
+                            fallback_response = self.model.generate_content(
+                                contents=prompt,
+                            )
                     else:
-                        fallback_response = self.client.models.generate_content(
-                            model=self.fallback_model_id,
-                            contents=prompt,
-                            tools=[],  # 關鍵：顯性禁止 tools / AFC
-                            config=generation_config,
-                        )
+                        if fallback_config is not None:
+                            fallback_response = self.client.models.generate_content(
+                                model=self.fallback_model_id,
+                                contents=prompt,
+                                config=fallback_config,
+                            )
+                        else:
+                            fallback_response = self.client.models.generate_content(
+                                model=self.fallback_model_id,
+                                contents=prompt,
+                            )
                     text = self._extract_text_from_response(fallback_response)
                     if not text or not text.strip():
                         logger.warning("[GEMINI] Extracted empty text from fallback response")
@@ -390,45 +434,36 @@ class GeminiProvider:
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
         
         try:
-            # 建立 generation_config，強制使用 text/plain
-            # 使用 dict 或正確的 config 型別（避免 GenerationConfig 沒有 tools 屬性的問題）
-            try:
-                if hasattr(genai_types, 'GenerateContentConfig'):
-                    generation_config = genai_types.GenerateContentConfig(
-                        response_mime_type="text/plain",  # 強制純文字輸出
-                        max_output_tokens=max_tokens if max_tokens else 2048,  # 使用傳入的 max_tokens 或至少 2048
-                        temperature=0.4,
-                    )
-                else:
-                    generation_config = {
-                        "response_mime_type": "text/plain",
-                        "max_output_tokens": max_tokens if max_tokens else 2048,
-                        "temperature": 0.4,
-                    }
-            except Exception as config_error:
-                logger.debug(f"[GEMINI] Failed to create config object: {config_error}, using dict")
-                generation_config = {
-                    "response_mime_type": "text/plain",
-                    "max_output_tokens": max_tokens if max_tokens else 2048,
-                    "temperature": 0.4,
-                }
+            # 使用共用的 config 建構邏輯（支援 tools，沒支援就忽略）
+            effective_max_tokens = max_tokens if max_tokens else 2048
+            generation_config = self._build_config(max_output_tokens=effective_max_tokens, temperature=0.4)
             
             # 優先使用設定好的 GenerativeModel（有 text/plain）
-            # 顯性關掉 tools / AFC（放在頂層參數，不在 config 裡）
             if self.model:
-                response = self.model.generate_content(
-                    contents=prompt,
-                    tools=[],  # 關鍵：顯性禁止 tools / AFC
-                    generation_config=generation_config,
-                )
+                if generation_config is not None:
+                    response = self.model.generate_content(
+                        contents=prompt,
+                        generation_config=generation_config,
+                    )
+                else:
+                    # 萬一沒有可用的 config 類別，退回最簡單呼叫
+                    response = self.model.generate_content(
+                        contents=prompt,
+                    )
             else:
                 # Fallback 到原本的方式
-                response = self.client.models.generate_content(
-                    model=self.fast_model_id,
-                    contents=prompt,
-                    tools=[],  # 關鍵：顯性禁止 tools / AFC
-                    config=generation_config,
-                )
+                if generation_config is not None:
+                    response = self.client.models.generate_content(
+                        model=self.fast_model_id,
+                        contents=prompt,
+                        config=generation_config,
+                    )
+                else:
+                    # 萬一沒有可用的 config 類別，退回最簡單呼叫
+                    response = self.client.models.generate_content(
+                        model=self.fast_model_id,
+                        contents=prompt,
+                    )
             
             # 使用穩健的文字提取方法
             full_text = self._extract_text_from_response(response)
@@ -437,6 +472,10 @@ class GeminiProvider:
             if full_text and full_text.strip():
                 yield full_text
             # 如果沒有文字，不 yield 任何東西（讓上層處理空內容）
+        except Exception as e:
+            logger.exception("[GEMINI] generate_content failed in ask_stream(): %s", e)
+            # 不 yield 任何東西，讓上層處理空內容
+            return
         except APIError as e:
             # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
             error_str = str(e).lower()
