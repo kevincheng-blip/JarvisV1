@@ -77,19 +77,20 @@ class GeminiProviderAsync(BaseProviderAsync):
         """
         執行 Gemini 請求（改為一次性取得完整結果，但仍維持 streaming 介面）
         注意：google-genai SDK 不支援 stream=True，所以改為一次性取得完整結果後再觸發 on_chunk
+        加入 timeout 控制，確保 Scout 角色能在 8 秒內回應
         """
         start_time = time.time()
         full_content = ""
+        first_chunk_time = None
         
         try:
             loop = asyncio.get_event_loop()
             
             # 一次性取得完整結果（不使用 stream 參數）
             def get_full_response():
-                nonlocal full_content
+                nonlocal full_content, first_chunk_time
                 try:
-                    # 使用傳入的 max_tokens，如果為 None 則使用預設值 512
-                    # 注意：Gemini 目前不支援 max_tokens，但保留參數以維持介面一致性
+                    # Scout 角色使用較短的 max_tokens 以加速（512-768）
                     effective_max_tokens = max_tokens if max_tokens is not None else 512
                     # ask_stream 現在會一次性返回完整文字（但仍維持 generator 介面）
                     for chunk in self._provider.ask_stream(
@@ -98,14 +99,31 @@ class GeminiProviderAsync(BaseProviderAsync):
                         max_tokens=effective_max_tokens,
                     ):
                         if chunk:
+                            # 記錄第一個 chunk 的時間
+                            if first_chunk_time is None:
+                                first_chunk_time = time.time()
                             full_content += chunk
                 except Exception as e:
                     error_msg = f"[Gemini Error: {str(e)}]"
                     full_content = error_msg
                 return full_content
             
-            # 在 executor 中執行同步呼叫
-            full_content = await loop.run_in_executor(None, get_full_response)
+            # 在 executor 中執行同步呼叫，加入 8 秒 timeout（Scout 加速）
+            try:
+                full_content = await asyncio.wait_for(
+                    loop.run_in_executor(None, get_full_response),
+                    timeout=8.0
+                )
+            except asyncio.TimeoutError:
+                execution_time = time.time() - start_time
+                timeout_msg = f"Gemini API call timeout after {execution_time:.2f}s"
+                return ProviderResult(
+                    success=False,
+                    content=full_content or "[Timeout: Gemini 回應超時]",
+                    error=f"TIMEOUT:{timeout_msg}",
+                    provider_name=self.provider_name,
+                    execution_time=execution_time,
+                )
             
             # 取得完整結果後，一次性觸發 on_chunk（維持上層介面）
             if on_chunk and full_content:

@@ -50,6 +50,9 @@ class WarRoomEvent:
     content: Optional[str] = None
     error: Optional[str] = None
     meta: Optional[Dict] = None
+    first_token_ms: Optional[int] = None  # 首響時間（毫秒）
+    total_ms: Optional[int] = None  # 總耗時（毫秒）
+    status: Optional[str] = None  # 狀態：ok, timeout, error
     
     def dict(self) -> Dict:
         """轉換為字典（用於 JSON 序列化）"""
@@ -197,7 +200,9 @@ class WarRoomEngineV6:
         # 5. 定義單一角色執行函式
         async def run_single_role(role_name: str, provider_key: str):
             """執行單一角色（內部函式）"""
-            role_start_time = time.time()
+            role_start_time = time.perf_counter()
+            first_token_time = None
+            role_status = "ok"
             
             try:
                 # 5.1 產生 role_start 事件
@@ -231,8 +236,15 @@ class WarRoomEngineV6:
                 # 5.5 定義 chunk callback（同步函式，使用外層的 loop）
                 def on_chunk(chunk: str):
                     """Chunk 回調函式（同步）"""
-                    nonlocal full_content
+                    nonlocal full_content, first_token_time
                     full_content += chunk
+                    
+                    # 記錄第一個 chunk 的時間（首響時間）
+                    if first_token_time is None:
+                        first_token_time = time.perf_counter()
+                    
+                    # 計算首響時間（毫秒）
+                    first_token_ms = int((first_token_time - role_start_time) * 1000) if first_token_time else None
                     
                     # 將 chunk 事件放入佇列（使用外層已取得的 loop）
                     chunk_event = WarRoomEvent(
@@ -242,6 +254,7 @@ class WarRoomEngineV6:
                         role_label=self.role_chinese_names.get(role_name, role_name),
                         provider=provider_key,
                         chunk=chunk,
+                        first_token_ms=first_token_ms,
                     )
                     # 使用 call_soon_threadsafe 將同步 callback 轉為異步
                     # 這裡只使用外層已經抓好的 loop，不再呼叫 get_running_loop()
@@ -249,26 +262,59 @@ class WarRoomEngineV6:
                         lambda: asyncio.create_task(event_queue.put(chunk_event))
                     )
                 
-                # 5.6 根據角色決定 max_tokens
-                # Strategist 維持 512，其他角色使用 256 以加速回應
+                # 5.6 根據角色決定 max_tokens 和 timeout
+                # Strategist 維持 512，其他角色使用較短長度以加速回應
                 if role_name == "Strategist":
                     role_max_tokens = request.max_tokens  # 預設 512
+                    role_timeout = 15.0  # Strategist 允許較長時間
+                elif role_name == "Scout":
+                    role_max_tokens = min(512, request.max_tokens)  # Scout 使用 512 以加速
+                    role_timeout = 8.0  # Scout 使用較短的 timeout（已在 provider 層有 8 秒 timeout）
                 else:
                     role_max_tokens = min(256, request.max_tokens)  # 其他角色限制為 256
+                    role_timeout = 15.0  # 其他角色使用標準 timeout
                 
-                # 5.7 呼叫 ProviderManager 執行角色
-                result = await self.provider_manager.run_role_streaming(
-                    role_name=role_name,
-                    prompt=full_prompt,
-                    enabled_providers=request.enabled_providers,
-                    on_chunk=on_chunk,
-                    max_tokens=role_max_tokens,
-                )
+                # 5.7 呼叫 ProviderManager 執行角色（加入 timeout 保護）
+                try:
+                    result = await asyncio.wait_for(
+                        self.provider_manager.run_role_streaming(
+                            role_name=role_name,
+                            prompt=full_prompt,
+                            enabled_providers=request.enabled_providers,
+                            on_chunk=on_chunk,
+                            max_tokens=role_max_tokens,
+                        ),
+                        timeout=role_timeout
+                    )
+                except asyncio.TimeoutError:
+                    # Timeout fallback
+                    total_time = time.perf_counter() - role_start_time
+                    total_ms = int(total_time * 1000)
+                    first_token_ms = int((first_token_time - role_start_time) * 1000) if first_token_time else total_ms
+                    
+                    role_status = "timeout"
+                    timeout_content = "【系統備援】此角色在設定時間內未完成回應，已觸發 timeout。請稍後重試或檢查 provider 狀態。"
+                    
+                    result = ProviderResult(
+                        success=False,
+                        content=full_content or timeout_content,
+                        error=f"TIMEOUT: Role {role_name} exceeded {role_timeout}s timeout",
+                        provider_name=provider_key,
+                        execution_time=total_time,
+                    )
+                    
+                    self.logger.warning(
+                        f"[ENGINE_V6] Role {role_name} timeout after {total_time:.2f}s"
+                    )
                 
-                execution_time = time.time() - role_start_time
+                # 計算總耗時（毫秒）
+                total_time = time.perf_counter() - role_start_time
+                total_ms = int(total_time * 1000)
+                first_token_ms = int((first_token_time - role_start_time) * 1000) if first_token_time else None
+                
                 role_results[role_name] = result
                 
-                # 5.6 產生 role_done 事件
+                # 5.8 產生 role_done 事件（包含 timing 資訊）
                 await event_queue.put(WarRoomEvent(
                     type="role_done",
                     session_id=request.session_id,
@@ -277,21 +323,30 @@ class WarRoomEngineV6:
                     provider=provider_key,
                     content=result.content if result.success else "",
                     error=result.error if not result.success else None,
+                    first_token_ms=first_token_ms,
+                    total_ms=total_ms,
+                    status=role_status,
                     meta={
                         "success": result.success,
-                        "execution_time": execution_time,
+                        "execution_time": total_time,
                         "provider_name": result.provider_name,
                     },
                 ))
                 self.logger.info(
                     f"[ENGINE_V6] Role done: {role_name}, "
-                    f"success={result.success}, time={execution_time:.2f}s"
+                    f"success={result.success}, status={role_status}, "
+                    f"first_token={first_token_ms}ms, total={total_ms}ms"
                 )
                 
             except Exception as e:
-                execution_time = time.time() - role_start_time
+                total_time = time.perf_counter() - role_start_time
+                total_ms = int(total_time * 1000)
+                first_token_ms = int((first_token_time - role_start_time) * 1000) if first_token_time else None
+                
                 error_msg = f"Role {role_name} failed: {str(e)}"
                 self.logger.error(f"[ENGINE_V6] {error_msg}", exc_info=True)
+                
+                role_status = "error"
                 
                 # 產生錯誤事件
                 await event_queue.put(WarRoomEvent(
@@ -301,7 +356,10 @@ class WarRoomEngineV6:
                     role_label=self.role_chinese_names.get(role_name, role_name),
                     provider=provider_key,
                     error=error_msg,
-                    meta={"success": False, "execution_time": execution_time},
+                    first_token_ms=first_token_ms,
+                    total_ms=total_ms,
+                    status=role_status,
+                    meta={"success": False, "execution_time": total_time},
                 ))
                 
                 # 儲存錯誤結果
@@ -310,7 +368,7 @@ class WarRoomEngineV6:
                     content="",
                     error=error_msg,
                     provider_name=provider_key,
-                    execution_time=execution_time,
+                    execution_time=total_time,
                 )
         
         # 6. 啟動所有角色任務（並行執行）
@@ -387,8 +445,8 @@ class WarRoomEngineV6:
             except asyncio.QueueEmpty:
                 break
         
-        # 10. 產生 summary 事件
-        summary_content = self._generate_summary(role_results, request)
+        # 10. 產生結構化 summary 事件
+        summary_content = await self._generate_summary(role_results, request)
         yield WarRoomEvent(
             type="summary",
             session_id=request.session_id,
@@ -397,43 +455,91 @@ class WarRoomEngineV6:
                 "total_roles": len(role_results),
                 "successful_roles": sum(1 for r in role_results.values() if r.success),
                 "failed_roles": sum(1 for r in role_results.values() if not r.success),
+                "structured": True,
             },
         )
         
         self.logger.info(f"[ENGINE_V6] Session completed: {request.session_id}")
     
-    def _generate_summary(
+    async def _generate_summary(
         self,
         role_results: Dict[str, ProviderResult],
         request: WarRoomRequest,
     ) -> str:
         """
-        產生總結內容
+        產生結構化總結內容
         
         Args:
             role_results: 角色結果字典
             request: War Room 請求
             
         Returns:
-            總結文字
+            結構化總結文字（包含四個標題：Market Overview, Technical & Indicators, Capital & Risk, Trading Stance）
         """
-        successful_roles = [name for name, result in role_results.items() if result.success]
-        failed_roles = [name for name, result in role_results.items() if not result.success]
+        # 組合所有角色的內容作為 context
+        all_role_contents = []
+        for role_name, result in role_results.items():
+            if result.success and result.content:
+                role_label = self.role_chinese_names.get(role_name, role_name)
+                all_role_contents.append(f"【{role_label}】\n{result.content}\n")
         
-        summary_parts = [
-            f"戰情室分析完成（Session: {request.session_id}）",
-            f"執行角色數: {len(role_results)}",
-            f"成功: {len(successful_roles)}",
-        ]
+        context_text = "\n".join(all_role_contents) if all_role_contents else "所有角色均未成功完成分析。"
         
-        if failed_roles:
-            summary_parts.append(f"失敗: {len(failed_roles)} ({', '.join(failed_roles)})")
-        
-        # 如果有 Strategist 角色的結果，優先使用
+        # 如果 Strategist 成功，檢查其內容是否已經符合結構化格式
         if "Strategist" in role_results and role_results["Strategist"].success:
             strategist_content = role_results["Strategist"].content
-            if strategist_content:
-                summary_parts.append(f"\n策略統整建議:\n{strategist_content[:500]}...")
+            # 檢查是否包含結構化標題
+            if strategist_content and any(
+                title in strategist_content 
+                for title in ["Market Overview", "Technical & Indicators", "Capital & Risk", "Trading Stance"]
+            ):
+                # 已經有結構化內容，直接使用
+                return strategist_content
         
-        return "\n".join(summary_parts)
+        # 生成結構化總結的 prompt
+        summary_prompt = f"""請根據以下各角色的分析結果，產出一份結構化的戰情室總結報告。
+
+各角色分析內容：
+{context_text}
+
+請依照以下四個標題結構輸出（中英文可混用，但標題固定）：
+
+**Market Overview（市場概況）**
+簡短說明當前大盤 / 產業 / 指數方向與重要事件（1～2 段）。
+
+**Technical & Indicators（技術與指標）**
+摘要整合各角色提到的 K 線、型態、RSI / KD / MA 等技術指標資訊（1～2 段）。
+
+**Capital & Risk（資金與風險）**
+說明資金流向、籌碼變化、風險點與需要留意的事件（1～2 段）。
+
+**Trading Stance（操作立場）**
+明確表達多空立場（偏多 / 偏空 / 觀望），並提供 2～4 點具體操作建議（例如「嚴設停損」、「只做短線」等）。
+
+重要要求：
+- 總長度控制在 3～5 段內，不要碎碎念
+- 整合共識，而不是平均每個人
+- 若有重大意見分歧，要在 Trading Stance 中點出
+- 用簡潔、專業的語言表達"""
+        
+        # 使用 Strategist 的 provider（通常是 GPT）生成結構化總結
+        try:
+            strategist_provider_key = self.role_provider_map.get("Strategist", "gpt")
+            if strategist_provider_key in request.enabled_providers:
+                # 使用 provider_manager 生成總結
+                summary_result = await self.provider_manager.run_role_streaming(
+                    role_name="Strategist",
+                    prompt=summary_prompt,
+                    enabled_providers=request.enabled_providers,
+                    on_chunk=None,  # Summary 不需要 streaming
+                    max_tokens=request.max_tokens,
+                )
+                if summary_result.success:
+                    return summary_result.content
+        
+        except Exception as e:
+            self.logger.error(f"[ENGINE_V6] Failed to generate structured summary: {e}")
+        
+        # Fallback：返回簡單的組合內容
+        return context_text
 

@@ -46,6 +46,17 @@ export function RoleCardPro({ role }: RoleCardProProps) {
   };
 
   const getExecutionTime = () => {
+    // 優先使用後端提供的 timing 資訊（毫秒）
+    if (role.totalMs !== null && role.totalMs !== undefined) {
+      const totalTime = (role.totalMs / 1000).toFixed(1);
+      if (role.firstTokenMs !== null && role.firstTokenMs !== undefined) {
+        const firstTokenTime = (role.firstTokenMs / 1000).toFixed(1);
+        return `首響：${firstTokenTime}s｜總耗時：${totalTime}s`;
+      }
+      return `總耗時：${totalTime}s`;
+    }
+    
+    // Fallback 到前端計算的時間（向後兼容）
     if (role.finishedAt && role.startedAt) {
       const totalTime = ((role.finishedAt - role.startedAt) / 1000).toFixed(1);
       if (role.firstChunkAt) {
@@ -61,6 +72,24 @@ export function RoleCardPro({ role }: RoleCardProProps) {
         return `首響：${firstChunkTime}s｜進行中：${elapsed}s`;
       }
       return `進行中：${elapsed}s`;
+    }
+    return null;
+  };
+  
+  const getStatusBadge = () => {
+    if (role.roleStatus === "timeout") {
+      return (
+        <span className="text-xs text-command-red font-semibold border border-command-red/50 px-2 py-0.5 rounded">
+          TIMEOUT
+        </span>
+      );
+    }
+    if (role.roleStatus === "error") {
+      return (
+        <span className="text-xs text-command-red font-semibold border border-command-red/50 px-2 py-0.5 rounded">
+          ERROR
+        </span>
+      );
     }
     return null;
   };
@@ -93,9 +122,10 @@ export function RoleCardPro({ role }: RoleCardProProps) {
         </div>
         <div className="flex flex-col items-end gap-1">
           {getStatusDisplay()}
+          {getStatusBadge()}
           {getExecutionTime() && (
             <span className="text-xs text-gray-500 font-mono">
-              {getExecutionTime()}s
+              {getExecutionTime()}
             </span>
           )}
         </div>

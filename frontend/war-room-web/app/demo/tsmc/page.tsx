@@ -127,9 +127,13 @@ export default function DemoTsmcPage() {
         if (resolvedRoleKey && event.chunk) {
           const role = newState.roles[resolvedRoleKey];
           if (role) {
-            // 追蹤首響時間
+            // 追蹤首響時間（向後兼容）
             if (!role.firstChunkAt && role.content.length === 0) {
               role.firstChunkAt = Date.now();
+            }
+            // 從後端接收首響時間（優先使用）
+            if (event.first_token_ms !== null && event.first_token_ms !== undefined) {
+              role.firstTokenMs = event.first_token_ms;
             }
             role.content += event.chunk;
             role.status = "running";
@@ -142,6 +146,16 @@ export default function DemoTsmcPage() {
           if (role) {
             role.status = event.error ? "error" : "done";
             role.finishedAt = Date.now();
+            // 從後端接收 timing 資訊
+            if (event.first_token_ms !== null && event.first_token_ms !== undefined) {
+              role.firstTokenMs = event.first_token_ms;
+            }
+            if (event.total_ms !== null && event.total_ms !== undefined) {
+              role.totalMs = event.total_ms;
+            }
+            if (event.status) {
+              role.roleStatus = event.status;
+            }
             if (event.error) {
               role.error = event.error;
             }

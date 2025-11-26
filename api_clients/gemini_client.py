@@ -15,7 +15,7 @@ class GeminiProvider:
     呼叫 Gemini 2.x 模型
     """
 
-    def __init__(self, model: str = "gemini-2.5-flash"):
+    def __init__(self, model: str = "gemini-1.5-flash"):
         # 先嘗試 GEMINI_API_KEY，再 fallback 到 GOOGLE_API_KEY
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
@@ -47,10 +47,17 @@ class GeminiProvider:
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
         
         try:
+            # 使用 generation_config 優化參數以加速回應
+            generation_config = {}
+            if max_tokens:
+                # 限制輸出長度以加速（Scout 角色使用較短的 max_tokens）
+                generation_config["max_output_tokens"] = min(max_tokens, 768)
+            
             # 不使用 stream 參數，一次性取得完整結果
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=prompt,
+                config=generation_config if generation_config else None,
             )
             
             # 從 response 中萃取出完整文字
