@@ -107,8 +107,11 @@ class GeminiProviderAsync(BaseProviderAsync):
                                 first_chunk_time = time.time()
                             full_content += chunk
                 except Exception as e:
-                    error_msg = f"[Gemini Error: {str(e)}]"
-                    full_content = error_msg
+                    # 不要直接把錯誤訊息當作內容，記錄 log 即可
+                    import logging
+                    logger = logging.getLogger("war_room.gemini_provider")
+                    logger.exception("[GEMINI] Error in get_full_response: %s", e)
+                    # 不設定 full_content，讓後續的空內容檢查處理
                 return full_content
             
             # 在 executor 中執行同步呼叫，加入 8 秒 timeout（Scout 加速）

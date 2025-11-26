@@ -65,15 +65,30 @@ class GeminiProvider:
         if hasattr(response, "text"):
             try:
                 text = response.text
-                if text and isinstance(text, str) and text.strip():
-                    return text.strip()
-                # 如果 text 是方法，嘗試呼叫
+                # 如果是方法或 property，嘗試呼叫
                 if callable(text):
                     text = text()
-                    if text and isinstance(text, str) and text.strip():
-                        return text.strip()
+                
+                # 檢查是否為有效字串
+                if text:
+                    if isinstance(text, str):
+                        if text.strip():
+                            logger.debug("[GEMINI] Successfully extracted text from response.text")
+                            return text.strip()
+                        else:
+                            logger.debug("[GEMINI] response.text is empty string")
+                    else:
+                        # 如果不是字串，嘗試轉換
+                        text_str = str(text).strip()
+                        if text_str and not text_str.startswith("<"):
+                            logger.debug(f"[GEMINI] Converted response.text to string: {type(text)}")
+                            return text_str
+                else:
+                    logger.debug(f"[GEMINI] response.text is None or falsy: {repr(text)}")
             except Exception as e:
                 logger.debug(f"[GEMINI] Failed to access response.text: {e}")
+                import traceback
+                logger.debug(f"[GEMINI] Traceback: {traceback.format_exc()}")
         
         # 2) 退而求其次：從 candidates / content / parts 裡面找 text
         text_parts = []
@@ -273,9 +288,34 @@ class GeminiProvider:
                         text_value = response.text
                         if callable(text_value):
                             text_value = text_value()
-                        logger.warning(f"[GEMINI] response.text value: {repr(text_value)[:200]}")
+                        logger.warning(f"[GEMINI] response.text value: {repr(text_value)[:500]}")
+                        # 如果 text_value 不是 None，嘗試直接使用
+                        if text_value and isinstance(text_value, str) and text_value.strip():
+                            logger.warning("[GEMINI] Using response.text directly as fallback")
+                            return text_value.strip()
                     except Exception as e:
                         logger.warning(f"[GEMINI] Failed to get response.text value: {e}")
+                        import traceback
+                        logger.warning(f"[GEMINI] Traceback: {traceback.format_exc()}")
+                
+                # 檢查 candidates 結構
+                if hasattr(response, "candidates"):
+                    try:
+                        candidates = response.candidates
+                        if candidates:
+                            logger.warning(f"[GEMINI] candidates count: {len(candidates) if hasattr(candidates, '__len__') else 'N/A'}")
+                            if len(candidates) > 0:
+                                candidate = candidates[0]
+                                logger.warning(f"[GEMINI] candidate type: {type(candidate).__name__}")
+                                if hasattr(candidate, "content"):
+                                    content = candidate.content
+                                    logger.warning(f"[GEMINI] content type: {type(content).__name__}")
+                                    if hasattr(content, "parts"):
+                                        parts = content.parts
+                                        logger.warning(f"[GEMINI] parts: {parts}")
+                except Exception as e:
+                    logger.warning(f"[GEMINI] Failed to inspect candidates: {e}")
+                
                 return ""
             return text
         except Exception as e:
