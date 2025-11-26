@@ -6,10 +6,8 @@ from google.genai.errors import APIError
 
 logger = logging.getLogger("war_room")
 
-# Fast model（優先使用，速度最快）
-FAST_MODEL_ID = "gemini-1.5-flash"
-
-# Fallback model（當 fast model 不可用時使用，原本穩定版本）
+# 使用 gemini-2.5-flash 作為主要與備援模型，避免 1.5-flash 404 噴 log
+FAST_MODEL_ID = "gemini-2.5-flash"
 FALLBACK_MODEL_ID = "gemini-2.5-flash"
 
 
