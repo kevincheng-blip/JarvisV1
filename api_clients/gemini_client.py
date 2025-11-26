@@ -45,62 +45,136 @@ class GeminiProvider:
             提取的文字內容，如果沒有文字則返回空字串
         """
         # 1) 優先使用 .text（若為 google-genai 官方物件）
-        if hasattr(response, "text") and response.text:
-            text = response.text
-            if isinstance(text, str) and text.strip():
-                return text.strip()
+        if hasattr(response, "text"):
+            try:
+                text = response.text
+                if text and isinstance(text, str) and text.strip():
+                    return text.strip()
+                # 如果 text 是方法，嘗試呼叫
+                if callable(text):
+                    text = text()
+                    if text and isinstance(text, str) and text.strip():
+                        return text.strip()
+            except Exception as e:
+                logger.debug(f"[GEMINI] Failed to access response.text: {e}")
         
         # 2) 退而求其次：從 candidates / content / parts 裡面找 text
         text_parts = []
         
         # 取得 candidates（可能是屬性或方法）
         candidates = None
-        if hasattr(response, "candidates"):
-            candidates = response.candidates
-        elif hasattr(response, "get") and callable(getattr(response, "get")):
-            candidates = response.get("candidates", [])
+        try:
+            if hasattr(response, "candidates"):
+                candidates = response.candidates
+                # 如果是方法，嘗試呼叫
+                if callable(candidates):
+                    candidates = candidates()
+        except Exception as e:
+            logger.debug(f"[GEMINI] Failed to access response.candidates: {e}")
+        
+        # 如果 candidates 是 None 或空，嘗試其他方式
+        if not candidates:
+            # 嘗試直接檢查 response 的屬性
+            if hasattr(response, "__dict__"):
+                logger.debug(f"[GEMINI] Response attributes: {list(response.__dict__.keys())}")
+            # 嘗試檢查是否有其他文字欄位
+            for attr_name in ["content", "result", "output"]:
+                if hasattr(response, attr_name):
+                    attr_value = getattr(response, attr_name)
+                    if isinstance(attr_value, str) and attr_value.strip():
+                        return attr_value.strip()
         
         # 遍歷所有 candidates
         if candidates:
-            for candidate in candidates:
-                # 取得 content
-                content = None
-                if hasattr(candidate, "content"):
-                    content = candidate.content
-                elif isinstance(candidate, dict):
-                    content = candidate.get("content")
+            try:
+                # 確保 candidates 是可迭代的
+                if not hasattr(candidates, "__iter__"):
+                    candidates = [candidates]
                 
-                if not content:
-                    continue
-                
-                # 取得 parts
-                parts = None
-                if hasattr(content, "parts"):
-                    parts = content.parts
-                elif isinstance(content, dict):
-                    parts = content.get("parts", [])
-                elif hasattr(content, "get") and callable(getattr(content, "get")):
-                    parts = content.get("parts", [])
-                
-                if not parts:
-                    continue
-                
-                # 遍歷所有 parts，提取文字
-                for part in parts:
-                    part_text = None
-                    if hasattr(part, "text"):
-                        part_text = part.text
-                    elif isinstance(part, dict):
-                        part_text = part.get("text")
+                for candidate in candidates:
+                    # 取得 content
+                    content = None
+                    try:
+                        if hasattr(candidate, "content"):
+                            content = candidate.content
+                            if callable(content):
+                                content = content()
+                        elif isinstance(candidate, dict):
+                            content = candidate.get("content")
+                    except Exception as e:
+                        logger.debug(f"[GEMINI] Failed to access candidate.content: {e}")
+                        continue
                     
-                    if isinstance(part_text, str) and part_text.strip():
-                        text_parts.append(part_text.strip())
+                    if not content:
+                        continue
+                    
+                    # 取得 parts
+                    parts = None
+                    try:
+                        if hasattr(content, "parts"):
+                            parts = content.parts
+                            if callable(parts):
+                                parts = parts()
+                        elif isinstance(content, dict):
+                            parts = content.get("parts", [])
+                    except Exception as e:
+                        logger.debug(f"[GEMINI] Failed to access content.parts: {e}")
+                        continue
+                    
+                    if not parts:
+                        # 如果沒有 parts，嘗試直接從 content 取得文字
+                        if hasattr(content, "text"):
+                            part_text = content.text
+                            if callable(part_text):
+                                part_text = part_text()
+                            if isinstance(part_text, str) and part_text.strip():
+                                text_parts.append(part_text.strip())
+                        continue
+                    
+                    # 確保 parts 是可迭代的
+                    if not hasattr(parts, "__iter__"):
+                        parts = [parts]
+                    
+                    # 遍歷所有 parts，提取文字
+                    for part in parts:
+                        part_text = None
+                        try:
+                            if hasattr(part, "text"):
+                                part_text = part.text
+                                if callable(part_text):
+                                    part_text = part_text()
+                            elif isinstance(part, dict):
+                                part_text = part.get("text")
+                            elif isinstance(part, str):
+                                part_text = part
+                            
+                            if isinstance(part_text, str) and part_text.strip():
+                                text_parts.append(part_text.strip())
+                        except Exception as e:
+                            logger.debug(f"[GEMINI] Failed to extract text from part: {e}")
+                            continue
+            except Exception as e:
+                logger.debug(f"[GEMINI] Error iterating candidates: {e}")
         
         # 組合所有文字部分
         full_text = "\n".join(text_parts).strip()
         
         if not full_text:
-            logger.warning("[GEMINI] Response parsed but no text content extracted")
+            # 加入更詳細的 debug log
+            logger.warning(
+                "[GEMINI] Response parsed but no text content extracted. "
+                f"Response type: {type(response)}, "
+                f"Has text attr: {hasattr(response, 'text')}, "
+                f"Has candidates attr: {hasattr(response, 'candidates')}"
+            )
+            # 嘗試直接轉換 response 為字串（最後手段）
+            try:
+                response_str = str(response)
+                if response_str and response_str.strip() and not response_str.startswith("<"):
+                    logger.debug(f"[GEMINI] Using response string representation: {response_str[:100]}")
+                    return response_str.strip()
+            except Exception:
+                pass
         
         return full_text
 
@@ -117,7 +191,21 @@ class GeminiProvider:
             text = self._extract_text_from_response(response)
             # 為了避免前端看到空內容，這裡做一層防禦
             if not text or not text.strip():
-                logger.warning("[GEMINI] Extracted empty text from response")
+                # 加入更詳細的 debug 資訊
+                logger.warning(
+                    f"[GEMINI] Extracted empty text from response. "
+                    f"Response type: {type(response).__name__}, "
+                    f"Has text attr: {hasattr(response, 'text')}"
+                )
+                # 嘗試直接檢查 response.text 的值
+                if hasattr(response, "text"):
+                    try:
+                        text_value = response.text
+                        if callable(text_value):
+                            text_value = text_value()
+                        logger.warning(f"[GEMINI] response.text value: {repr(text_value)[:200]}")
+                    except Exception as e:
+                        logger.warning(f"[GEMINI] Failed to get response.text value: {e}")
                 return ""
             return text
         except APIError as e:
