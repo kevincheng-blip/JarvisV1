@@ -313,8 +313,8 @@ class GeminiProvider:
                                     if hasattr(content, "parts"):
                                         parts = content.parts
                                         logger.warning(f"[GEMINI] parts: {parts}")
-                except Exception as e:
-                    logger.warning(f"[GEMINI] Failed to inspect candidates: {e}")
+                    except Exception as e:
+                        logger.warning(f"[GEMINI] Failed to inspect candidates: {e}")
                 
                 return ""
             return text
