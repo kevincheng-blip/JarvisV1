@@ -269,7 +269,7 @@ class WarRoomEngineV6:
                     role_timeout = 15.0  # Strategist 允許較長時間
                 elif role_name == "Scout":
                     role_max_tokens = request.max_tokens  # Scout 使用完整的 max_tokens（至少 2048）以確保有足夠 token 產生內容
-                    role_timeout = 8.0  # Scout 使用較短的 timeout（已在 provider 層有 8 秒 timeout）
+                    role_timeout = 15.0  # Scout 使用 15 秒 timeout，讓 Gemini API 有足夠時間回應
                 else:
                     role_max_tokens = min(256, request.max_tokens)  # 其他角色限制為 256
                     role_timeout = 15.0  # 其他角色使用標準 timeout

@@ -80,7 +80,7 @@ class GeminiProviderAsync(BaseProviderAsync):
         """
         執行 Gemini 請求（改為一次性取得完整結果，但仍維持 streaming 介面）
         注意：google-genai SDK 不支援 stream=True，所以改為一次性取得完整結果後再觸發 on_chunk
-        加入 timeout 控制，確保 Scout 角色能在 8 秒內回應
+        加入 timeout 控制，確保 Scout 角色能在 15 秒內回應
         """
         start_time = time.time()
         full_content = ""
@@ -114,11 +114,11 @@ class GeminiProviderAsync(BaseProviderAsync):
                     # 不設定 full_content，讓後續的空內容檢查處理
                 return full_content
             
-            # 在 executor 中執行同步呼叫，加入 8 秒 timeout（Scout 加速）
+            # 在 executor 中執行同步呼叫，加入 15 秒 timeout（讓 Gemini API 有足夠時間回應）
             try:
                 full_content = await asyncio.wait_for(
                     loop.run_in_executor(None, get_full_response),
-                    timeout=8.0
+                    timeout=15.0
                 )
             except asyncio.TimeoutError:
                 execution_time = time.time() - start_time
