@@ -337,21 +337,21 @@ class GeminiProvider:
                     # Fallback 時也使用設定好的 model（如果有的話），同樣設定 text/plain
                     try:
                         if hasattr(genai_types, 'GenerateContentConfig'):
-                    generation_config = genai_types.GenerateContentConfig(
-                        response_mime_type="text/plain",
-                        max_output_tokens=2048,
-                        temperature=0.4,
-                    )
+                            generation_config = genai_types.GenerateContentConfig(
+                                response_mime_type="text/plain",
+                                max_output_tokens=2048,
+                                temperature=0.4,
+                            )
                         else:
                             generation_config = {
                                 "response_mime_type": "text/plain",
-                                "max_output_tokens": 768,
+                                "max_output_tokens": 2048,
                                 "temperature": 0.4,
                             }
                     except Exception:
                         generation_config = {
                             "response_mime_type": "text/plain",
-                            "max_output_tokens": 768,
+                            "max_output_tokens": 2048,
                             "temperature": 0.4,
                         }
                     if self.model:
@@ -450,13 +450,13 @@ class GeminiProvider:
                         if hasattr(genai_types, 'GenerateContentConfig'):
                             generation_config = genai_types.GenerateContentConfig(
                                 response_mime_type="text/plain",
-                                max_output_tokens=min(max_tokens, 768) if max_tokens else 768,
+                                max_output_tokens=max_tokens if max_tokens else 2048,
                                 temperature=0.4,
                             )
                         else:
                             generation_config = {
                                 "response_mime_type": "text/plain",
-                                "max_output_tokens": min(max_tokens, 768) if max_tokens else 768,
+                                "max_output_tokens": max_tokens if max_tokens else 2048,
                                 "temperature": 0.4,
                             }
                     except Exception:
