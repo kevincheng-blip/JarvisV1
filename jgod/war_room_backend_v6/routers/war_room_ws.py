@@ -120,7 +120,7 @@ async def war_room_websocket(websocket: WebSocket, session_id: str):
                 mode=request_data.get("mode", "god"),
                 enabled_providers=request_data.get("enabled_providers", []),
                 user_prompt=request_data.get("user_prompt", ""),
-                max_tokens=request_data.get("max_tokens", 512),
+                max_tokens=request_data.get("max_tokens", 2048),
                 start_date=request_data.get("start_date"),
                 end_date=request_data.get("end_date"),
                 market_context=request_data.get("market_context"),

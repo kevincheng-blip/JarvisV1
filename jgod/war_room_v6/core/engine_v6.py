@@ -31,7 +31,7 @@ class WarRoomRequest:
     stock_ids: List[str]  # 例如 ["2330", "2412"]
     mode: Literal["god", "custom"]
     enabled_providers: List[str]  # ["gpt", "claude", "gemini", "perplexity"]
-    max_tokens: int = 512
+    max_tokens: int = 2048
     user_prompt: str = ""
     start_date: Optional[str] = None
     end_date: Optional[str] = None
@@ -268,7 +268,7 @@ class WarRoomEngineV6:
                     role_max_tokens = request.max_tokens  # 預設 512
                     role_timeout = 15.0  # Strategist 允許較長時間
                 elif role_name == "Scout":
-                    role_max_tokens = min(512, request.max_tokens)  # Scout 使用 512 以加速
+                    role_max_tokens = request.max_tokens  # Scout 使用完整的 max_tokens（至少 2048）以確保有足夠 token 產生內容
                     role_timeout = 8.0  # Scout 使用較短的 timeout（已在 provider 層有 8 秒 timeout）
                 else:
                     role_max_tokens = min(256, request.max_tokens)  # 其他角色限制為 256

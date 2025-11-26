@@ -240,21 +240,21 @@ class GeminiProvider:
                 if hasattr(genai_types, 'GenerateContentConfig'):
                     generation_config = genai_types.GenerateContentConfig(
                         response_mime_type="text/plain",  # 強制純文字輸出
-                        max_output_tokens=768,  # Scout 使用較短的輸出
+                        max_output_tokens=2048,  # 確保有足夠 token 產生實際內容（避免被 thoughts 耗光）
                         temperature=0.4,  # 保持穩定但有一點變化
                     )
                 else:
                     # Fallback 到 dict（SDK 應該會自動轉換）
                     generation_config = {
                         "response_mime_type": "text/plain",
-                        "max_output_tokens": 768,
+                        "max_output_tokens": 2048,
                         "temperature": 0.4,
                     }
             except Exception as config_error:
                 logger.debug(f"[GEMINI] Failed to create config object: {config_error}, using dict")
                 generation_config = {
                     "response_mime_type": "text/plain",
-                    "max_output_tokens": 768,
+                    "max_output_tokens": 2048,
                     "temperature": 0.4,
                 }
             
@@ -337,11 +337,11 @@ class GeminiProvider:
                     # Fallback 時也使用設定好的 model（如果有的話），同樣設定 text/plain
                     try:
                         if hasattr(genai_types, 'GenerateContentConfig'):
-                            generation_config = genai_types.GenerateContentConfig(
-                                response_mime_type="text/plain",
-                                max_output_tokens=768,
-                                temperature=0.4,
-                            )
+                    generation_config = genai_types.GenerateContentConfig(
+                        response_mime_type="text/plain",
+                        max_output_tokens=2048,
+                        temperature=0.4,
+                    )
                         else:
                             generation_config = {
                                 "response_mime_type": "text/plain",
@@ -391,20 +391,20 @@ class GeminiProvider:
                 if hasattr(genai_types, 'GenerateContentConfig'):
                     generation_config = genai_types.GenerateContentConfig(
                         response_mime_type="text/plain",  # 強制純文字輸出
-                        max_output_tokens=min(max_tokens, 768) if max_tokens else 768,
+                        max_output_tokens=max_tokens if max_tokens else 2048,  # 使用傳入的 max_tokens 或至少 2048
                         temperature=0.4,
                     )
                 else:
                     generation_config = {
                         "response_mime_type": "text/plain",
-                        "max_output_tokens": min(max_tokens, 768) if max_tokens else 768,
+                        "max_output_tokens": max_tokens if max_tokens else 2048,
                         "temperature": 0.4,
                     }
             except Exception as config_error:
                 logger.debug(f"[GEMINI] Failed to create config object: {config_error}, using dict")
                 generation_config = {
                     "response_mime_type": "text/plain",
-                    "max_output_tokens": min(max_tokens, 768) if max_tokens else 768,
+                    "max_output_tokens": max_tokens if max_tokens else 2048,
                     "temperature": 0.4,
                 }
             
