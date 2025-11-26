@@ -3,10 +3,13 @@ Gemini Provider 非同步實作（支援 Streaming）
 """
 import asyncio
 import time
+import logging
 from typing import Optional, Callable
 
 from api_clients.gemini_client import GeminiProvider
 from .base_provider import BaseProviderAsync, ProviderResult
+
+logger = logging.getLogger("war_room.gemini_provider")
 
 
 class GeminiProviderAsync(BaseProviderAsync):
@@ -98,7 +101,7 @@ class GeminiProviderAsync(BaseProviderAsync):
                         user_prompt=prompt,
                         max_tokens=effective_max_tokens,
                     ):
-                        if chunk:
+                        if chunk and chunk.strip():
                             # 記錄第一個 chunk 的時間
                             if first_chunk_time is None:
                                 first_chunk_time = time.time()
@@ -125,14 +128,26 @@ class GeminiProviderAsync(BaseProviderAsync):
                     execution_time=execution_time,
                 )
             
+            # 檢查內容是否為空
+            if not full_content or not full_content.strip():
+                # 如果內容為空，使用備援訊息
+                logger.warning("[GEMINI] Empty content returned from client, using fallback message")
+                full_content = "【GEMINI 備援提示】本次 Gemini 回傳的是空內容，建議參考其他角色（Intel / Quant / Strategist）的分析。"
+                execution_time = time.time() - start_time
+                return ProviderResult(
+                    success=False,
+                    content=full_content,
+                    error="EMPTY_CONTENT",
+                    provider_name=self.provider_name,
+                    execution_time=execution_time,
+                )
+            
             # 取得完整結果後，一次性觸發 on_chunk（維持上層介面）
             if on_chunk and full_content:
                 try:
                     on_chunk(full_content)
                 except Exception as callback_error:
                     # 如果 on_chunk 回調失敗，記錄但不影響主流程
-                    import logging
-                    logger = logging.getLogger("war_room.gemini_provider")
                     logger.warning(f"on_chunk callback failed: {callback_error}")
             
             execution_time = time.time() - start_time

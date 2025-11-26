@@ -33,6 +33,76 @@ class GeminiProvider:
         # 如果沒有指定 model，使用 fast model
         self.fast_model_id = model or FAST_MODEL_ID
         self.fallback_model_id = FALLBACK_MODEL_ID
+    
+    def _extract_text_from_response(self, response) -> str:
+        """
+        從 Gemini API response 中穩健地提取文字內容
+        
+        Args:
+            response: Google Gemini API 的回應物件
+            
+        Returns:
+            提取的文字內容，如果沒有文字則返回空字串
+        """
+        # 1) 優先使用 .text（若為 google-genai 官方物件）
+        if hasattr(response, "text") and response.text:
+            text = response.text
+            if isinstance(text, str) and text.strip():
+                return text.strip()
+        
+        # 2) 退而求其次：從 candidates / content / parts 裡面找 text
+        text_parts = []
+        
+        # 取得 candidates（可能是屬性或方法）
+        candidates = None
+        if hasattr(response, "candidates"):
+            candidates = response.candidates
+        elif hasattr(response, "get") and callable(getattr(response, "get")):
+            candidates = response.get("candidates", [])
+        
+        # 遍歷所有 candidates
+        if candidates:
+            for candidate in candidates:
+                # 取得 content
+                content = None
+                if hasattr(candidate, "content"):
+                    content = candidate.content
+                elif isinstance(candidate, dict):
+                    content = candidate.get("content")
+                
+                if not content:
+                    continue
+                
+                # 取得 parts
+                parts = None
+                if hasattr(content, "parts"):
+                    parts = content.parts
+                elif isinstance(content, dict):
+                    parts = content.get("parts", [])
+                elif hasattr(content, "get") and callable(getattr(content, "get")):
+                    parts = content.get("parts", [])
+                
+                if not parts:
+                    continue
+                
+                # 遍歷所有 parts，提取文字
+                for part in parts:
+                    part_text = None
+                    if hasattr(part, "text"):
+                        part_text = part.text
+                    elif isinstance(part, dict):
+                        part_text = part.get("text")
+                    
+                    if isinstance(part_text, str) and part_text.strip():
+                        text_parts.append(part_text.strip())
+        
+        # 組合所有文字部分
+        full_text = "\n".join(text_parts).strip()
+        
+        if not full_text:
+            logger.warning("[GEMINI] Response parsed but no text content extracted")
+        
+        return full_text
 
     def ask(self, system_prompt: str, user_prompt: str) -> str:
         prompt = f"{system_prompt}\n\n使用者問題：{user_prompt}"
@@ -43,7 +113,13 @@ class GeminiProvider:
                 model=self.fast_model_id,
                 contents=prompt,
             )
-            return response.text
+            # 使用穩健的文字提取方法
+            text = self._extract_text_from_response(response)
+            # 為了避免前端看到空內容，這裡做一層防禦
+            if not text or not text.strip():
+                logger.warning("[GEMINI] Extracted empty text from response")
+                return ""
+            return text
         except APIError as e:
             # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
             error_str = str(e).lower()
@@ -64,7 +140,11 @@ class GeminiProvider:
                         model=self.fallback_model_id,
                         contents=prompt,
                     )
-                    return fallback_response.text
+                    text = self._extract_text_from_response(fallback_response)
+                    if not text or not text.strip():
+                        logger.warning("[GEMINI] Extracted empty text from fallback response")
+                        return ""
+                    return text
                 except Exception as fallback_error:
                     return f"[Gemini API 錯誤（fallback 也失敗）：{fallback_error}]"
             return f"[Gemini API 錯誤：{e}]"
@@ -93,24 +173,13 @@ class GeminiProvider:
                 config=generation_config if generation_config else None,
             )
             
-            # 從 response 中萃取出完整文字
-            full_text = ""
-            if hasattr(response, 'text') and response.text:
-                full_text = response.text
-            elif hasattr(response, 'candidates') and response.candidates:
-                # 如果 response.text 不存在，嘗試從 candidates 中提取
-                for candidate in response.candidates:
-                    if hasattr(candidate, 'content') and candidate.content:
-                        if hasattr(candidate.content, 'parts') and candidate.content.parts:
-                            for part in candidate.content.parts:
-                                if hasattr(part, 'text') and part.text:
-                                    full_text += part.text
+            # 使用穩健的文字提取方法
+            full_text = self._extract_text_from_response(response)
             
-            if not full_text:
-                full_text = "[Gemini returned empty content]"
-            
-            # 一次性 yield 完整文字（維持 generator 介面）
-            yield full_text
+            # 如果提取到文字，才 yield（空字串就不送出了）
+            if full_text and full_text.strip():
+                yield full_text
+            # 如果沒有文字，不 yield 任何東西（讓上層處理空內容）
         except APIError as e:
             # 檢查是否為 404 錯誤（檢查錯誤訊息或 status_code）
             error_str = str(e).lower()
@@ -133,22 +202,13 @@ class GeminiProvider:
                         config=generation_config if generation_config else None,
                     )
                     
-                    # 從 fallback response 中萃取出完整文字
-                    full_text = ""
-                    if hasattr(fallback_response, 'text') and fallback_response.text:
-                        full_text = fallback_response.text
-                    elif hasattr(fallback_response, 'candidates') and fallback_response.candidates:
-                        for candidate in fallback_response.candidates:
-                            if hasattr(candidate, 'content') and candidate.content:
-                                if hasattr(candidate.content, 'parts') and candidate.content.parts:
-                                    for part in candidate.content.parts:
-                                        if hasattr(part, 'text') and part.text:
-                                            full_text += part.text
+                    # 使用穩健的文字提取方法
+                    full_text = self._extract_text_from_response(fallback_response)
                     
-                    if not full_text:
-                        full_text = "[Gemini returned empty content]"
-                    
-                    yield full_text
+                    # 如果提取到文字，才 yield（空字串就不送出了）
+                    if full_text and full_text.strip():
+                        yield full_text
+                    # 如果沒有文字，不 yield 任何東西（讓上層處理空內容）
                 except Exception as fallback_error:
                     yield f"[Gemini API 錯誤（fallback 也失敗）：{fallback_error}]"
             else:
