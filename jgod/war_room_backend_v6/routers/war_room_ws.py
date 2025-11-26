@@ -114,13 +114,21 @@ async def war_room_websocket(websocket: WebSocket, session_id: str):
         
         # 驗證請求資料
         try:
+            # 強制最低 max_tokens = 2048（即使前端送 512 也要被蓋掉）
+            DEFAULT_MAX_TOKENS = 2048
+            req_max = request_data.get("max_tokens")
+            if req_max is None:
+                max_tokens = DEFAULT_MAX_TOKENS
+            else:
+                max_tokens = max(req_max, DEFAULT_MAX_TOKENS)
+            
             war_room_request = WarRoomRequest(
                 session_id=session_id,
                 stock_ids=request_data.get("stock_ids", []),
                 mode=request_data.get("mode", "god"),
                 enabled_providers=request_data.get("enabled_providers", []),
                 user_prompt=request_data.get("user_prompt", ""),
-                max_tokens=request_data.get("max_tokens", 2048),
+                max_tokens=max_tokens,
                 start_date=request_data.get("start_date"),
                 end_date=request_data.get("end_date"),
                 market_context=request_data.get("market_context"),

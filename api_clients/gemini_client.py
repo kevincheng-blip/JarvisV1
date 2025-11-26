@@ -259,9 +259,11 @@ class GeminiProvider:
                 }
             
             # 優先使用設定好的 GenerativeModel（有 text/plain）
+            # 顯性關掉 tools / AFC（放在頂層參數，不在 config 裡）
             if self.model:
                 response = self.model.generate_content(
                     contents=prompt,
+                    tools=[],  # 關鍵：顯性禁止 tools / AFC
                     generation_config=generation_config,
                 )
             else:
@@ -269,6 +271,7 @@ class GeminiProvider:
                 response = self.client.models.generate_content(
                     model=self.fast_model_id,
                     contents=prompt,
+                    tools=[],  # 關鍵：顯性禁止 tools / AFC
                     config=generation_config,
                 )
             
@@ -409,9 +412,11 @@ class GeminiProvider:
                 }
             
             # 優先使用設定好的 GenerativeModel（有 text/plain）
+            # 顯性關掉 tools / AFC（放在頂層參數，不在 config 裡）
             if self.model:
                 response = self.model.generate_content(
                     contents=prompt,
+                    tools=[],  # 關鍵：顯性禁止 tools / AFC
                     generation_config=generation_config,
                 )
             else:
@@ -419,6 +424,7 @@ class GeminiProvider:
                 response = self.client.models.generate_content(
                     model=self.fast_model_id,
                     contents=prompt,
+                    tools=[],  # 關鍵：顯性禁止 tools / AFC
                     config=generation_config,
                 )
             
@@ -462,18 +468,20 @@ class GeminiProvider:
                     except Exception:
                         generation_config = {
                             "response_mime_type": "text/plain",
-                            "max_output_tokens": min(max_tokens, 768) if max_tokens else 768,
+                            "max_output_tokens": max_tokens if max_tokens else 2048,
                             "temperature": 0.4,
                         }
                     if self.model:
                         fallback_response = self.model.generate_content(
                             contents=prompt,
+                            tools=[],  # 關鍵：顯性禁止 tools / AFC
                             generation_config=generation_config,
                         )
                     else:
                         fallback_response = self.client.models.generate_content(
                             model=self.fallback_model_id,
                             contents=prompt,
+                            tools=[],  # 關鍵：顯性禁止 tools / AFC
                             config=generation_config,
                         )
                     

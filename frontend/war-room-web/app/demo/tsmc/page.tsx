@@ -31,7 +31,7 @@ export default function DemoTsmcPage() {
           mode: config.mode,
           enabled_providers: config.enabledProviders,
           user_prompt: config.userPrompt,
-          max_tokens: 512,
+          max_tokens: 2048,
         });
 
         const sessionId = sessionResponse.session_id;
@@ -80,7 +80,7 @@ export default function DemoTsmcPage() {
           mode: config.mode,
           enabled_providers: config.enabledProviders,
           user_prompt: config.userPrompt,
-          max_tokens: 512,
+          max_tokens: 2048,
         });
 
         setWsClient(client);
