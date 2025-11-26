@@ -489,38 +489,30 @@ class GeminiProvider:
                 )
                 try:
                     # Fallback 時也使用設定好的 model（如果有的話），同樣設定 text/plain
-                    try:
-                        if hasattr(genai_types, 'GenerateContentConfig'):
-                            generation_config = genai_types.GenerateContentConfig(
-                                response_mime_type="text/plain",
-                                max_output_tokens=max_tokens if max_tokens else 2048,
-                                temperature=0.4,
+                    effective_max_tokens = max_tokens if max_tokens else 2048
+                    fallback_config = self._build_config(max_output_tokens=effective_max_tokens, temperature=0.4)
+                    if self.model:
+                        if fallback_config is not None:
+                            fallback_response = self.model.generate_content(
+                                contents=prompt,
+                                generation_config=fallback_config,
                             )
                         else:
-                            generation_config = {
-                                "response_mime_type": "text/plain",
-                                "max_output_tokens": max_tokens if max_tokens else 2048,
-                                "temperature": 0.4,
-                            }
-                    except Exception:
-                        generation_config = {
-                            "response_mime_type": "text/plain",
-                            "max_output_tokens": max_tokens if max_tokens else 2048,
-                            "temperature": 0.4,
-                        }
-                    if self.model:
-                        fallback_response = self.model.generate_content(
-                            contents=prompt,
-                            tools=[],  # 關鍵：顯性禁止 tools / AFC
-                            generation_config=generation_config,
-                        )
+                            fallback_response = self.model.generate_content(
+                                contents=prompt,
+                            )
                     else:
-                        fallback_response = self.client.models.generate_content(
-                            model=self.fallback_model_id,
-                            contents=prompt,
-                            tools=[],  # 關鍵：顯性禁止 tools / AFC
-                            config=generation_config,
-                        )
+                        if fallback_config is not None:
+                            fallback_response = self.client.models.generate_content(
+                                model=self.fallback_model_id,
+                                contents=prompt,
+                                config=fallback_config,
+                            )
+                        else:
+                            fallback_response = self.client.models.generate_content(
+                                model=self.fallback_model_id,
+                                contents=prompt,
+                            )
                     
                     # 使用穩健的文字提取方法
                     full_text = self._extract_text_from_response(fallback_response)
