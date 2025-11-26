@@ -360,12 +360,14 @@ class GeminiProvider:
                     if self.model:
                         fallback_response = self.model.generate_content(
                             contents=prompt,
+                            tools=[],  # 關鍵：顯性禁止 tools / AFC
                             generation_config=generation_config,
                         )
                     else:
                         fallback_response = self.client.models.generate_content(
                             model=self.fallback_model_id,
                             contents=prompt,
+                            tools=[],  # 關鍵：顯性禁止 tools / AFC
                             config=generation_config,
                         )
                     text = self._extract_text_from_response(fallback_response)
