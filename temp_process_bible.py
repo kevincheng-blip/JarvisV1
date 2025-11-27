@@ -1,0 +1,434 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+處理 JGOD_STOCK_TRADING_BIBLE_v1.txt，建立 AI 知識庫版和閱讀強化版
+"""
+
+import re
+
+def classify_content(line):
+    """判斷內容類型並加上標籤"""
+    line = line.strip()
+    if not line or line.startswith('='):
+        return None
+    
+    # 檢測程式碼
+    if '```' in line or 'Python' in line or 'class ' in line or 'def ' in line or 'import ' in line:
+        return '[CODE]'
+    
+    # 檢測表格
+    if '\t' in line and ('特徵' in line or '條件' in line or '說明' in line or '|' in line):
+        return '[TABLE]'
+    
+    # 檢測規則
+    if any(keyword in line for keyword in ['如果', '若', '當', '則', '應該', '必須', '需要', '規則', '條件', 'IF', 'THEN', '突破', '跌破', '出現']):
+        return '[RULE]'
+    
+    # 檢測系統架構
+    if any(keyword in line for keyword in ['系統', '架構', '模組', '引擎', '流程', '階段', 'Blueprint', '策略', '方法']):
+        return '[STRUCTURE]'
+    
+    # 檢測概念定義
+    if any(keyword in line for keyword in ['定義', '概念', '特徵', '原則', '邏輯', '哲學', '價值觀', '思維']):
+        return '[CONCEPT]'
+    
+    # 預設為註解
+    return '[NOTE]'
+
+def process_bible_ai_kb():
+    """建立 AI 知識庫版"""
+    input_file = '/Users/kevincheng/JarvisV1/docs/JGOD_STOCK_TRADING_BIBLE_v1.txt'
+    output_file = '/Users/kevincheng/JarvisV1/docs/JGOD_STOCK_TRADING_BIBLE_v1_AI知識庫版_v1.md'
+    
+    with open(input_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    output_lines = [
+        "# J-GOD 股票交易聖經 v1.0 - AI 知識庫版 v1\n",
+        "\n",
+        "> **重要說明**：本文件為 AI 知識庫格式，每段內容都已標記分類標籤，可直接被 AI 模型解析、轉換為 JSON、向量化或規則引擎使用。\n",
+        "> \n",
+        "> **原始文件**：`JGOD_STOCK_TRADING_BIBLE_v1.txt`（未修改）\n",
+        "\n",
+        "---\n",
+        "\n",
+        "## 文件說明\n",
+        "\n",
+        "[NOTE]\n",
+        "本文件是 J-GOD 股神作戰系統的核心大腦來源之一，所有內容均完整保留，僅進行結構化分類標記，未刪除或修改任何技術內容。\n",
+        "\n",
+        "---\n",
+        "\n"
+    ]
+    
+    current_tag = None
+    buffer = []
+    
+    for i, line in enumerate(lines):
+        tag = classify_content(line)
+        
+        if tag:
+            if current_tag != tag:
+                if buffer:
+                    output_lines.append('\n'.join(buffer) + '\n\n')
+                    buffer = []
+                output_lines.append(f"{tag}\n")
+                current_tag = tag
+            buffer.append(line.rstrip())
+        else:
+            if buffer:
+                output_lines.append('\n'.join(buffer) + '\n\n')
+                buffer = []
+                current_tag = None
+            if line.strip():
+                output_lines.append(line)
+    
+    if buffer:
+        output_lines.append('\n'.join(buffer) + '\n\n')
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.writelines(output_lines)
+    
+    print(f"✓ AI 知識庫版已建立：{output_file}")
+    print(f"  原始行數: {len(lines)}")
+    print(f"  輸出行數: {len(output_lines)}")
+
+def process_bible_reading():
+    """建立閱讀強化版"""
+    input_file = '/Users/kevincheng/JarvisV1/docs/JGOD_STOCK_TRADING_BIBLE_v1.txt'
+    output_file = '/Users/kevincheng/JarvisV1/docs/JGOD_STOCK_TRADING_BIBLE_v1_閱讀強化版_v1.md'
+    
+    with open(input_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    output = """# J-GOD 股票交易聖經 v1.0：閱讀強化版 v1
+
+> **說明**：本文件是 J-GOD 股神作戰系統的完整交易聖經，整合了核心交易哲學、技術方法、系統架構與實戰指南。
+
+---
+
+## 一、這本書的目的
+
+[CONCEPT]
+name: 本書目的
+definition: 打造世界級 1% 個人自營商的完整知識體系，整合 J-GOD 系統的核心交易哲學、技術方法、系統架構與實戰指南。
+
+[NOTE]
+本手冊旨在建立完整的交易知識體系，從哲學思維到技術方法，從系統架構到實戰指南。
+
+---
+
+## 二、核心投資邏輯
+
+### 2.1 股神哲學
+
+[CONCEPT]
+name: 核心價值觀
+definition: 
+1. 只相信資料與統計，不相信情緒與感覺
+2. 預測錯誤就是經驗
+3. 紀律大於聰明
+4. 市場大道（Market Tao）
+
+[RULE]
+IF 所有決策
+THEN 先在「虛擬市場」跑過，驗證勝率後才敢實單
+
+[RULE]
+IF 預測錯誤
+THEN 追查原因 → 標籤 → 寫進資料庫 → 更新演算法
+
+[RULE]
+IF 停損觸發
+THEN 停損是保護不是懲罰
+
+[CONCEPT]
+name: 市場大道（Market Tao）
+definition: 
+- 市場不是模型，是一種節奏
+- 市場不是模式，是一種呼吸
+- 市場不是規則，是一種循環
+- 能聽懂市場呼吸與節奏，才能成為真正的交易者
+
+### 2.2 投資思維
+
+[CONCEPT]
+name: 自營部邏輯
+definition: 不是你挑風格，是市場告訴你哪個好賺。多週期策略池：當沖、隔日沖、波段（3-15天）全部允許。
+
+[RULE]
+IF 策略選擇
+THEN 優先級由 J-GOD 依「實際績效」排序
+
+[CONCEPT]
+name: 宏觀原則
+definition: 
+- 主流＋龍頭＋突破＝永恆的暴利模式
+- 資金流永遠會講話
+- 主力永遠會展現跡象
+- 市場永遠重複，但每次都有細微差異
+
+[CONCEPT]
+name: 內在寧靜
+definition: 市場最終不是比技術，是比「靜」。在巨大波動面前依然能保持完全清晰的大腦。無懼、無躁、無追高、無報復、無自我破壞。
+
+---
+
+## 三、股票判斷方法（技術面 + 基本面）
+
+### 3.1 強勢股判斷法
+
+[RULE]
+IF 主流龍頭特徵
+THEN 標的為當前市場主流族群中的龍頭或前段班，日線站上季線，且近日量能放大至近 20 日均量以上，股價突破明顯壓力區
+
+[RULE]
+IF 強勢回檔特徵
+THEN 標的屬於近期主流強勢股，日線呈現多頭排列，自前波段高點拉回 3～8% 左右，回檔量縮，接近重要支撐
+
+[RULE]
+IF 主力洗盤反轉特徵
+THEN 個股中長期仍為多頭結構，出現明顯洗盤 K：長下影、大陰棒後快速收腳、隔日急拉紅 K
+
+### 3.2 無效股、地雷股辨識方法
+
+[RULE]
+IF 高檔爆量出貨警戒
+THEN 標的已在高檔區間，出現異常爆量、長上影線、開高走低
+
+[RULE]
+IF 假突破辨識
+THEN 突破當天量能急縮，突破後無法維持在突破區之上，5 分/15 分 K 跌破關鍵均線
+
+[RULE]
+IF 趨勢反轉訊號
+THEN 連續 2～3 日無法突破短期壓力，量縮價滯漲，跌破關鍵支撐
+
+### 3.3 流動性、成交量、K 線情緒判斷
+
+[CONCEPT]
+name: 成交量判斷
+definition: 成交量是市場情緒的直接反映，需要結合價格走勢綜合判斷。
+
+[CONCEPT]
+name: K 線情緒判斷
+definition: K 線形態反映多空力量的對比，需要結合成交量、均線、支撐壓力位綜合判斷。
+
+---
+
+## 四、交易策略
+
+[RULE]
+IF 主流＋龍頭＋突破
+THEN 這是永恆的暴利模式
+
+[RULE]
+IF 資金流動向明確
+THEN 跟隨資金流方向，優先選擇主流族群中的龍頭股
+
+[RULE]
+IF 主力展現跡象
+THEN 觀察主力行為，跟隨主力操作節奏
+
+[NOTE]
+詳細的交易策略請參考原始文件中的完整內容。
+
+---
+
+## 五、風險控管與心理面
+
+### 5.1 風險控管
+
+[RULE]
+IF 停損觸發
+THEN 停損是保護不是懲罰，必須嚴格執行
+
+[RULE]
+IF 高檔爆量出貨
+THEN 這是風控與出場策略，不是賺錢策略
+
+[RULE]
+IF 趨勢反轉訊號出現
+THEN 必須立即減倉或出場，避免重大損失
+
+### 5.2 心理面
+
+[CONCEPT]
+name: 內在寧靜
+definition: 市場最終不是比技術，是比「靜」。在巨大波動面前依然能保持完全清晰的大腦。
+
+[RULE]
+IF 面對市場波動
+THEN 保持無懼、無躁、無追高、無報復、無自我破壞
+
+[RULE]
+IF 預測錯誤
+THEN 追查原因 → 標籤 → 寫進資料庫 → 更新演算法，錯誤不會白費，全部變成更高勝率的磚塊
+
+---
+
+## 六、開盤／盤中／收盤 SOP
+
+[NOTE]
+本文件主要聚焦於交易哲學與技術方法，詳細的開盤/盤中/收盤 SOP 請參考其他股市聖經文件。
+
+[RULE]
+IF 開盤前
+THEN 檢查市場大環境，確認主流族群與資金流向
+
+[RULE]
+IF 盤中
+THEN 觀察價格走勢、成交量、K 線形態，判斷市場情緒與主力行為
+
+[RULE]
+IF 收盤後
+THEN 檢討當日交易，更新資料庫，調整策略參數
+
+---
+
+## 七、實戰案例整理
+
+[NOTE]
+本文件主要聚焦於交易哲學與技術方法，詳細的實戰案例請參考其他股市聖經文件。
+
+[CONCEPT]
+name: 實戰原則
+definition: 
+- 主流＋龍頭＋突破＝永恆的暴利模式
+- 資金流永遠會講話
+- 主力永遠會展現跡象
+- 市場永遠重複，但每次都有細微差異
+
+---
+
+## 八、AI 補充
+
+### 8.1 系統化交易
+
+[NOTE]
+AI 補充：J-GOD 系統的核心是將所有交易決策系統化、數據化，透過統計驗證與演算法優化，實現持續穩定的獲利。
+
+[RULE]
+IF 建立交易系統
+THEN 所有決策都先在「虛擬市場」跑過，驗證勝率後才敢實單
+
+[RULE]
+IF 系統優化
+THEN 每次預測錯誤 → 追查原因 → 標籤 → 寫進資料庫 → 更新演算法
+
+### 8.2 多週期策略
+
+[NOTE]
+AI 補充：J-GOD 系統支援多週期策略池，包含當沖、隔日沖、波段（3-15天）等，優先級由系統依「實際績效」排序。
+
+[RULE]
+IF 策略選擇
+THEN 不是你挑風格，是市場告訴你哪個好賺，優先級由 J-GOD 依「實際績效」排序
+
+---
+
+## 九、可轉程式化的 J-GOD 規則列表
+
+### 9.1 強勢股判斷規則
+
+[RULE]
+IF 主流龍頭特徵 AND 日線站上季線 AND 量能放大至近 20 日均量以上 AND 股價突破明顯壓力區
+THEN 標的為強勢股候選
+
+[RULE]
+IF 強勢回檔特徵 AND 日線呈現多頭排列 AND 自前波段高點拉回 3～8% AND 回檔量縮 AND 接近重要支撐
+THEN 標的為強勢回檔候選
+
+[RULE]
+IF 主力洗盤反轉特徵 AND 個股中長期仍為多頭結構 AND 出現明顯洗盤 K
+THEN 標的為洗盤反轉候選
+
+### 9.2 地雷股辨識規則
+
+[RULE]
+IF 高檔爆量出貨警戒 AND 標的已在高檔區間 AND 出現異常爆量 AND 長上影線 AND 開高走低
+THEN 觸發風控與出場策略
+
+[RULE]
+IF 假突破辨識 AND 突破當天量能急縮 AND 突破後無法維持在突破區之上
+THEN 標的為假突破，應避免進場
+
+[RULE]
+IF 趨勢反轉訊號 AND 連續 2～3 日無法突破短期壓力 AND 量縮價滯漲 AND 跌破關鍵支撐
+THEN 觸發減倉或出場策略
+
+### 9.3 交易執行規則
+
+[RULE]
+IF 主流＋龍頭＋突破
+THEN 這是永恆的暴利模式，優先考慮進場
+
+[RULE]
+IF 資金流動向明確
+THEN 跟隨資金流方向，優先選擇主流族群中的龍頭股
+
+[RULE]
+IF 主力展現跡象
+THEN 觀察主力行為，跟隨主力操作節奏
+
+### 9.4 風險控管規則
+
+[RULE]
+IF 停損觸發
+THEN 停損是保護不是懲罰，必須嚴格執行
+
+[RULE]
+IF 高檔爆量出貨
+THEN 這是風控與出場策略，立即減倉或出場
+
+[RULE]
+IF 趨勢反轉訊號出現
+THEN 必須立即減倉或出場，避免重大損失
+
+### 9.5 系統優化規則
+
+[RULE]
+IF 預測錯誤
+THEN 追查原因 → 標籤 → 寫進資料庫 → 更新演算法
+
+[RULE]
+IF 策略績效評估
+THEN 優先級由 J-GOD 依「實際績效」排序
+
+---
+
+## 總結
+
+[NOTE]
+本文件完整保留了原始內容的所有技術細節，包括：
+- 所有交易哲學與價值觀
+- 所有技術判斷方法
+- 所有交易規則與策略
+- 所有風險控管原則
+
+[CONCEPT]
+name: J-GOD 股票交易聖經
+definition: 整合了 J-GOD 系統的核心交易哲學、技術方法、系統架構與實戰指南，旨在打造世界級 1% 個人自營商的完整知識體系。
+
+[NOTE]
+本文件旨在建立完整的交易知識體系，從哲學思維到技術方法，從系統架構到實戰指南，實現持續穩定的獲利。
+
+---
+
+*文件建立時間：2024年*
+*版本：v1*
+*原始文件：JGOD_STOCK_TRADING_BIBLE_v1.txt（未修改）*
+
+"""
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(output)
+    
+    print(f"✓ 閱讀強化版已建立：{output_file}")
+
+if __name__ == '__main__':
+    print("開始處理 JGOD_STOCK_TRADING_BIBLE_v1.txt...")
+    process_bible_ai_kb()
+    process_bible_reading()
+    print("✓ 處理完成！")
+
