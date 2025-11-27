@@ -23,6 +23,12 @@ from .capital_flow_factor import (
     CapitalFlowEngine,
 )
 
+from .cross_asset_factor import (
+    CrossAssetWindowConfig,
+    CrossAssetFactor,
+    CrossAssetFactorEngine,
+)
+
 __all__ = [
     # Step 2 - F_InfoTime
     "VolumeBar",
@@ -34,5 +40,9 @@ __all__ = [
     "CapitalFlowSample",
     "CapitalFlowFactor",
     "CapitalFlowEngine",
+    # Step 5 - F_CrossAsset
+    "CrossAssetWindowConfig",
+    "CrossAssetFactor",
+    "CrossAssetFactorEngine",
 ]
 
