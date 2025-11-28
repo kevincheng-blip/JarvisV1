@@ -5,7 +5,9 @@ Factor Engine 模組：核心因子計算引擎
 - InfoTimeBarGenerator：信息時間 Volume Bar 生成器（Step 2）
 - OrderbookFactorEngine：微觀流動性因子引擎（Step 3）
 - CapitalFlowEngine：資金流基礎因子引擎（Step 4）
+- CrossAssetFactorEngine：跨資產聯動因子引擎（Step 5）
 - InertiaFactorEngine：資金流慣性因子引擎（Step 6）
+- FSignalEngine：訊號生成因子引擎（Step 7）
 """
 
 from .info_time_engine import (
@@ -36,6 +38,13 @@ from .inertia_factor import (
     InertiaFactorEngine,
 )
 
+from .signal_factor import (
+    FSignalConfig,
+    FSignalBucket,
+    FSignalFactor,
+    FSignalEngine,
+)
+
 __all__ = [
     # Step 2 - F_InfoTime
     "VolumeBar",
@@ -55,5 +64,10 @@ __all__ = [
     "InertiaWindowConfig",
     "InertiaFactor",
     "InertiaFactorEngine",
+    # Step 7 - F_Signal
+    "FSignalConfig",
+    "FSignalBucket",
+    "FSignalFactor",
+    "FSignalEngine",
 ]
 
