@@ -67,7 +67,7 @@ class CrossAssetFactor:
         timestamp: 因子計算時間戳（使用最新 Bar 的 end_ts）
         rolling_corr: 近期報酬的 rolling correlation（-1 到 1）
         rolling_beta: 以 ref 為自變數的回歸 beta（簡化版）
-        spread_zscore: 價差 Z-score（目前為 None，待未來實作）
+        spread_zscore: 價差 Z-score（pair spread 的標準化值，當 std 接近 0 時為 0.0）
     """
     target_symbol: str
     reference_symbol: str
@@ -168,19 +168,60 @@ class CrossAssetFactorEngine:
                 log_return = np.log(curr_price / prev_price)
                 self.return_history[symbol].append(log_return)
         
-        # 檢查是否所有相關資產的 return_history 長度都 >= window_size
-        all_ready = True
-        for sym in all_symbols:
-            if len(self.return_history[sym]) < self.config.window_size:
-                all_ready = False
-                break
-        
-        # 若不足，回傳 None
-        if not all_ready:
+        # 檢查 target 是否有足夠的資料（至少需要 window_size 個 returns）
+        # target 是必須的，其他 reference symbols 的檢查留給 _compute_factors 處理
+        target_return_count = len(self.return_history[self.config.target_symbol])
+        if target_return_count < self.config.window_size:
             return None
+        
+        # 檢查是否有至少一個 reference symbol 有足夠資料
+        # 如果所有 reference 都沒有足夠資料，_compute_factors 會回傳空列表，但我們仍可讓它執行
+        # 實際上，只要 target 有足夠資料，就可以嘗試計算因子（_compute_factors 會跳過資料不足的 references）
         
         # 若足夠，計算因子並回傳
         return self._compute_factors()
+    
+    def _compute_spread_zscore(
+        self, 
+        target_returns: np.ndarray, 
+        ref_returns: np.ndarray, 
+        beta: float
+    ) -> float:
+        """
+        計算 pair spread Z-score（內部方法）
+        
+        Args:
+            target_returns: 目標資產的報酬序列
+            ref_returns: 參考資產的報酬序列
+            beta: 已計算的 rolling beta
+            
+        Returns:
+            spread_zscore: Z-score 值（float），若 std 接近 0 則回傳 0.0
+        """
+        # 計算 spread = target - beta * ref
+        spread = target_returns - beta * ref_returns
+        
+        # 計算 spread 的 mean 與 std（使用 sample std，ddof=1）
+        mean_spread = np.mean(spread)
+        std_spread = np.std(spread, ddof=1)
+        
+        # 若 std_spread 幾乎為 0（避免除以零）
+        # 使用更實務的門檻值，判斷 spread 是否幾乎沒有變動
+        EPS = 1e-6
+        if std_spread < EPS or np.isclose(std_spread, 0.0, atol=EPS):
+            return 0.0
+        
+        # 取視窗內最新一筆 spread
+        last_spread = spread[-1]
+        
+        # 計算 Z-score
+        spread_zscore = (last_spread - mean_spread) / std_spread
+        
+        # 檢查是否為 NaN 或 inf（額外安全檢查）
+        if not np.isfinite(spread_zscore):
+            return 0.0
+        
+        return float(spread_zscore)
     
     def _compute_factors(self) -> List[CrossAssetFactor]:
         """
@@ -196,42 +237,61 @@ class CrossAssetFactorEngine:
         """
         factors: List[CrossAssetFactor] = []
         
-        # 取得 target 的報酬序列
-        target_returns = np.array(list(self.return_history[self.config.target_symbol]))
+        # 取得 target 的價格序列和 returns 序列（用於計算 price-level beta 和 correlation）
+        target_prices = list(self.price_history[self.config.target_symbol])
+        target_returns_array = np.array(list(self.return_history[self.config.target_symbol]))
         
         # 使用最新的時間戳（通常用 target 的時間戳）
         latest_ts = self.last_timestamp.get(self.config.target_symbol, 0.0)
         
         # 對每個 reference_symbol 計算因子
         for ref_symbol in self.config.reference_symbols:
-            ref_returns = np.array(list(self.return_history[ref_symbol]))
+            ref_prices = list(self.price_history[ref_symbol])
+            ref_returns_list = list(self.return_history[ref_symbol])
             
-            # 確保長度一致（理論上應該都是 window_size）
-            min_len = min(len(target_returns), len(ref_returns))
-            if min_len < self.config.window_size:
+            # 確保價格序列長度足夠（至少需要 window_size 個價格點）
+            min_price_len = min(len(target_prices), len(ref_prices))
+            if min_price_len < self.config.window_size:
                 continue  # 跳過這個 reference
             
-            target_ret = target_returns[:min_len]
-            ref_ret = ref_returns[:min_len]
+            # 取得最近的 window_size 個價格點
+            target_price_window = target_prices[-self.config.window_size:]
+            ref_price_window = ref_prices[-self.config.window_size:]
             
-            # 計算 rolling correlation
-            if len(target_ret) > 1 and np.std(target_ret) > 0 and np.std(ref_ret) > 0:
-                corr_matrix = np.corrcoef(target_ret, ref_ret)
-                rolling_corr = float(corr_matrix[0, 1])
+            # 轉成 numpy array，確保是 float 類型
+            target_prices_array = np.asarray(target_price_window, dtype=float)
+            ref_prices_array = np.asarray(ref_price_window, dtype=float)
+            
+            # 計算 rolling correlation（繼續使用 returns）
+            if len(target_returns_array) >= self.config.window_size and len(ref_returns_list) >= self.config.window_size:
+                target_ret = target_returns_array[-self.config.window_size:]
+                ref_ret = np.array(ref_returns_list[-self.config.window_size:])
+                if len(target_ret) >= 2 and np.std(target_ret, ddof=1) > 1e-12 and np.std(ref_ret, ddof=1) > 1e-12:
+                    corr_matrix = np.corrcoef(target_ret, ref_ret)
+                    rolling_corr = float(corr_matrix[0, 1])
+                else:
+                    rolling_corr = 0.0
             else:
                 rolling_corr = 0.0
             
-            # 計算簡單 beta（最小平方法：beta = Cov(x, y) / Var(x)）
-            if len(ref_ret) > 1 and np.var(ref_ret) > 1e-10:  # 避免除以零
-                cov_matrix = np.cov(ref_ret, target_ret)
-                rolling_beta = float(cov_matrix[0, 1] / np.var(ref_ret))
+            # 計算 rolling beta（使用 price-level beta：beta = Cov(target_prices, ref_prices) / Var(ref_prices)）
+            # 使用 sample variance/covariance（ddof=1）
+            var_ref_prices = np.var(ref_prices_array, ddof=1)
+            if len(ref_prices_array) >= 2 and var_ref_prices > 1e-12:
+                # 計算協方差：Cov(target_prices, ref_prices)，使用 ddof=1
+                cov_matrix = np.cov(target_prices_array, ref_prices_array, ddof=1)
+                cov_tr = float(cov_matrix[0, 1])
+                rolling_beta = cov_tr / var_ref_prices
             else:
                 rolling_beta = 0.0
             
-            # TODO: 實作 spread_zscore（未來可擴充為共整合或價差交易因子）
-            # 簡易版本：spread = target - beta * ref，然後標準化
-            # 目前先設為 None
-            spread_zscore = None
+            # 計算 spread_zscore：pair spread Z-score（繼續使用 returns）
+            if len(target_returns_array) >= self.config.window_size and len(ref_returns_list) >= self.config.window_size:
+                target_ret = target_returns_array[-self.config.window_size:]
+                ref_ret = np.array(ref_returns_list[-self.config.window_size:])
+                spread_zscore = self._compute_spread_zscore(target_ret, ref_ret, rolling_beta)
+            else:
+                spread_zscore = 0.0
             
             # 建立 CrossAssetFactor 實例
             factor = CrossAssetFactor(

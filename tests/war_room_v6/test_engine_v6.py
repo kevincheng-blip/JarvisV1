@@ -160,7 +160,7 @@ class TestWarRoomEngineV6:
         assert request.stock_ids == ["2330"]
         assert request.mode == "god"
         assert request.enabled_providers == ["gpt"]
-        assert request.max_tokens == 512  # 預設值
+        assert request.max_tokens == 2048  # 預設值（已更新為 2048）
     
     def test_war_room_event_dict(self):
         """測試 WarRoomEvent.dict() 方法"""

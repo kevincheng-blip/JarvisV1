@@ -190,6 +190,9 @@ class TestCrossAssetFactorEngine:
                         assert factor.reference_symbol in ["QQQ", "ES"]
                         assert -1.0 <= factor.rolling_corr <= 1.0
                         assert isinstance(factor.rolling_beta, float)
+                        # 驗證 spread_zscore 不為 None，且是 float
+                        assert factor.spread_zscore is not None
+                        assert isinstance(factor.spread_zscore, float)
     
     def test_rolling_correlation_calculation(self, engine):
         """測試 rolling correlation 計算"""
@@ -221,6 +224,10 @@ class TestCrossAssetFactorEngine:
         qqq_factor = next(f for f in result if f.reference_symbol == "QQQ")
         # 高度相關的序列應該有接近 1.0 的 correlation
         assert qqq_factor.rolling_corr > 0.9
+        # 驗證 spread_zscore 在合理範圍（高度相關情況下，Z-score 不應該爆掉）
+        assert qqq_factor.spread_zscore is not None
+        assert isinstance(qqq_factor.spread_zscore, float)
+        assert abs(qqq_factor.spread_zscore) < 5.0
     
     def test_rolling_beta_calculation(self, engine):
         """測試 rolling beta 計算"""
@@ -282,6 +289,109 @@ class TestCrossAssetFactorEngine:
         assert status["2330.TW"] == 0  # 只有一個價格點，沒有報酬
         assert status["QQQ"] == 0
         assert status["ES"] == 0
+    
+    def test_spread_zscore_basic(self, engine):
+        """測試 spread_zscore 基本功能：不為 None 且是 float"""
+        base_time = 1000.0
+        base_price = 750.0
+        
+        # 建立足夠的資料來計算因子
+        for i in range(12):
+            for symbol in ["2330.TW", "QQQ", "ES"]:
+                price = base_price + i * 1.0
+                bar = VolumeBar(
+                    start_ts=base_time + i * 60.0,
+                    end_ts=base_time + (i + 1) * 60.0,
+                    symbol=symbol,
+                    vwap=price,
+                    total_volume=1000000,
+                    tick_count=100,
+                    open_price=price - 0.5,
+                    high_price=price + 0.5,
+                    low_price=price - 0.5,
+                    close_price=price,
+                    avg_bid=price - 0.25,
+                    avg_ask=price + 0.25,
+                )
+                result = engine.update_with_bar(bar)
+        
+        # 檢查 spread_zscore 是否存在且為 float
+        assert result is not None
+        for factor in result:
+            assert factor.spread_zscore is not None
+            assert isinstance(factor.spread_zscore, float)
+            # Z-score 應該在合理範圍內
+            assert abs(factor.spread_zscore) < 10.0  # 允許較大的範圍
+    
+    def test_spread_zscore_reasonable_range(self, engine):
+        """測試高度相關情況下 spread_zscore 在合理範圍"""
+        base_time = 1000.0
+        
+        # 建立高度相關的價格序列
+        for i in range(12):
+            target_price = 750.0 + i * 1.0
+            ref_price = 400.0 + i * 0.8  # 高度相關
+            
+            for symbol, price in [("2330.TW", target_price), ("QQQ", ref_price)]:
+                bar = VolumeBar(
+                    start_ts=base_time + i * 60.0,
+                    end_ts=base_time + (i + 1) * 60.0,
+                    symbol=symbol,
+                    vwap=price,
+                    total_volume=1000000,
+                    tick_count=100,
+                    open_price=price - 0.5,
+                    high_price=price + 0.5,
+                    low_price=price - 0.5,
+                    close_price=price,
+                    avg_bid=price - 0.25,
+                    avg_ask=price + 0.25,
+                )
+                result = engine.update_with_bar(bar)
+        
+        # 高度相關的序列，spread_zscore 應該在合理範圍
+        assert result is not None
+        qqq_factor = next(f for f in result if f.reference_symbol == "QQQ")
+        assert qqq_factor.spread_zscore is not None
+        assert isinstance(qqq_factor.spread_zscore, float)
+        assert abs(qqq_factor.spread_zscore) < 5.0  # 高度相關情況下，Z-score 應該較小
+    
+    def test_spread_zscore_edge_case_zero_std(self, engine):
+        """測試 edge case：幾乎沒有變動的 spread，std 接近 0"""
+        base_time = 1000.0
+        base_price = 750.0
+        
+        # 建立幾乎完全相同的價格序列（target 和 ref 幾乎相同，beta ≈ 1）
+        for i in range(12):
+            # 兩個資產價格幾乎相同，只有微小的差異
+            target_price = base_price + i * 0.01
+            ref_price = base_price + i * 0.01  # 幾乎完全相同
+            
+            for symbol, price in [("2330.TW", target_price), ("QQQ", ref_price)]:
+                bar = VolumeBar(
+                    start_ts=base_time + i * 60.0,
+                    end_ts=base_time + (i + 1) * 60.0,
+                    symbol=symbol,
+                    vwap=price,
+                    total_volume=1000000,
+                    tick_count=100,
+                    open_price=price - 0.0001,  # 極小的波動
+                    high_price=price + 0.0001,
+                    low_price=price - 0.0001,
+                    close_price=price,
+                    avg_bid=price - 0.00005,
+                    avg_ask=price + 0.00005,
+                )
+                result = engine.update_with_bar(bar)
+        
+        # 當 spread std 接近 0 時，spread_zscore 應該安全地設為 0.0
+        assert result is not None
+        qqq_factor = next(f for f in result if f.reference_symbol == "QQQ")
+        assert qqq_factor.spread_zscore is not None
+        assert isinstance(qqq_factor.spread_zscore, float)
+        # 應該回傳 0.0 而不是 NaN 或 inf
+        assert qqq_factor.spread_zscore == 0.0
+        assert np.isfinite(qqq_factor.spread_zscore)
 
 
 if __name__ == "__main__":

@@ -192,10 +192,15 @@ class InfoTimeBarGenerator:
         avg_bid = sum(tick.bid_price for tick in self.current_bar_ticks) / len(self.current_bar_ticks)
         avg_ask = sum(tick.ask_price for tick in self.current_bar_ticks) / len(self.current_bar_ticks)
         
-        # 建立 VolumeBar
+        # 建立 VolumeBar（確保時間順序正確）
+        # 使用 min/max 確保時間順序，不依賴列表順序
+        timestamps = [tick.timestamp for tick in self.current_bar_ticks]
+        start_ts = min(timestamps)
+        end_ts = max(timestamps)
+        
         volume_bar = VolumeBar(
-            start_ts=self.current_bar_start_ts,
-            end_ts=self.current_bar_end_ts,
+            start_ts=start_ts,
+            end_ts=end_ts,
             symbol=self.current_symbol,
             vwap=vwap,
             total_volume=self.current_bar_volume,

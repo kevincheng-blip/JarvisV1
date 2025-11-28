@@ -271,7 +271,8 @@ class MockSinopacAPI:
         """
         if base_price is not None:
             self.base_price = base_price
-            self.current_price = base_price
+        # 無論是否傳入 base_price，都要重置 current_price 為 base_price
+        self.current_price = self.base_price
         self.current_time = time.time()
         self.tick_count = 0
 
