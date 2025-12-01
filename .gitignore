@@ -76,6 +76,26 @@ Thumbs.db
 tmp/
 *.tmp
 
+# Ultra Auto-Git Mode - Required patterns
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+*.log
+*.tmp
+*.sqlite
+*.db
+.env
+env/
+venv/
+.venv/
+node_modules/
+output/
+checkpoints/
+dist/
+build/
+.DS_Store
+*.egg-info
+
 # Large data files (over 10MB, if not meant for repo)
 # *.csv
 # *.parquet
