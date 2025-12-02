@@ -122,7 +122,61 @@ class PathBWindowResult:
     factor_attribution: Optional[Dict[str, float]] = None
 ```
 
-### 3. PathBRunResult
+### 3. PathBWindowGovernanceResult
+
+```python
+@dataclass
+class PathBWindowGovernanceResult:
+    """單一 Window 的 Governance 評估結果"""
+    
+    window_id: str
+    train_start: str
+    train_end: str
+    test_start: str
+    test_end: str
+    
+    rules_triggered: List[str]
+    # 例如：["MAX_DRAWDOWN_BREACH", "TE_BREACH"]
+    
+    metrics: Dict[str, float]
+    # 可包含：
+    # - "sharpe"
+    # - "max_drawdown"
+    # - "total_return"
+    # - "tracking_error"（如果有）
+    # - "turnover"
+    
+    notes: Optional[str] = None
+    # 用來存簡短文字，例如 "Sharpe < threshold for 3 windows"
+```
+
+### 4. PathBRunGovernanceSummary
+
+```python
+@dataclass
+class PathBRunGovernanceSummary:
+    """Path B 完整執行的 Governance 彙總統計"""
+    
+    total_windows: int
+    
+    rule_hit_counts: Dict[str, int]
+    # key：rule 名稱，如 "MAX_DRAWDOWN_BREACH"
+    # value：有多少個 window 觸發
+    
+    windows_with_any_breach: int
+    # 有多少個 window 至少觸發了一個 rule
+    
+    max_consecutive_breach_windows: int
+    # 最多連續多少個 window 都觸發了 rule
+    
+    global_metrics: Dict[str, float]
+    # 例如：
+    # - "avg_sharpe"
+    # - "avg_max_drawdown"
+    # - "avg_tracking_error"
+```
+
+### 5. PathBRunResult
 
 ```python
 @dataclass
@@ -147,6 +201,12 @@ class PathBRunResult:
     # 包含：
     # - 每個 rule 的觸發次數
     # - 觸發時的市場環境特徵
+    
+    # Governance Summary（新增）
+    governance_summary: Optional[PathBRunGovernanceSummary] = None
+    
+    # Windows Governance（新增）
+    windows_governance: Optional[List[PathBWindowGovernanceResult]] = None
     
     # 輸出檔案路徑
     output_files: List[str] = field(default_factory=list)
@@ -331,6 +391,54 @@ class PathBEngine:
 
 ---
 
+## 🛡️ Governance & Kill-Switch Simulation
+
+Path B 每個 window 會套用 Step 6 的核心治理規則，可以用於「模擬與統計治理規則在不同市場視窗下的觸發頻率」。
+
+### 基礎治理規則（Step B3 實作）
+
+1. **MAX_DRAWDOWN_BREACH**
+   - 條件：`max_drawdown <= max_drawdown_threshold`
+   - 預設門檻：-15%
+
+2. **SHARPE_TOO_LOW**
+   - 條件：`sharpe < sharpe_threshold`
+   - 預設門檻：2.0
+
+3. **TE_BREACH**
+   - 條件：`tracking_error > tracking_error_max`
+   - 預設門檻：4%
+
+4. **TURNOVER_TOO_HIGH**
+   - 條件：`turnover > turnover_max`
+   - 預設門檻：100%
+
+### Governance 統計功能
+
+Path B 可以統計：
+- 有多少個 window 會觸發 kill-switch 類型條件
+- 哪些 rule 最常被觸發
+- 整體 Sharpe / DD 在多視窗下的穩定度
+- 最多連續多少個 window 都觸發了 rule
+
+### 使用範例
+
+```python
+config = PathBConfig(
+    ...
+    max_drawdown_threshold=-0.15,  # -15%
+    sharpe_threshold=2.0,
+    tracking_error_max=0.04,  # 4%
+    turnover_max=1.0,  # 100%
+)
+
+result = engine.run(config)
+
+# 查看 governance 結果
+print(f"觸發 breach 的 window 數：{result.governance_summary.windows_with_any_breach}")
+print(f"規則觸發次數：{result.governance_summary.rule_hit_counts}")
+```
+
 ---
 
 ## 🚀 B2 Minimal Implementation 狀態
@@ -358,10 +466,27 @@ class PathBEngine:
    - 串聯所有 window 執行
    - 生成 PathBRunResult
 
-### ⏳ TODO（Step B3 之後）
+### ✅ 已實作（Step B3）
+
+1. **基礎治理規則評估** - `_evaluate_governance_for_window()`
+   - MAX_DRAWDOWN_BREACH 檢測
+   - SHARPE_TOO_LOW 檢測
+   - TE_BREACH 檢測
+   - TURNOVER_TOO_HIGH 檢測
+
+2. **Governance 彙總統計** - `_compute_governance_summary()`
+   - Rule 觸發次數統計
+   - 最多連續 breach window 數
+   - 跨 window 平均指標
+
+3. **Governance 型別定義**
+   - PathBWindowGovernanceResult
+   - PathBRunGovernanceSummary
+
+### ⏳ TODO（Step B3+ 之後）
 
 1. **Train 階段優化** - 目前跳過 train 階段
-2. **Governance Rules** - Alpha Sunset、Regime Switch、Kill Switch 檢測
+2. **進階 Governance Rules** - Alpha Sunset、Regime Switch、Kill Switch 完整模擬
 3. **因子歸因** - Factor attribution 分析
 4. **報告生成** - 完整的報告輸出
 

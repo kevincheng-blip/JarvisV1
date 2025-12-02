@@ -24,10 +24,29 @@ from typing import List
 # J-GOD modules
 from jgod.experiments import ExperimentOrchestrator, ExperimentConfig
 
-# TODO: Import all required modules for initialization
+# Data loaders
+from jgod.path_a.mock_data_loader import MockPathADataLoader
+# TODO: 之後接 FinMindPathADataLoader
 # from jgod.path_a.finmind_loader import FinMindPathADataLoader
-# from jgod.alpha_engine.alpha_engine import AlphaEngine
-# ... etc
+# from FinMind.data import DataLoader as FinMindClient
+
+# Core engines
+from jgod.alpha_engine.alpha_engine import AlphaEngine
+from jgod.risk.risk_model import MultiFactorRiskModel
+# Path A backtest 目前使用 OptimizerCore v1，所以我們先用 v1
+from jgod.optimizer.optimizer_core import OptimizerCore
+from jgod.optimizer.optimizer_config import OptimizerConfig
+# TODO: 未來升級到 OptimizerCoreV2
+# from jgod.optimizer.optimizer_core_v2 import OptimizerCoreV2
+from jgod.execution.execution_engine import ExecutionEngine
+from jgod.execution.execution_models import FixedSlippageModel
+from jgod.execution.cost_model import DefaultCostModel
+from jgod.performance.attribution_engine import PerformanceEngine
+from jgod.diagnostics.diagnosis_engine import DiagnosisEngine
+
+# Knowledge & Learning
+from jgod.knowledge.knowledge_brain import KnowledgeBrain
+from jgod.learning.error_learning_engine import ErrorLearningEngine
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,6 +93,13 @@ def parse_args() -> argparse.Namespace:
         help="Data source: finmind or mock. Default: finmind.",
     )
     parser.add_argument(
+        "--mode",
+        type=str,
+        default="basic",
+        choices=["basic", "extreme"],
+        help="Execution mode: basic (standard modules) or extreme (professional-grade modules). Default: basic.",
+    )
+    parser.add_argument(
         "--notes",
         type=str,
         default=None,
@@ -82,14 +108,212 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_orchestrator() -> ExperimentOrchestrator:
-    """建立 ExperimentOrchestrator 實例"""
-    # TODO: 初始化所有模組
-    # 這裡先留骨架，實際實作時需要初始化所有依賴
+def build_orchestrator(data_source: str = "mock", mode: str = "basic") -> ExperimentOrchestrator:
+    """建立 ExperimentOrchestrator 實例
     
-    raise NotImplementedError(
-        "build_orchestrator() needs to be implemented with all module dependencies"
+    Args:
+        data_source: 資料來源，"mock" 或 "finmind"
+        mode: 執行模式，"basic" 或 "extreme"
+    
+    Returns:
+        ExperimentOrchestrator 實例
+    
+    Raises:
+        ValueError: 如果 data_source 或 mode 不支援
+    """
+    # =================================================================
+    # (A) 選擇 DataLoader
+    # =================================================================
+    if mode == "basic":
+        if data_source == "mock":
+            from jgod.path_a.mock_data_loader import MockConfig
+            mock_config = MockConfig(seed=123)
+            data_loader = MockPathADataLoader(config=mock_config)
+        elif data_source == "finmind":
+            from jgod.path_a.finmind_data_loader import FinMindPathADataLoader
+            
+            try:
+                data_loader = FinMindPathADataLoader()
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to initialize FinMind data loader: {e}. "
+                    "Please ensure FINMIND_TOKEN is set in environment variables, "
+                    "or use --data-source mock for testing."
+                )
+        else:
+            raise ValueError(
+                f"Unsupported data_source: {data_source}. "
+                "Must be 'mock' or 'finmind'."
+            )
+    elif mode == "extreme":
+        if data_source == "mock":
+            from jgod.path_a.mock_data_loader_extreme import (
+                MockPathADataLoaderExtreme,
+                MockConfigExtreme,
+                VolatilityRegime,
+            )
+            mock_config_extreme = MockConfigExtreme(seed=123)
+            data_loader = MockPathADataLoaderExtreme(config=mock_config_extreme)
+        elif data_source == "finmind":
+            from jgod.path_a.finmind_data_loader_extreme import (
+                FinMindPathADataLoaderExtreme,
+                FinMindLoaderConfigExtreme,
+            )
+            
+            try:
+                config_extreme = FinMindLoaderConfigExtreme(
+                    cache_enabled=True,
+                    use_parquet_cache=True,
+                    fallback_to_mock_extreme=True,
+                )
+                data_loader = FinMindPathADataLoaderExtreme(config=config_extreme)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to initialize FinMind Extreme data loader: {e}. "
+                    "Please ensure FINMIND_TOKEN is set in environment variables, "
+                    "or use --data-source mock for testing."
+                )
+        else:
+            raise NotImplementedError(
+                f"EXTREME mode currently supports only 'mock' or 'finmind' data sources, "
+                f"got: {data_source}"
+            )
+    else:
+        raise ValueError(
+            f"Unsupported mode: {mode}. Must be 'basic' or 'extreme'."
+        )
+    
+    # =================================================================
+    # (B) 初始化 Knowledge + Error Engine
+    # =================================================================
+    knowledge_brain = KnowledgeBrain(
+        path="knowledge_base/jgod_knowledge_v1.jsonl"
     )
+    
+    error_learning_engine = ErrorLearningEngine(
+        draft_output_path="knowledge_base/jgod_knowledge_drafts.jsonl",
+        report_output_dir="error_logs/reports"
+    )
+    
+    # =================================================================
+    # (C) 初始化 Alpha / Risk / Optimizer
+    # =================================================================
+    if mode == "basic":
+        alpha_engine = AlphaEngine(
+            enable_micro_momentum=False,
+            factor_weights=None
+        )
+    elif mode == "extreme":
+        from jgod.alpha_engine.alpha_engine_extreme import (
+            AlphaEngineExtreme,
+            AlphaEngineExtremeConfig,
+        )
+        alpha_engine = AlphaEngineExtreme(
+            config=AlphaEngineExtremeConfig()
+        )
+    
+    if mode == "basic":
+        risk_model = MultiFactorRiskModel(
+            factor_names=None  # 使用預設標準因子
+        )
+    elif mode == "extreme":
+        from jgod.risk.risk_model_extreme import (
+            MultiFactorRiskModelExtreme,
+            RiskModelExtremeConfig,
+        )
+        risk_model = MultiFactorRiskModelExtreme(
+            config=RiskModelExtremeConfig()
+        )
+    
+    # Path A backtest 目前使用 OptimizerCore v1
+    optimizer = OptimizerCore(
+        config=OptimizerConfig()
+    )
+    # TODO: 未來升級到 OptimizerCoreV2
+    # optimizer = OptimizerCoreV2(
+    #     solver="OSQP",
+    #     verbose=False
+    # )
+    
+    # =================================================================
+    # (D) 初始化 Execution Engine
+    # =================================================================
+    if mode == "basic":
+        execution_model = FixedSlippageModel(slippage=0.001)
+        cost_model = DefaultCostModel(
+            commission_rate=0.001425,
+            min_commission=20.0,
+            tax_rate=0.003
+        )
+        
+        execution_engine = ExecutionEngine(
+            execution_model=execution_model,
+            cost_model=cost_model,
+            broker_adapter=None,  # 使用預設 MockBrokerAdapter
+            min_trade_threshold=0.001
+        )
+    elif mode == "extreme":
+        from jgod.execution.execution_engine_extreme import (
+            ExecutionEngineExtreme,
+            ExecutionEngineExtremeConfig,
+        )
+        from jgod.execution.cost_model import DefaultCostModel
+        
+        cost_model = DefaultCostModel(
+            commission_rate=0.001425,
+            min_commission=20.0,
+            tax_rate=0.003
+        )
+        
+        execution_config = ExecutionEngineExtremeConfig(
+            damp_threshold=0.1,
+            slippage_k=0.001,
+            slippage_alpha=0.5,
+        )
+        
+        execution_engine = ExecutionEngineExtreme(
+            cost_model=cost_model,
+            config=execution_config,
+        )
+    
+    # =================================================================
+    # (E) 初始化 Performance Engine
+    # =================================================================
+    performance_engine = PerformanceEngine(
+        periods_per_year=252,
+        risk_free_rate=0.0
+    )
+    
+    # =================================================================
+    # (F) 初始化 Diagnosis Engine
+    # =================================================================
+    diagnosis_engine = DiagnosisEngine(
+        error_learning_engine=error_learning_engine,
+        config={
+            "TE_max": 0.05,
+            "T_max": 0.20,
+            "max_drawdown_threshold": -0.20,
+            "sharpe_threshold": 0.5,
+            "ir_threshold": 0.2,
+        }
+    )
+    
+    # =================================================================
+    # (G) 建立 ExperimentOrchestrator
+    # =================================================================
+    orchestrator = ExperimentOrchestrator(
+        data_loader=data_loader,
+        alpha_engine=alpha_engine,
+        risk_model=risk_model,
+        optimizer=optimizer,
+        execution_engine=execution_engine,
+        performance_engine=performance_engine,
+        diagnosis_engine=diagnosis_engine,
+        knowledge_brain=knowledge_brain,
+        error_learning_engine=error_learning_engine,
+    )
+    
+    return orchestrator
 
 
 def main() -> None:
@@ -111,10 +335,11 @@ def main() -> None:
     )
     
     # 建立 Orchestrator
-    orchestrator = build_orchestrator()
+    orchestrator = build_orchestrator(data_source=config.data_source, mode=args.mode)
     
     # 執行實驗
     print(f"Starting experiment: {config.name}")
+    print(f"Mode: {args.mode}")
     print(f"Period: {config.start_date} to {config.end_date}")
     print(f"Universe: {len(universe)} symbols")
     print()

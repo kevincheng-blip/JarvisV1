@@ -20,12 +20,12 @@ from .experiment_types import (
     ExperimentRunResult,
 )
 
+# Performance 模組直接導入，不設 fallback
+from jgod.performance import PerformanceEngine, PerformanceEngineRequest, PerformanceEngineResult
+
 # Type imports（避免循環導入）
 try:
     from jgod.path_a.path_a_schema import PathAConfig, PathABacktestResult, PathADataLoader
-    from jgod.path_a.path_a_backtest import PathARunContext, run_path_a_backtest
-    from jgod.performance.performance_types import PerformanceEngineRequest, PerformanceEngineResult
-    from jgod.performance.attribution_engine import PerformanceEngine
     from jgod.diagnostics.diagnosis_engine import DiagnosisEngine
     from jgod.alpha_engine.alpha_engine import AlphaEngine
     from jgod.risk.risk_model import MultiFactorRiskModel
@@ -40,7 +40,6 @@ except ImportError:
     MultiFactorRiskModel = Any
     OptimizerCoreV2 = Any
     ExecutionEngine = Any
-    PerformanceEngine = Any
     DiagnosisEngine = Any
     KnowledgeBrain = Any
     ErrorLearningEngine = Any
@@ -166,17 +165,24 @@ class ExperimentOrchestrator:
         self,
         path_a_config: PathAConfig
     ) -> PathABacktestResult:
-        """執行 Path A 回測"""
-        # 建立 PathARunContext
-        from jgod.path_a.path_a_backtest import PathARunContext
+        """執行 Path A 回測
         
+        執行流程：
+        - 使用 DataLoader 載入價格與特徵
+        - 建立 PathARunContext
+        - 呼叫 run_path_a_backtest
+        """
+        # 為了避免 top-level import 失敗，改成在這裡 local import
+        from jgod.path_a.path_a_backtest import PathARunContext, run_path_a_backtest
+        
+        # 建立 PathARunContext
         context = PathARunContext(
             config=path_a_config,
             data_loader=self.data_loader,
             alpha_engine=self.alpha_engine,
             risk_model=self.risk_model,
             optimizer=self.optimizer,
-            execution_engine=self.execution_engine,
+            error_engine=self.error_learning_engine,
             error_bridge=None,  # TODO: 實作 ErrorBridge
         )
         

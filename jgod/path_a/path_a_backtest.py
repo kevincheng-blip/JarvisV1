@@ -13,7 +13,7 @@ The goal of v1 is **not** to implement all details, but to:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Optional
+from typing import Protocol, Optional, List
 
 import numpy as np
 import pandas as pd
@@ -29,6 +29,14 @@ from jgod.alpha_engine.alpha_engine import AlphaEngine
 from jgod.risk.risk_model import MultiFactorRiskModel
 from jgod.optimizer.optimizer_core import OptimizerCore
 from jgod.learning.error_learning_engine import ErrorLearningEngine
+
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+# 價格欄位名稱（用於避免 feature_frame 和 price_frame 欄位重複）
+PRICE_COLUMNS = ["close", "open", "high", "low", "volume"]
 
 
 # ---------------------------------------------------------------------------
@@ -199,29 +207,36 @@ def run_path_a_backtest(ctx: PathARunContext) -> PathABacktestResult:
             # ------------------------------------------------------------------
             # 2a) Prepare alpha inputs for AlphaEngine
             # ------------------------------------------------------------------
-            # Extract features for current_date across all symbols
-            if isinstance(feature_frame.index, pd.MultiIndex):
-                date_mask = feature_frame.index.get_level_values(0) == current_date
-                feature_slice = feature_frame.loc[date_mask]
-                # AlphaEngine expects a DataFrame with index=symbol
-                alpha_input = feature_slice.droplevel(0)  # drop date level
-            else:
-                # Single-level index: assume date index, need to extract by date
-                alpha_input = feature_frame.loc[[current_date]]
+            # 使用 helper 準備 alpha input（合併 feature 和 price 資料）
+            alpha_input = _prepare_alpha_input(
+                feature_frame=feature_frame,
+                price_frame=price_frame,
+                current_date=current_date,
+                universe=config.universe
+            )
             
-            # TODO: Ensure alpha_input has the correct format for AlphaEngine
-            # AlphaEngine.compute_all expects a DataFrame per symbol, not per date
-            # This may need adjustment based on actual AlphaEngine interface
-            
-            # For now, we'll compute composite_alpha assuming feature_frame
-            # is properly formatted
             try:
+                # AlphaEngine 會自動偵測橫截面模式
                 alpha_result = ctx.alpha_engine.compute_all(alpha_input)
-                # Extract composite_alpha if it's a DataFrame, or use directly if Series
+                
+                # Extract composite_alpha
+                # 在橫截面模式下，alpha_result 的 index 應該是 symbol
                 if isinstance(alpha_result, pd.DataFrame):
-                    composite_alpha = alpha_result.get('composite_alpha', alpha_result.iloc[:, 0])
-                else:
+                    if 'composite_alpha' in alpha_result.columns:
+                        composite_alpha = alpha_result['composite_alpha']
+                    else:
+                        # 如果沒有 composite_alpha 欄位，使用第一個欄位
+                        composite_alpha = alpha_result.iloc[:, 0]
+                elif isinstance(alpha_result, pd.Series):
                     composite_alpha = alpha_result
+                else:
+                    composite_alpha = pd.Series(0.0, index=config.universe)
+                
+                # 確保 composite_alpha 的 index 對齊 universe
+                if isinstance(composite_alpha, pd.Series):
+                    composite_alpha = composite_alpha.reindex(config.universe, fill_value=0.0)
+                else:
+                    composite_alpha = pd.Series(0.0, index=config.universe)
             except Exception as e:
                 # Fallback: use zero alpha if computation fails
                 print(f"Warning: AlphaEngine computation failed on {current_date}: {e}")
@@ -237,15 +252,35 @@ def run_path_a_backtest(ctx: PathARunContext) -> PathABacktestResult:
             # For now, we assume the risk_model is already fitted and can provide covariance.
             
             try:
-                cov_matrix = ctx.risk_model.get_covariance_matrix()
-                # Ensure covariance matrix is aligned with universe
-                if cov_matrix.shape[0] != len(config.universe):
-                    # If shape mismatch, create a simple identity matrix as fallback
-                    print(f"Warning: Covariance matrix shape mismatch. Using identity matrix.")
-                    cov_matrix = np.eye(len(config.universe))
+                # 優先嘗試從 Risk Model 取得（如果已經 fit 且 symbols 對齊）
+                risk_model_ready = (
+                    hasattr(ctx.risk_model, 'symbols') and 
+                    ctx.risk_model.symbols == list(config.universe)
+                )
+                
+                if risk_model_ready:
+                    cov_matrix = ctx.risk_model.get_covariance_matrix()
+                    if cov_matrix.shape[0] == len(config.universe):
+                        # Shape 正確，使用它
+                        pass
+                    else:
+                        # Shape 不對，改用 sample covariance
+                        cov_matrix = _compute_sample_covariance(
+                            price_frame,
+                            list(config.universe),
+                            lookback_days=min(60, len(price_frame))
+                        )
+                else:
+                    # Risk Model 還沒 fit 或 symbols 不對齊，從 price_frame 計算
+                    cov_matrix = _compute_sample_covariance(
+                        price_frame,
+                        list(config.universe),
+                        lookback_days=min(60, len(price_frame))
+                    )
             except Exception as e:
-                print(f"Warning: Failed to get covariance matrix: {e}. Using identity matrix.")
-                cov_matrix = np.eye(len(config.universe))
+                print(f"Warning: Failed to compute covariance matrix: {e}. Using identity matrix.")
+                # 使用小的 identity matrix（而不是全 1）
+                cov_matrix = np.eye(len(config.universe)) * 0.01
             
             # ------------------------------------------------------------------
             # 2c) Optimize portfolio weights
@@ -408,4 +443,151 @@ def _extract_price_for_date(
     df_slice = price_frame.loc[date, col_names]
     df_slice.index = universe
     return df_slice.astype(float)
+
+
+def _prepare_alpha_input(
+    feature_frame: pd.DataFrame,
+    price_frame: pd.DataFrame,
+    current_date: pd.Timestamp,
+    universe: List[str]
+) -> pd.DataFrame:
+    """
+    準備 AlphaEngine 的輸入資料
+    
+    將 feature_frame 和 price_frame 合併，產生包含所有必要欄位的 DataFrame
+    
+    Args:
+        feature_frame: Feature frame with MultiIndex (date, symbol)
+        price_frame: Price frame with index=date, columns=MultiIndex(symbol, field)
+        current_date: 當前日期
+        universe: 股票列表
+    
+    Returns:
+        DataFrame with index=symbol, columns=所有 features + price fields
+    """
+    # 1. 從 feature_frame 提取該日期的 features
+    if isinstance(feature_frame.index, pd.MultiIndex):
+        date_mask = feature_frame.index.get_level_values(0) == current_date
+        feature_slice = feature_frame.loc[date_mask].droplevel(0)  # drop date level
+    else:
+        feature_slice = feature_frame.loc[[current_date]]
+    
+    # 2. 從 price_frame 提取該日期的價格資料
+    price_data = {}
+    for symbol in universe:
+        try:
+            if isinstance(price_frame.columns, pd.MultiIndex):
+                price_data[symbol] = {
+                    'close': price_frame.loc[current_date, (symbol, 'close')],
+                    'volume': price_frame.loc[current_date, (symbol, 'volume')],
+                    'open': price_frame.loc[current_date, (symbol, 'open')],
+                    'high': price_frame.loc[current_date, (symbol, 'high')],
+                    'low': price_frame.loc[current_date, (symbol, 'low')],
+                }
+            else:
+                # wide format fallback
+                price_data[symbol] = {
+                    'close': price_frame.loc[current_date, f'{symbol}_close'],
+                    'volume': price_frame.loc[current_date, f'{symbol}_volume'],
+                    'open': price_frame.loc[current_date, f'{symbol}_open'],
+                    'high': price_frame.loc[current_date, f'{symbol}_high'],
+                    'low': price_frame.loc[current_date, f'{symbol}_low'],
+                }
+        except (KeyError, IndexError):
+            # 如果某個欄位不存在，使用 NaN
+            price_data[symbol] = {
+                'close': np.nan,
+                'volume': np.nan,
+                'open': np.nan,
+                'high': np.nan,
+                'low': np.nan,
+            }
+    
+    # 3. 合併成單一 DataFrame
+    price_df = pd.DataFrame(price_data).T
+    price_df.index.name = None  # 移除 index name
+    
+    # 4. 合併 feature 和 price 資料
+    if feature_slice.index.name is not None:
+        feature_slice.index.name = None
+    
+    # 確保價格欄位只來自 price_df，避免 join 時欄位重疊
+    overlap_price_cols = [c for c in feature_slice.columns if c in PRICE_COLUMNS]
+    if overlap_price_cols:
+        feature_slice = feature_slice.drop(columns=overlap_price_cols)
+    
+    # 確保 index 對齊，然後合併
+    feature_slice = feature_slice.reindex(universe, fill_value=0.0)
+    price_df = price_df.reindex(universe, fill_value=np.nan)
+    
+    # 使用 join 合併（outer join 確保所有股票都在結果中）
+    alpha_input = feature_slice.join(price_df, how='outer')
+    
+    # 5. 確保所有 universe 的股票都在結果中
+    alpha_input = alpha_input.reindex(universe, fill_value=0.0)
+    
+    # 6. 填充 NaN
+    alpha_input = alpha_input.fillna(0.0)
+    
+    return alpha_input
+
+
+def _compute_sample_covariance(
+    price_frame: pd.DataFrame,
+    universe: List[str],
+    lookback_days: int = 60
+) -> np.ndarray:
+    """
+    從 price_frame 計算 returns 和 covariance matrix
+    
+    Args:
+        price_frame: Price frame with index=date, columns=MultiIndex(symbol, field)
+        universe: 股票列表
+        lookback_days: 使用的歷史天數
+    
+    Returns:
+        Covariance matrix (n_symbols × n_symbols)，年化
+    """
+    # 1. 提取 close prices
+    close_data = {}
+    for symbol in universe:
+        try:
+            if isinstance(price_frame.columns, pd.MultiIndex):
+                close_data[symbol] = price_frame[(symbol, 'close')]
+            else:
+                close_data[symbol] = price_frame[f'{symbol}_close']
+        except KeyError:
+            # 如果某個股票沒有資料，創建全 NaN 的 Series
+            close_data[symbol] = pd.Series(np.nan, index=price_frame.index)
+    
+    close_df = pd.DataFrame(close_data)
+    
+    # 2. 使用最近 lookback_days 天
+    if len(close_df) > lookback_days:
+        recent_close = close_df.tail(lookback_days)
+    else:
+        recent_close = close_df
+    
+    # 3. 計算 returns
+    returns = recent_close.pct_change().dropna()
+    
+    # 4. 如果資料不足，返回 identity matrix
+    if len(returns) < 2:
+        n = len(universe)
+        return np.eye(n) * 0.01  # 小一點的 identity
+    
+    # 5. 確保所有 universe 的股票都有資料
+    returns = returns.reindex(columns=universe, fill_value=0.0)
+    
+    # 6. 計算 covariance matrix（年化）
+    cov_matrix = returns.cov().values * 252  # 年化
+    
+    # 7. 確保是對稱且正定
+    cov_matrix = (cov_matrix + cov_matrix.T) / 2  # 確保對稱
+    eigenvalues = np.linalg.eigvals(cov_matrix)
+    if np.any(eigenvalues < 0):
+        # 如果有負特徵值，調整
+        cov_matrix = cov_matrix + np.eye(len(universe)) * 0.001
+    
+    return cov_matrix
 

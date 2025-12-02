@@ -357,6 +357,99 @@ for window_result in result.window_results:
 
 ---
 
+## 🛡️ Governance & Kill-Switch Simulation via Path B
+
+Path B 每個 window 會套用 Step 6 的核心治理規則，可以統計與模擬治理規則在不同市場視窗下的觸發頻率。
+
+### 基礎治理規則
+
+Path B 目前實作以下基礎治理規則（參考 Step 6 V2.1）：
+
+1. **MAX_DRAWDOWN_BREACH**
+   - 條件：`max_drawdown <= max_drawdown_threshold`
+   - 預設門檻：-15%
+   - 用途：偵測過大的回撤風險
+
+2. **SHARPE_TOO_LOW**
+   - 條件：`sharpe < sharpe_threshold`
+   - 預設門檻：2.0
+   - 用途：偵測風險調整後報酬不足
+
+3. **TE_BREACH**
+   - 條件：`tracking_error > tracking_error_max`
+   - 預設門檻：4%
+   - 用途：偵測追蹤誤差過大
+
+4. **TURNOVER_TOO_HIGH**
+   - 條件：`turnover > turnover_max`
+   - 預設門檻：100%
+   - 用途：偵測過度交易
+
+### Governance 統計功能
+
+Path B 可以統計：
+
+- **有多少個 window 會觸發 kill-switch 類型條件**
+  - 透過 `governance_summary.windows_with_any_breach` 取得
+  
+- **哪些 rule 最常被觸發**
+  - 透過 `governance_summary.rule_hit_counts` 取得
+  - 例如：`{"MAX_DRAWDOWN_BREACH": 3, "SHARPE_TOO_LOW": 5}`
+
+- **整體 Sharpe / DD 在多視窗下的穩定度**
+  - 透過 `governance_summary.global_metrics` 取得
+  - 包含：`avg_sharpe`, `avg_max_drawdown`, `avg_tracking_error` 等
+
+- **最多連續多少個 window 都觸發了 rule**
+  - 透過 `governance_summary.max_consecutive_breach_windows` 取得
+  - 用於評估策略是否在特定市場環境下持續失效
+
+### 使用範例
+
+```python
+from jgod.path_b.path_b_engine import PathBEngine, PathBConfig
+
+engine = PathBEngine()
+
+config = PathBConfig(
+    train_start="2024-01-01",
+    train_end="2024-06-30",
+    test_start="2024-07-01",
+    test_end="2024-12-31",
+    walkforward_window="6m",
+    walkforward_step="1m",
+    universe=["2330.TW", "2317.TW"],
+    rebalance_frequency="M",
+    # Governance 門檻設定
+    max_drawdown_threshold=-0.15,  # -15%
+    sharpe_threshold=2.0,
+    tracking_error_max=0.04,  # 4%
+    turnover_max=1.0,  # 100%
+)
+
+result = engine.run(config)
+
+# 查看 governance 結果
+print(f"總 window 數：{result.governance_summary.total_windows}")
+print(f"觸發 breach 的 window 數：{result.governance_summary.windows_with_any_breach}")
+print(f"規則觸發次數：{result.governance_summary.rule_hit_counts}")
+print(f"最多連續 breach window 數：{result.governance_summary.max_consecutive_breach_windows}")
+
+# 查看每個 window 的 governance 結果
+for window_gov in result.windows_governance:
+    if window_gov.rules_triggered:
+        print(f"Window {window_gov.window_id} 觸發規則：{window_gov.rules_triggered}")
+```
+
+### 未來擴充
+
+Step B3+ 將加入：
+- **Alpha IC / Alpha Sunset**：監控 Alpha 衰減
+- **Regime/Stress hits**：市場環境變化檢測
+- **Kill switch 模擬**：完整風險控制機制
+
+---
+
 ## 📚 相關文件
 
 - `spec/JGOD_PathBEngine_Spec.md` - Path B Engine 規格文件

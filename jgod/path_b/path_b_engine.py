@@ -75,6 +75,12 @@ class PathBConfig:
     transaction_cost_bps: float = 5.0
     slippage_bps: float = 0.0
     
+    # Governance thresholds (optional, with sensible defaults)
+    max_drawdown_threshold: float = -0.15  # -15%
+    sharpe_threshold: float = 2.0
+    tracking_error_max: float = 0.04  # 4%
+    turnover_max: float = 1.0  # e.g. 100% per window
+    
     # 實驗名稱
     experiment_name: str = "path_b_experiment"
 
@@ -95,7 +101,7 @@ class PathBWindowResult:
     # Test 階段結果
     test_result: PathABacktestResult
     
-    # Governance Rule 觸發紀錄
+    # Governance Rule 觸發紀錄（保留向後兼容）
     governance_events: List[Dict[str, Any]] = field(default_factory=list)
     # 例如：
     # [
@@ -116,6 +122,54 @@ class PathBWindowResult:
 
 
 @dataclass
+class PathBWindowGovernanceResult:
+    """單一 Window 的 Governance 評估結果"""
+    
+    window_id: int
+    train_start: str
+    train_end: str
+    test_start: str
+    test_end: str
+    
+    rules_triggered: List[str]
+    # 例如：["MAX_DRAWDOWN_BREACH", "TE_BREACH"]
+    
+    metrics: Dict[str, float]
+    # 可包含：
+    # - "sharpe"
+    # - "max_drawdown"
+    # - "total_return"
+    # - "tracking_error"（如果有）
+    # - "turnover"
+    
+    notes: Optional[str] = None
+    # 用來存簡短文字，例如 "Sharpe < threshold for 3 windows"
+
+
+@dataclass
+class PathBRunGovernanceSummary:
+    """Path B 完整執行的 Governance 彙總統計"""
+    
+    total_windows: int
+    
+    rule_hit_counts: Dict[str, int]
+    # key：rule 名稱，如 "MAX_DRAWDOWN_BREACH"
+    # value：有多少個 window 觸發
+    
+    windows_with_any_breach: int
+    # 有多少個 window 至少觸發了一個 rule
+    
+    max_consecutive_breach_windows: int
+    # 最多連續多少個 window 都觸發了 rule
+    
+    global_metrics: Dict[str, float]
+    # 例如：
+    # - "avg_sharpe"
+    # - "avg_max_drawdown"
+    # - "avg_tracking_error"
+
+
+@dataclass
 class PathBRunResult:
     """完整的 Path B 執行結果"""
     
@@ -132,11 +186,17 @@ class PathBRunResult:
     # - Window 間一致性（Sharpe 標準差）
     # - Alpha Stability Score
     
-    # Governance 分析
+    # Governance 分析（保留向後兼容）
     governance_analysis: Dict[str, Any] = field(default_factory=dict)
     # 包含：
     # - 每個 rule 的觸發次數
     # - 觸發時的市場環境特徵
+    
+    # Governance Summary（新增）
+    governance_summary: Optional[PathBRunGovernanceSummary] = None
+    
+    # Windows Governance（新增）
+    windows_governance: Optional[List[PathBWindowGovernanceResult]] = None
     
     # 輸出檔案路徑
     output_files: List[str] = field(default_factory=list)
@@ -200,8 +260,10 @@ class PathBEngine:
         
         # Step 2-4: 執行每個 window
         window_results = []
+        windows_governance = []  # 收集所有 window 的 governance 結果
+        
         for window_id, (train_start, train_end, test_start, test_end) in enumerate(windows, 1):
-            window_result = self._run_single_window(
+            window_result, governance_result = self._run_single_window(
                 window_id=window_id,
                 train_start=train_start,
                 train_end=train_end,
@@ -210,16 +272,25 @@ class PathBEngine:
                 config=config
             )
             window_results.append(window_result)
+            windows_governance.append(governance_result)
         
         # Step 5: Combine & Export
         summary = self._compute_summary(window_results)
         governance_analysis = self._analyze_governance(window_results, config)
+        
+        # Step 6: Compute Governance Summary
+        governance_summary = self._compute_governance_summary(
+            windows_governance=windows_governance,
+            config=config,
+        )
         
         result = PathBRunResult(
             config=config,
             window_results=window_results,
             summary=summary,
             governance_analysis=governance_analysis,
+            governance_summary=governance_summary,
+            windows_governance=windows_governance,
         )
         
         # TODO: Export results to files
@@ -409,7 +480,7 @@ class PathBEngine:
             config=config
         )
         
-        return PathBWindowResult(
+        window_result = PathBWindowResult(
             window_id=window_id,
             train_start=train_start,
             train_end=train_end,
@@ -426,6 +497,20 @@ class PathBEngine:
             information_ratio=information_ratio,
             factor_attribution=None,  # TODO: extract factor attribution in future
         )
+        
+        # Step 5 - Evaluate Governance for Window
+        governance_result = self._evaluate_governance_for_window(
+            window_id=window_id,
+            train_start=train_start,
+            train_end=train_end,
+            test_start=test_start,
+            test_end=test_end,
+            config=config,
+            window_result=window_result,
+            performance_result=perf_result,
+        )
+        
+        return window_result, governance_result
     
     def _get_or_create_data_loader(self, config: PathBConfig) -> PathADataLoader:
         """取得或建立 data loader"""
@@ -504,7 +589,7 @@ class PathBEngine:
         config: PathBConfig
     ) -> List[Dict[str, Any]]:
         """
-        套用 Governance Rules 並記錄觸發事件
+        套用 Governance Rules 並記錄觸發事件（保留向後兼容）
         
         Args:
             window_result: Window 結果（可選，用於分析）
@@ -531,6 +616,78 @@ class PathBEngine:
         #     ...
         
         return governance_events
+    
+    def _evaluate_governance_for_window(
+        self,
+        window_id: int,
+        train_start: str,
+        train_end: str,
+        test_start: str,
+        test_end: str,
+        config: PathBConfig,
+        window_result: PathBWindowResult,
+        performance_result: Optional[Any] = None,
+        diagnosis_result: Optional[Any] = None,
+    ) -> PathBWindowGovernanceResult:
+        """
+        評估單一 Window 的 Governance 規則
+        
+        Args:
+            window_id: Window ID
+            train_start: Train 階段開始日期
+            train_end: Train 階段結束日期
+            test_start: Test 階段開始日期
+            test_end: Test 階段結束日期
+            config: Path B 配置
+            window_result: Window 結果
+            performance_result: Performance 結果（可選）
+            diagnosis_result: Diagnosis 結果（可選）
+        
+        Returns:
+            PathBWindowGovernanceResult 物件
+        """
+        rules_triggered: List[str] = []
+        
+        # 建立 metrics 字典
+        metrics: Dict[str, float] = {
+            "sharpe": window_result.sharpe_ratio,
+            "max_drawdown": window_result.max_drawdown,
+            "total_return": window_result.total_return,
+            "turnover": window_result.turnover_rate,
+        }
+        
+        # 如果有 tracking_error，加入 metrics
+        if window_result.tracking_error is not None:
+            metrics["tracking_error"] = window_result.tracking_error
+        
+        # 檢查 MAX_DRAWDOWN_BREACH
+        if window_result.max_drawdown <= config.max_drawdown_threshold:
+            rules_triggered.append("MAX_DRAWDOWN_BREACH")
+        
+        # 檢查 SHARPE_TOO_LOW
+        if window_result.sharpe_ratio < config.sharpe_threshold:
+            rules_triggered.append("SHARPE_TOO_LOW")
+        
+        # 檢查 TE_BREACH（如果有 tracking_error）
+        if window_result.tracking_error is not None:
+            if window_result.tracking_error > config.tracking_error_max:
+                rules_triggered.append("TE_BREACH")
+        
+        # 檢查 TURNOVER_TOO_HIGH
+        if window_result.turnover_rate is not None:
+            if window_result.turnover_rate > config.turnover_max:
+                rules_triggered.append("TURNOVER_TOO_HIGH")
+        
+        return PathBWindowGovernanceResult(
+            window_id=window_id,
+            train_start=train_start,
+            train_end=train_end,
+            test_start=test_start,
+            test_end=test_end,
+            rules_triggered=rules_triggered,
+            metrics=metrics,
+            notes=None,  # 之後可以用 DiagnosisEngine 加註說明
+        )
     
     def _compute_summary(
         self,
@@ -582,6 +739,90 @@ class PathBEngine:
         # - Window consistency metrics
         
         return summary
+    
+    def _compute_governance_summary(
+        self,
+        windows_governance: List[PathBWindowGovernanceResult],
+        config: PathBConfig,
+    ) -> PathBRunGovernanceSummary:
+        """
+        計算 Governance 彙總統計
+        
+        Args:
+            windows_governance: 所有 window 的 governance 結果
+            config: Path B 配置
+        
+        Returns:
+            PathBRunGovernanceSummary 物件
+        """
+        total_windows = len(windows_governance)
+        
+        # 計算 rule_hit_counts
+        rule_hit_counts: Dict[str, int] = {}
+        for window_gov in windows_governance:
+            for rule in window_gov.rules_triggered:
+                rule_hit_counts[rule] = rule_hit_counts.get(rule, 0) + 1
+        
+        # 計算 windows_with_any_breach
+        windows_with_any_breach = sum(
+            1 for window_gov in windows_governance
+            if len(window_gov.rules_triggered) > 0
+        )
+        
+        # 計算 max_consecutive_breach_windows
+        max_consecutive = 0
+        current_consecutive = 0
+        for window_gov in windows_governance:
+            if len(window_gov.rules_triggered) > 0:
+                current_consecutive += 1
+                max_consecutive = max(max_consecutive, current_consecutive)
+            else:
+                current_consecutive = 0
+        
+        # 計算 global_metrics
+        global_metrics: Dict[str, float] = {}
+        
+        # 收集所有 metrics
+        sharpe_values = [
+            window_gov.metrics.get("sharpe")
+            for window_gov in windows_governance
+            if window_gov.metrics.get("sharpe") is not None
+        ]
+        max_dd_values = [
+            window_gov.metrics.get("max_drawdown")
+            for window_gov in windows_governance
+            if window_gov.metrics.get("max_drawdown") is not None
+        ]
+        total_return_values = [
+            window_gov.metrics.get("total_return")
+            for window_gov in windows_governance
+            if window_gov.metrics.get("total_return") is not None
+        ]
+        tracking_error_values = [
+            window_gov.metrics.get("tracking_error")
+            for window_gov in windows_governance
+            if window_gov.metrics.get("tracking_error") is not None
+        ]
+        
+        if sharpe_values:
+            global_metrics["avg_sharpe"] = float(np.mean(sharpe_values))
+        
+        if max_dd_values:
+            global_metrics["avg_max_drawdown"] = float(np.mean(max_dd_values))
+        
+        if total_return_values:
+            global_metrics["avg_total_return"] = float(np.mean(total_return_values))
+        
+        if tracking_error_values:
+            global_metrics["avg_tracking_error"] = float(np.mean(tracking_error_values))
+        
+        return PathBRunGovernanceSummary(
+            total_windows=total_windows,
+            rule_hit_counts=rule_hit_counts,
+            windows_with_any_breach=windows_with_any_breach,
+            max_consecutive_breach_windows=max_consecutive,
+            global_metrics=global_metrics,
+        )
     
     def _analyze_governance(
         self,

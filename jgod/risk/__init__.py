@@ -9,6 +9,16 @@ from .sizing import PositionSizer
 # Risk Model v1.0 - Multi-Factor Risk Model
 from .exposure_schema import FactorExposure, exposures_from_alpha_df, exposures_to_dataframe
 from .risk_model import MultiFactorRiskModel
+
+# Risk Model Extreme
+try:
+    from .risk_model_extreme import (
+        MultiFactorRiskModelExtreme,
+        RiskModelExtremeConfig,
+    )
+    _EXTREME_AVAILABLE = True
+except ImportError:
+    _EXTREME_AVAILABLE = False
 from .portfolio_risk import (
     compute_portfolio_exposure,
     compute_portfolio_risk,
@@ -41,4 +51,10 @@ __all__ = [
     "map_alpha_to_risk_factors",
     "STANDARD_FACTOR_NAMES",
 ]
+
+if _EXTREME_AVAILABLE:
+    __all__.extend([
+        "MultiFactorRiskModelExtreme",
+        "RiskModelExtremeConfig",
+    ])
 

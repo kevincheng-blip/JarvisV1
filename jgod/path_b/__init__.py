@@ -14,6 +14,8 @@ from jgod.path_b.path_b_engine import (
     PathBConfig,
     PathBWindowResult,
     PathBRunResult,
+    PathBWindowGovernanceResult,
+    PathBRunGovernanceSummary,
 )
 
 __all__ = [

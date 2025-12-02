@@ -95,6 +95,40 @@ class AlphaEngine:
                 for k, v in self.factor_weights.items()
             }
     
+    def _looks_like_date(self, val: str) -> bool:
+        """檢查字串是否像日期格式
+        
+        Args:
+            val: 要檢查的字串
+        
+        Returns:
+            True 如果看起來像日期格式（例如：'2024-01-01'）
+        """
+        import re
+        return bool(re.match(r'^\d{4}[-/]\d{2}[-/]\d{2}', str(val)))
+    
+    def _detect_input_mode(self, df: pd.DataFrame) -> str:
+        """偵測輸入 DataFrame 的模式
+        
+        Returns:
+            "timeseries" - 時間序列模式（index 是 DatetimeIndex）
+            "cross_sectional" - 橫截面模式（index 是 symbol）
+        """
+        if df.empty:
+            return "timeseries"  # 預設
+        
+        if isinstance(df.index, pd.DatetimeIndex):
+            return "timeseries"
+        
+        # 檢查 index 是否為 symbol（字串且不像日期）
+        if len(df.index) > 0:
+            first_val = df.index[0]
+            if isinstance(first_val, str) and not self._looks_like_date(first_val):
+                return "cross_sectional"
+        
+        # 預設嘗試時間序列
+        return "timeseries"
+    
     def compute_all(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute all alpha factors for a single stock
         
@@ -125,19 +159,50 @@ class AlphaEngine:
             ]
             return pd.DataFrame(columns=columns)
         
-        # Ensure index is datetime
-        if not isinstance(df.index, pd.DatetimeIndex):
-            if 'date' in df.columns:
-                df = df.set_index('date')
-            else:
-                df.index = pd.to_datetime(df.index)
+        # 偵測輸入模式（時間序列 vs 橫截面）
+        mode = self._detect_input_mode(df)
+        
+        # 根據模式處理 index
+        if mode == "timeseries":
+            # 時間序列模式：確保 index 是 DatetimeIndex
+            if not isinstance(df.index, pd.DatetimeIndex):
+                if 'date' in df.columns:
+                    df = df.set_index('date')
+                else:
+                    # 只在確定是時間序列模式時才嘗試轉換
+                    df.index = pd.to_datetime(df.index, errors='coerce')
+                    # 處理無法解析的情況
+                    invalid_mask = df.index.isna()
+                    if invalid_mask.any():
+                        # 如果無法解析，使用當前時間作為 fallback
+                        df.index = df.index.fillna(pd.Timestamp.now())
+        elif mode == "cross_sectional":
+            # 橫截面模式：保持 index 為 symbol，不做 datetime 轉換
+            # 對 features 做橫截面標準化（以便 factor 計算時使用）
+            df = df.copy()  # 避免修改原始資料
+            for col in df.columns:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    mean = df[col].mean()
+                    std = df[col].std()
+                    if std > 0:
+                        df[col] = (df[col] - mean) / std
+                    else:
+                        df[col] = 0.0
         
         # Compute all factors
         factor_scores: Dict[str, pd.Series] = {}
         
         for factor in self.factors:
             try:
-                score = factor.compute(df)
+                if mode == "cross_sectional":
+                    # 橫截面模式：直接使用標準化後的 features 計算 factor
+                    # 大部分 factor 需要時間序列，所以在橫截面模式下，我們使用簡化的計算
+                    # 根據可用的欄位來決定 factor score
+                    score = self._compute_cross_sectional_factor(factor, df)
+                else:
+                    # 時間序列模式：使用原始的 factor.compute()
+                    score = factor.compute(df)
+                
                 score_name = self.factor_names.get(factor.name, factor.name)
                 factor_scores[score_name] = score.fillna(0.0)
             except Exception as e:
@@ -206,4 +271,51 @@ class AlphaEngine:
             List of factor names
         """
         return [factor.name for factor in self.factors]
+    
+    def _compute_cross_sectional_factor(
+        self, 
+        factor: FactorBase, 
+        df: pd.DataFrame
+    ) -> pd.Series:
+        """在橫截面模式下計算 factor score
+        
+        這是一個簡化版本，因為大部分 factor 設計為時間序列計算。
+        在橫截面模式下，我們使用可用的 features 來計算簡單的 z-score。
+        
+        Args:
+            factor: Factor 實例
+            df: DataFrame with index=symbol, columns=features（已標準化）
+        
+        Returns:
+            pd.Series with factor scores, indexed by symbol
+        """
+        # 根據 factor 類型選擇合適的 feature
+        if factor.name == 'flow_factor':
+            # 使用 volume 或相關欄位
+            if 'volume' in df.columns:
+                return df['volume'].fillna(0.0)
+        elif factor.name == 'divergence_factor':
+            # 使用 daily_return_1d
+            if 'daily_return_1d' in df.columns:
+                return df['daily_return_1d'].fillna(0.0)
+        elif factor.name == 'reversion_factor':
+            # 使用 daily_return_1d 的反向
+            if 'daily_return_1d' in df.columns:
+                return -df['daily_return_1d'].fillna(0.0)
+        elif factor.name == 'inertia_factor':
+            # 使用 daily_return_1d（動量）
+            if 'daily_return_1d' in df.columns:
+                return df['daily_return_1d'].fillna(0.0)
+        elif factor.name == 'value_quality_factor':
+            # 使用 rolling_vol_5d（低波動表示高品質）
+            if 'rolling_vol_5d' in df.columns:
+                return -df['rolling_vol_5d'].fillna(0.0)
+        
+        # 預設：使用第一個數值欄位或返回零
+        numeric_cols = [col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])]
+        if numeric_cols:
+            return df[numeric_cols[0]].fillna(0.0)
+        
+        # 如果沒有任何欄位，返回零
+        return pd.Series(0.0, index=df.index)
 

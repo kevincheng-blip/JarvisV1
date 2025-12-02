@@ -15,6 +15,16 @@ from jgod.alpha_engine.inertia_factor import InertiaFactor
 from jgod.alpha_engine.value_quality_factor import ValueQualityFactor
 from jgod.alpha_engine.micro_momentum_factor import MicroMomentumFactor
 
+try:
+    from jgod.alpha_engine.alpha_engine_extreme import (
+        AlphaEngineExtreme,
+        AlphaEngineExtremeConfig,
+        VolatilityRegime,
+    )
+    _EXTREME_AVAILABLE = True
+except ImportError:
+    _EXTREME_AVAILABLE = False
+
 __all__ = [
     'AlphaEngine',
     'FactorBase',
@@ -23,6 +33,13 @@ __all__ = [
     'ReversionFactor',
     'InertiaFactor',
     'ValueQualityFactor',
-    'MicroMomentumFactor'
+    'MicroMomentumFactor',
 ]
+
+if _EXTREME_AVAILABLE:
+    __all__.extend([
+        'AlphaEngineExtreme',
+        'AlphaEngineExtremeConfig',
+        'VolatilityRegime',
+    ])
 
