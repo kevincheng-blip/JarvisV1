@@ -58,44 +58,64 @@ class TestPathBEngineSmoke:
         assert len(config.universe) == 2
     
     def test_path_b_engine_run_skeleton(self):
-        """Test that PathBEngine.run() can be called without errors"""
+        """
+        Test that PathBEngine.run() can be called without errors.
+        Minimal walk-forward test with mock data.
+        """
         engine = PathBEngine()
         
         config = PathBConfig(
-            train_start="2023-01-01",
-            train_end="2023-06-30",
-            test_start="2023-07-01",
-            test_end="2023-12-31",
-            walkforward_window="6m",
+            train_start="2024-01-01",
+            train_end="2024-01-15",
+            test_start="2024-01-16",
+            test_end="2024-01-20",
+            walkforward_window="1m",  # Small window for quick test
             walkforward_step="1m",
             universe=["2330.TW", "2317.TW"],
-            rebalance_frequency="M",
+            rebalance_frequency="D",
             alpha_config_set=[
                 {"name": "strategy_1", "alpha_config": {}}
             ],
+            data_source="mock",
+            mode="basic",
         )
         
-        # Run should not raise exception (even if it returns placeholder result)
-        # Note: This test may fail once implementation is added, which is expected
-        try:
-            result = engine.run(config)
+        # Run should not raise exception
+        result = engine.run(config)
+        
+        # Verify result structure
+        assert result is not None, "Result should not be None"
+        assert isinstance(result, PathBRunResult), "Result should be PathBRunResult"
+        assert result.config == config, "Result config should match input"
+        assert isinstance(result.window_results, list), "Window results should be a list"
+        assert len(result.window_results) >= 1, "Should have at least 1 window"
+        assert isinstance(result.summary, dict), "Summary should be a dict"
+        assert isinstance(result.governance_analysis, dict), "Governance analysis should be a dict"
+        
+        # Check each window result
+        for window_result in result.window_results:
+            assert window_result.window_id > 0, "Window ID should be positive"
+            assert window_result.train_start is not None, "Train start should be set"
+            assert window_result.train_end is not None, "Train end should be set"
+            assert window_result.test_start is not None, "Test start should be set"
+            assert window_result.test_end is not None, "Test end should be set"
             
-            # Verify result structure
-            assert result is not None
-            assert isinstance(result, PathBRunResult)
-            assert result.config == config
-            assert isinstance(result.window_results, list)
-            assert isinstance(result.summary, dict)
-            assert isinstance(result.governance_analysis, dict)
-            assert isinstance(result.output_files, list)
+            # Check performance metrics exist (can be float, including 0.0)
+            assert isinstance(window_result.sharpe_ratio, (float, int)), \
+                f"Sharpe ratio should be numeric, got {type(window_result.sharpe_ratio)}"
+            assert isinstance(window_result.max_drawdown, (float, int)), \
+                f"Max drawdown should be numeric, got {type(window_result.max_drawdown)}"
+            assert isinstance(window_result.total_return, (float, int)), \
+                f"Total return should be numeric, got {type(window_result.total_return)}"
+            assert isinstance(window_result.turnover_rate, (float, int)), \
+                f"Turnover rate should be numeric, got {type(window_result.turnover_rate)}"
             
-        except NotImplementedError:
-            # Expected if methods are not yet implemented
-            pytest.skip("Path B Engine methods not yet implemented")
-        except Exception as e:
-            # For now, allow other exceptions as implementation is skeleton
-            # In production, these should be specific and handled
-            pytest.skip(f"Path B Engine implementation incomplete: {e}")
+            # Check test_result exists
+            assert window_result.test_result is not None, "Test result should not be None"
+        
+        # Check summary contains basic metrics
+        assert "num_windows" in result.summary, "Summary should contain num_windows"
+        assert result.summary["num_windows"] >= 1, "Should have at least 1 window"
     
     def test_path_b_window_result_structure(self):
         """Test PathBWindowResult data structure"""

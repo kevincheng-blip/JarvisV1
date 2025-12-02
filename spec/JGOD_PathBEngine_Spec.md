@@ -331,6 +331,42 @@ class PathBEngine:
 
 ---
 
+---
+
+## 🚀 B2 Minimal Implementation 狀態
+
+### ✅ 已實作（Step B2）
+
+1. **Window 切割** - `_generate_windows()`
+   - 解析 walkforward_window 和 walkforward_step 參數
+   - 生成滾動的 train/test window 序列
+   - 支援 "6m", "1y" 等格式
+
+2. **單一 Window 執行** - `_run_single_window()`
+   - 最小可用版本
+   - 執行 Path A backtest（Test 階段）
+   - 計算基本績效指標（Sharpe, Max DD, Total Return, Turnover）
+   - 提取 Performance Summary
+
+3. **彙總統計** - `_compute_summary()`
+   - 計算平均 Sharpe、Max Drawdown
+   - 計算 Sharpe 標準差（一致性）
+   - 基本跨 window 統計
+
+4. **核心流程** - `run()`
+   - 完整的 walk-forward 流程
+   - 串聯所有 window 執行
+   - 生成 PathBRunResult
+
+### ⏳ TODO（Step B3 之後）
+
+1. **Train 階段優化** - 目前跳過 train 階段
+2. **Governance Rules** - Alpha Sunset、Regime Switch、Kill Switch 檢測
+3. **因子歸因** - Factor attribution 分析
+4. **報告生成** - 完整的報告輸出
+
+---
+
 ## 📚 參考文件
 
 - `docs/JGOD_PATH_B_STANDARD_v1.md` - Path B 標準文件

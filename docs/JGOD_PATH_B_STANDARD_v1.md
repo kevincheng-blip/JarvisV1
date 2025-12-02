@@ -288,6 +288,75 @@ window_id,avg_slippage_bps,avg_turnover,beta_stability_score,beta_update_frequen
 
 ---
 
+---
+
+## 🔄 目前在 J-GOD 中的使用方式
+
+### 目前支援功能（Step B2）
+
+Path B Engine 目前實作了 **最小可用版本**，可以執行：
+
+1. **多 Window Walk-Forward Backtest**
+   - 自動切割 train/test windows
+   - 對每個 window 執行 Path A backtest
+   - 收集所有 window 的績效統計
+
+2. **基本績效指標收集**
+   - Sharpe Ratio
+   - Maximum Drawdown
+   - Total Return
+   - Turnover Rate
+
+3. **跨 Window 一致性分析**
+   - 平均績效指標
+   - 標準差（穩定性）
+   - 基本彙總統計
+
+### 使用範例
+
+```python
+from jgod.path_b.path_b_engine import PathBEngine, PathBConfig
+
+# 建立 Path B Engine
+engine = PathBEngine()
+
+# 建立配置
+config = PathBConfig(
+    train_start="2024-01-01",
+    train_end="2024-06-30",
+    test_start="2024-07-01",
+    test_end="2024-12-31",
+    walkforward_window="6m",
+    walkforward_step="1m",
+    universe=["2330.TW", "2317.TW"],
+    rebalance_frequency="M",
+    alpha_config_set=[],
+    data_source="mock",
+    mode="basic",
+)
+
+# 執行 Walk-Forward Analysis
+result = engine.run(config)
+
+# 查看結果
+print(f"Number of windows: {result.summary['num_windows']}")
+print(f"Average Sharpe: {result.summary.get('avg_sharpe', 'N/A')}")
+
+for window_result in result.window_results:
+    print(f"Window {window_result.window_id}: "
+          f"Sharpe={window_result.sharpe_ratio:.2f}, "
+          f"DD={window_result.max_drawdown:.2%}")
+```
+
+### 之後延伸（Step B3+）
+
+- **Alpha Sunset / Regime / Kill Switch 模擬**
+- **完整的 Train 階段策略優化**
+- **因子歸因分析**
+- **詳細的報告生成**
+
+---
+
 ## 📚 相關文件
 
 - `spec/JGOD_PathBEngine_Spec.md` - Path B Engine 規格文件

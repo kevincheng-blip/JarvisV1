@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple, Any, Callable
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 
 from jgod.path_a.path_a_schema import PathABacktestResult
 from jgod.path_a.path_a_backtest import PathADataLoader
@@ -156,22 +157,29 @@ class PathBEngine:
         risk_model_factory: Optional[Callable] = None,
         optimizer_factory: Optional[Callable] = None,
         execution_engine_factory: Optional[Callable] = None,
+        data_source: str = "mock",
+        mode: str = "basic",
     ):
         """
         初始化 Path B Engine
         
         Args:
-            data_loader: Path A Data Loader 實例
+            data_loader: Path A Data Loader 實例（可選，若為 None 則在 run() 時根據 config 建立）
             alpha_engine_factory: Alpha Engine 工廠函數
             risk_model_factory: Risk Model 工廠函數
             optimizer_factory: Optimizer 工廠函數
             execution_engine_factory: Execution Engine 工廠函數
+            data_source: 資料來源（"mock" 或 "finmind"）
+            mode: 執行模式（"basic" 或 "extreme"）
         """
         self.data_loader = data_loader
         self.alpha_engine_factory = alpha_engine_factory
         self.risk_model_factory = risk_model_factory
         self.optimizer_factory = optimizer_factory
         self.execution_engine_factory = execution_engine_factory
+        self.data_source = data_source
+        self.mode = mode
+        self.base_universe: Optional[Sequence[str]] = None
         
         # TODO: integrate AlphaHealthMonitor
         # TODO: integrate RegimeManager
@@ -232,16 +240,78 @@ class PathBEngine:
         Returns:
             List of (train_start, train_end, test_start, test_end) tuples
         """
-        # TODO: Implement window generation logic
-        # - Parse walkforward_window (e.g., "6m" -> 6 months)
-        # - Parse walkforward_step (e.g., "1m" -> 1 month)
-        # - Generate overlapping windows
-        # - Return list of (train_start, train_end, test_start, test_end) tuples
+        def _parse_duration(duration_str: str) -> int:
+            """Parse duration string like '6m' -> 6 months"""
+            if duration_str.endswith('m'):
+                return int(duration_str[:-1])
+            elif duration_str.endswith('y'):
+                return int(duration_str[:-1]) * 12
+            else:
+                raise ValueError(f"Invalid duration format: {duration_str}. Expected format: '6m' or '1y'")
         
-        # Placeholder: return single window for now
-        return [
-            (config.train_start, config.train_end, config.test_start, config.test_end)
-        ]
+        # Parse walkforward parameters
+        window_months = _parse_duration(config.walkforward_window)
+        step_months = _parse_duration(config.walkforward_step)
+        
+        # Convert date strings to datetime
+        first_train_start = pd.to_datetime(config.train_start)
+        first_train_end = pd.to_datetime(config.train_end)
+        first_test_start = pd.to_datetime(config.test_start)
+        first_test_end = pd.to_datetime(config.test_end)
+        
+        # Calculate train and test durations in months
+        train_duration_months = (first_train_end.year - first_train_start.year) * 12 + \
+                                (first_train_end.month - first_train_start.month)
+        test_duration_months = (first_test_end.year - first_test_start.year) * 12 + \
+                               (first_test_end.month - first_test_start.month)
+        
+        # Generate windows
+        windows = []
+        current_train_start = first_train_start
+        window_id = 0
+        
+        while True:
+            # Calculate train end
+            train_end = current_train_start + pd.DateOffset(months=train_duration_months)
+            
+            # Calculate test start (immediately after train end)
+            test_start = train_end + pd.DateOffset(days=1)
+            test_end = test_start + pd.DateOffset(months=test_duration_months)
+            
+            # Check if test_end exceeds the global end date
+            if test_end > first_test_end:
+                # Check if we have at least one complete window
+                if window_id == 0:
+                    # Use the first window as-is (as specified in config)
+                    windows.append((
+                        config.train_start,
+                        config.train_end,
+                        config.test_start,
+                        config.test_end
+                    ))
+                break
+            
+            windows.append((
+                current_train_start.strftime("%Y-%m-%d"),
+                train_end.strftime("%Y-%m-%d"),
+                test_start.strftime("%Y-%m-%d"),
+                test_end.strftime("%Y-%m-%d"),
+            ))
+            
+            # Move to next window
+            current_train_start = current_train_start + pd.DateOffset(months=step_months)
+            window_id += 1
+        
+        # Ensure at least one window is returned
+        if not windows:
+            windows.append((
+                config.train_start,
+                config.train_end,
+                config.test_start,
+                config.test_end
+            ))
+        
+        return windows
     
     def _run_single_window(
         self,
@@ -253,7 +323,7 @@ class PathBEngine:
         config: PathBConfig
     ) -> PathBWindowResult:
         """
-        執行單一 window 的訓練與測試
+        執行單一 window 的訓練與測試（最小可用版本）
         
         Args:
             window_id: Window ID
@@ -266,33 +336,78 @@ class PathBEngine:
         Returns:
             PathBWindowResult 物件
         """
-        # TODO: Step 2 - Train 模式（IS）
-        # - Load training data
-        # - Optimize strategy parameters (if needed)
-        # - Record training statistics
+        # Step 2 - Train 模式（IS）- 目前簡化為不做訓練，直接使用預設參數
         train_result = None
         
-        # TODO: Step 3 - Test 模式（OOS）
-        # - Load test data
-        # - Run backtest with trained parameters
-        # - Calculate performance metrics
-        # - Perform factor attribution
-        test_result = None  # Placeholder
+        # Step 3 - Test 模式（OOS）
+        # 建立 Path A 設定（使用 test 期間）
+        from jgod.path_a.path_a_schema import PathAConfig
         
-        # TODO: Step 4 - Apply Governance Rules
-        governance_events = self._apply_governance_rules(
-            window_result=None,  # TODO: pass actual window_result
-            config=config
+        path_a_config = PathAConfig(
+            start_date=test_start,
+            end_date=test_end,
+            universe=list(config.universe),
+            rebalance_frequency=config.rebalance_frequency,
+            initial_nav=config.initial_nav,
+            transaction_cost_bps=config.transaction_cost_bps,
+            slippage_bps=config.slippage_bps,
+            experiment_name=f"{config.experiment_name}_window_{window_id}",
         )
         
-        # TODO: Extract performance metrics from test_result
-        sharpe_ratio = 0.0
-        max_drawdown = 0.0
-        total_return = 0.0
-        turnover_rate = 0.0
-        tracking_error = None
-        information_ratio = None
-        factor_attribution = None
+        # 建立或取得 data loader
+        data_loader = self._get_or_create_data_loader(config)
+        
+        # 建立引擎（如果沒有提供 factory，使用 build_orchestrator 的邏輯）
+        alpha_engine, risk_model, optimizer = self._get_or_create_engines(config)
+        
+        # 執行 Path A backtest
+        from jgod.path_a.path_a_backtest import PathARunContext, run_path_a_backtest
+        from jgod.learning.error_learning_engine import ErrorLearningEngine
+        
+        error_engine = ErrorLearningEngine(
+            draft_output_path="knowledge_base/jgod_knowledge_drafts.jsonl",
+            report_output_dir="error_logs/reports"
+        )
+        
+        context = PathARunContext(
+            config=path_a_config,
+            data_loader=data_loader,
+            alpha_engine=alpha_engine,
+            risk_model=risk_model,
+            optimizer=optimizer,
+            error_engine=error_engine,
+            error_bridge=None,
+        )
+        
+        test_result = run_path_a_backtest(context)
+        
+        # 計算績效指標
+        from jgod.performance.attribution_engine import PerformanceEngine
+        from jgod.performance.performance_types import PerformanceEngineRequest
+        
+        performance_engine = PerformanceEngine(periods_per_year=252, risk_free_rate=0.0)
+        perf_request = PerformanceEngineRequest.from_path_a_result(
+            test_result,
+            benchmark_returns=None,
+            factor_returns=None,
+            sector_map=None,
+        )
+        perf_result = performance_engine.compute_full_report(perf_request)
+        
+        # 提取績效指標
+        summary = perf_result.summary
+        sharpe_ratio = summary.sharpe
+        max_drawdown = summary.max_drawdown
+        total_return = summary.total_return
+        turnover_rate = summary.turnover_annualized
+        tracking_error = summary.tracking_error
+        information_ratio = summary.information_ratio
+        
+        # Step 4 - Apply Governance Rules (簡化版，目前返回空列表)
+        governance_events = self._apply_governance_rules(
+            window_result=None,  # TODO: pass actual window_result in Step B3
+            config=config
+        )
         
         return PathBWindowResult(
             window_id=window_id,
@@ -309,8 +424,79 @@ class PathBEngine:
             turnover_rate=turnover_rate,
             tracking_error=tracking_error,
             information_ratio=information_ratio,
-            factor_attribution=factor_attribution,
+            factor_attribution=None,  # TODO: extract factor attribution in future
         )
+    
+    def _get_or_create_data_loader(self, config: PathBConfig) -> PathADataLoader:
+        """取得或建立 data loader"""
+        if self.data_loader is not None:
+            return self.data_loader
+        
+        # 根據 config 建立 data loader（重用 build_orchestrator 的邏輯，但避免循環導入）
+        # 直接複製 build_orchestrator 中的 data loader 建立邏輯
+        if config.mode == "basic":
+            if config.data_source == "mock":
+                from jgod.path_a.mock_data_loader import MockConfig, MockPathADataLoader
+                mock_config = MockConfig(seed=123)
+                return MockPathADataLoader(config=mock_config)
+            elif config.data_source == "finmind":
+                from jgod.path_a.finmind_data_loader import FinMindPathADataLoader
+                return FinMindPathADataLoader()
+        elif config.mode == "extreme":
+            if config.data_source == "mock":
+                from jgod.path_a.mock_data_loader_extreme import (
+                    MockPathADataLoaderExtreme,
+                    MockConfigExtreme,
+                )
+                mock_config_extreme = MockConfigExtreme(seed=123)
+                return MockPathADataLoaderExtreme(config=mock_config_extreme)
+            elif config.data_source == "finmind":
+                from jgod.path_a.finmind_data_loader_extreme import (
+                    FinMindPathADataLoaderExtreme,
+                    FinMindLoaderConfigExtreme,
+                )
+                config_extreme = FinMindLoaderConfigExtreme(
+                    cache_enabled=True,
+                    use_parquet_cache=True,
+                    fallback_to_mock_extreme=True,
+                )
+                return FinMindPathADataLoaderExtreme(config=config_extreme)
+        
+        raise ValueError(f"Unsupported data_source or mode: {config.data_source}, {config.mode}")
+    
+    def _get_or_create_engines(self, config: PathBConfig) -> Tuple:
+        """取得或建立 alpha engine, risk model, optimizer"""
+        # 如果提供了 factory，使用 factory
+        if self.alpha_engine_factory and self.risk_model_factory and self.optimizer_factory:
+            alpha_engine = self.alpha_engine_factory()
+            risk_model = self.risk_model_factory()
+            optimizer = self.optimizer_factory()
+            return alpha_engine, risk_model, optimizer
+        
+        # 否則，根據 mode 建立引擎（直接複製 build_orchestrator 的邏輯）
+        from jgod.alpha_engine.alpha_engine import AlphaEngine
+        from jgod.risk.risk_model import MultiFactorRiskModel
+        from jgod.optimizer.optimizer_core import OptimizerCore
+        from jgod.optimizer.optimizer_config import OptimizerConfig
+        
+        if config.mode == "basic":
+            alpha_engine = AlphaEngine(
+                enable_micro_momentum=False,
+                factor_weights=None
+            )
+            risk_model = MultiFactorRiskModel(factor_names=None)
+        elif config.mode == "extreme":
+            from jgod.alpha_engine.alpha_engine_extreme import AlphaEngineExtreme, AlphaEngineExtremeConfig
+            from jgod.risk.risk_model_extreme import MultiFactorRiskModelExtreme, RiskModelExtremeConfig
+            
+            alpha_engine = AlphaEngineExtreme(config=AlphaEngineExtremeConfig())
+            risk_model = MultiFactorRiskModelExtreme(config=RiskModelExtremeConfig())
+        else:
+            raise ValueError(f"Unsupported mode: {config.mode}")
+        
+        optimizer = OptimizerCore(config=OptimizerConfig())
+        
+        return alpha_engine, risk_model, optimizer
     
     def _apply_governance_rules(
         self,
@@ -359,16 +545,43 @@ class PathBEngine:
         Returns:
             彙總統計字典
         """
-        # TODO: Compute summary statistics
-        # - Average Sharpe across windows
-        # - Average Max Drawdown
-        # - Sharpe standard deviation (consistency)
-        # - Alpha Stability Score
+        if not window_results:
+            return {
+                "num_windows": 0,
+            }
         
-        return {
+        # Extract metrics
+        sharpe_ratios = [w.sharpe_ratio for w in window_results if pd.notna(w.sharpe_ratio)]
+        max_drawdowns = [w.max_drawdown for w in window_results if pd.notna(w.max_drawdown)]
+        total_returns = [w.total_return for w in window_results if pd.notna(w.total_return)]
+        turnover_rates = [w.turnover_rate for w in window_results if pd.notna(w.turnover_rate)]
+        
+        summary = {
             "num_windows": len(window_results),
-            # TODO: Add more summary statistics
         }
+        
+        # Average metrics
+        if sharpe_ratios:
+            summary["avg_sharpe"] = float(np.mean(sharpe_ratios))
+            summary["sharpe_std"] = float(np.std(sharpe_ratios))
+            summary["sharpe_min"] = float(np.min(sharpe_ratios))
+            summary["sharpe_max"] = float(np.max(sharpe_ratios))
+        
+        if max_drawdowns:
+            summary["avg_max_drawdown"] = float(np.mean(max_drawdowns))
+            summary["worst_drawdown"] = float(np.min(max_drawdowns))
+        
+        if total_returns:
+            summary["avg_total_return"] = float(np.mean(total_returns))
+        
+        if turnover_rates:
+            summary["avg_turnover_rate"] = float(np.mean(turnover_rates))
+        
+        # TODO: Add more summary statistics
+        # - Alpha Stability Score
+        # - Window consistency metrics
+        
+        return summary
     
     def _analyze_governance(
         self,
