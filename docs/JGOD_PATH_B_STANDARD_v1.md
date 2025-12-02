@@ -1,0 +1,295 @@
+# J-GOD Path B Standard v1
+
+## 📋 概述
+
+Path B Engine 是 J-GOD 系統中用於執行 **In-Sample / Out-of-Sample 測試**與 **Walk-Forward Analysis** 的核心引擎。Path B 的目的是嚴格驗證策略是否在未來世界能存活，避免資料窺探偏差，並提供策略穩定性的客觀評估。
+
+---
+
+## 🎯 Path A vs Path B 的差別
+
+### Path A: Validation Lab（驗證實驗室）
+
+**目的**:
+- 快速原型開發與策略驗證
+- 單一時間範圍的回測
+- 找出有潛力的策略方向
+
+**特點**:
+- 使用全部歷史資料進行回測
+- 適合探索性分析
+- 快速迭代與測試
+
+**產出**:
+- 單一回測結果
+- 績效報告、風險分析
+- 診斷報告與修復建議
+
+### Path B: Production Readiness Test（生產就緒測試）
+
+**目的**:
+- 嚴格驗證策略穩定性
+- 模擬真實部署環境
+- 評估策略在未來世界的表現
+
+**特點**:
+- 採用 Walk-Forward Analysis
+- 分割訓練集與測試集
+- 多 window 一致性評估
+
+**產出**:
+- 多 window 測試結果
+- Alpha Stability Report
+- Governance Rule 觸發分析
+
+### 對照表
+
+| 面向 | Path A | Path B |
+|------|--------|--------|
+| **資料使用** | 全部歷史資料 | 分割 Train/Test |
+| **時間範圍** | 單一連續範圍 | 多個滾動 Window |
+| **評估重點** | 策略潛力 | 策略穩定性 |
+| **主要風險** | 資料窺探 | 過度優化 |
+| **適用階段** | 開發階段 | 上線前驗證 |
+
+---
+
+## 🎯 Path B 的目的：驗證策略是否在未來世界能存活
+
+### 核心問題
+
+在策略開發過程中，最關鍵的問題是：
+
+> **「這個策略在未來還能有效嗎？」**
+
+Path B 透過以下機制回答這個問題：
+
+### 1. Out-of-Sample Testing
+
+- 將資料分割為訓練集（In-Sample）與測試集（Out-of-Sample）
+- 在訓練集上優化策略
+- 在測試集上驗證策略表現
+- **核心假設**: 如果策略在測試集上表現良好，則較可能在未來有效
+
+### 2. Walk-Forward Analysis
+
+- 採用滾動視窗方式進行多次訓練/測試
+- 每個 window 都是獨立的實驗
+- 評估策略在不同市場環境下的穩定性
+- **核心假設**: 如果策略在多個 window 中都表現穩定，則較可能在不同市場環境下有效
+
+### 3. Consistency Metrics
+
+- 計算跨 window 的一致性（例如 Sharpe 標準差）
+- 評估策略表現的穩定性
+- 識別過度優化的策略
+
+---
+
+## 🔗 Path B 與 Step 6 的結合方式
+
+Path B 與 J-GOD Step 6（Governance Rules）緊密整合，在 Walk-Forward Analysis 中模擬各種治理規則的觸發與影響。
+
+### Walk-Forward 中如何測 Alpha Sunset
+
+**Alpha Sunset** 是當 Alpha 衰減到一定程度時，自動停用策略的機制。
+
+在 Path B 中：
+
+1. **每個 Window 的 Test 階段**:
+   - 計算 Alpha 在測試期的衰減率
+   - 比較訓練期與測試期的 Alpha 表現
+   - 如果衰減超過閾值，觸發 Alpha Sunset
+
+2. **觸發記錄**:
+   - 記錄觸發日期
+   - 記錄觸發時的市場環境（volatility、regime 等）
+   - 分析觸發後的表現影響
+
+3. **跨 Window 分析**:
+   - 統計各 window 的 Alpha Sunset 觸發頻率
+   - 識別容易觸發的市場環境
+   - 評估 Alpha Sunset 規則的有效性
+
+### Walk-Forward 中如何測 Regime Switch
+
+**Regime Switch** 是當市場環境變化時，自動調整策略參數的機制。
+
+在 Path B 中：
+
+1. **每個 Window**:
+   - 檢測 Train 與 Test 階段的市場環境變化
+   - 識別 Regime 切換事件
+   - 評估 Regime Switch 規則的觸發時機
+
+2. **Regime Detection**:
+   - 使用 volatility、momentum 等指標
+   - 分類為低波動、正常、高波動等 regime
+   - 記錄各 window 的 regime 分布
+
+3. **策略調整**:
+   - 模擬 Regime Switch 觸發後的策略參數調整
+   - 比較調整前後的表現差異
+   - 評估 Regime Switch 規則的有效性
+
+### Walk-Forward 中如何測 Kill Switch
+
+**Kill Switch** 是當風險指標超過閾值時，立即停止交易的機制。
+
+在 Path B 中：
+
+1. **每個 Window 的 Test 階段**:
+   - 監控最大回落、Sharpe Ratio 等風險指標
+   - 如果超過閾值，觸發 Kill Switch
+   - 記錄觸發日期與觸發原因
+
+2. **觸發分析**:
+   - 分析觸發前的市場特徵
+   - 評估觸發後的損失控制效果
+   - 比較有/無 Kill Switch 的表現差異
+
+3. **跨 Window 統計**:
+   - 統計各 window 的 Kill Switch 觸發次數
+   - 識別容易觸發的市場條件
+   - 優化 Kill Switch 參數設定
+
+---
+
+## 📊 Path B 的產出報告格式
+
+### 1. 每 Window 的績效報告
+
+**CSV 格式** (`window_results.csv`):
+
+```csv
+window_id,train_start,train_end,test_start,test_end,sharpe,max_drawdown,total_return,turnover_rate,tracking_error,information_ratio
+1,2023-01-01,2023-06-30,2023-07-01,2023-12-31,1.25,-0.15,0.18,0.45,0.08,0.75
+2,2023-02-01,2023-07-31,2023-08-01,2024-01-31,1.10,-0.18,0.15,0.50,0.09,0.65
+...
+```
+
+**JSON 格式** (`window_results.json`):
+
+```json
+{
+  "window_results": [
+    {
+      "window_id": 1,
+      "train_start": "2023-01-01",
+      "train_end": "2023-06-30",
+      "test_start": "2023-07-01",
+      "test_end": "2023-12-31",
+      "sharpe": 1.25,
+      "max_drawdown": -0.15,
+      "total_return": 0.18,
+      "turnover_rate": 0.45,
+      "tracking_error": 0.08,
+      "information_ratio": 0.75
+    }
+  ]
+}
+```
+
+### 2. Governance Rule 觸發紀錄
+
+**CSV 格式** (`governance_events.csv`):
+
+```csv
+window_id,rule_name,triggered,trigger_date,trigger_reason
+1,alpha_sunset,True,2023-10-15,alpha_decay:0.52
+1,kill_switch,False,,
+2,regime_switch,True,2023-09-20,regime:high_volatility
+...
+```
+
+### 3. Alpha Stability Report
+
+**Markdown 格式** (`alpha_stability_report.md`):
+
+```markdown
+# Alpha Stability Report
+
+## Summary Statistics
+
+- Average Sharpe Ratio: 1.18
+- Sharpe Ratio Std Dev: 0.12
+- Consistency Score: 0.85
+
+## Window-by-Window Analysis
+
+### Window 1 (2023-01-01 to 2023-12-31)
+- Sharpe: 1.25
+- Max DD: -0.15
+- ...
+
+## Governance Rule Analysis
+
+### Alpha Sunset
+- Triggered: 3 times
+- Average trigger date: Day 45 of test period
+- Impact: -2.3% return reduction
+
+### Kill Switch
+- Triggered: 1 time
+- Prevented: -5.2% additional loss
+```
+
+### 4. Regime 分析
+
+**CSV 格式** (`regime_analysis.csv`):
+
+```csv
+window_id,test_period,regime,volatility_level,sharpe,max_drawdown
+1,2023-07-01 to 2023-12-31,normal,0.02,1.25,-0.15
+2,2023-08-01 to 2024-01-31,high,0.04,0.95,-0.22
+...
+```
+
+### 5. 滑價 / Beta 更新分析
+
+**CSV 格式** (`slippage_beta_analysis.csv`):
+
+```csv
+window_id,avg_slippage_bps,avg_turnover,beta_stability_score,beta_update_frequency
+1,5.2,0.45,0.92,monthly
+2,6.1,0.50,0.88,monthly
+...
+```
+
+---
+
+## 🔄 執行流程
+
+### 完整流程圖
+
+```
+1. Window 切割
+   ↓
+2. For each window:
+   ├─ Train 階段（IS）
+   │   └─ 策略優化
+   │
+   ├─ Test 階段（OOS）
+   │   ├─ 執行回測
+   │   ├─ 計算績效
+   │   └─ 因子歸因
+   │
+   └─ Governance Rules
+       ├─ Alpha Sunset 檢測
+       ├─ Regime Switch 檢測
+       └─ Kill Switch 檢測
+   ↓
+3. Combine & Export
+   ├─ 跨 window 統計
+   ├─ Alpha Stability 分析
+   ├─ Governance 分析
+   └─ 生成報告
+```
+
+---
+
+## 📚 相關文件
+
+- `spec/JGOD_PathBEngine_Spec.md` - Path B Engine 規格文件
+- `docs/JGOD_PATHA_STANDARD_v1.md` - Path A 標準文件
+
