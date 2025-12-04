@@ -89,17 +89,25 @@ class PathBConfig:
 class PathBWindowResult:
     """單一 Window 的測試結果"""
     
+    # 必填欄位（沒有預設值）
     window_id: int
     train_start: str
     train_end: str
     test_start: str
     test_end: str
     
+    # Test 階段結果（必填）
+    test_result: PathABacktestResult
+    
+    # 績效統計（Test 階段，必填）
+    sharpe_ratio: float
+    max_drawdown: float
+    total_return: float
+    turnover_rate: float
+    
+    # 可選欄位（有預設值）
     # Train 階段結果
     train_result: Optional[PathABacktestResult] = None
-    
-    # Test 階段結果
-    test_result: PathABacktestResult
     
     # Governance Rule 觸發紀錄（保留向後兼容）
     governance_events: List[Dict[str, Any]] = field(default_factory=list)
@@ -109,11 +117,7 @@ class PathBWindowResult:
     #     {"rule": "kill_switch", "triggered": False}
     # ]
     
-    # 績效統計（Test 階段）
-    sharpe_ratio: float
-    max_drawdown: float
-    total_return: float
-    turnover_rate: float
+    # 績效統計（可選）
     tracking_error: Optional[float] = None
     information_ratio: Optional[float] = None
     
@@ -481,18 +485,20 @@ class PathBEngine:
         )
         
         window_result = PathBWindowResult(
+            # 必填欄位
             window_id=window_id,
             train_start=train_start,
             train_end=train_end,
             test_start=test_start,
             test_end=test_end,
-            train_result=train_result,
             test_result=test_result,
-            governance_events=governance_events,
             sharpe_ratio=sharpe_ratio,
             max_drawdown=max_drawdown,
             total_return=total_return,
             turnover_rate=turnover_rate,
+            # 可選欄位
+            train_result=train_result,
+            governance_events=governance_events,
             tracking_error=tracking_error,
             information_ratio=information_ratio,
             factor_attribution=None,  # TODO: extract factor attribution in future
