@@ -1,4 +1,16 @@
-"""Path A 歷史回測資料引擎模組
+"""
+# LEGACY: do not use for new development
+
+此檔案為舊版 Path A Engine 定義，目前未被使用。
+實際的 Path A 實作位於 jgod/path_a/ 目錄下。
+
+Path A 的正確使用方式：
+- 使用 jgod.path_a.path_a_backtest.run_path_a_backtest()
+- 使用 jgod.path_a 下的資料結構與模組
+
+此檔案保留僅為向後相容性，新開發請勿使用。
+
+Path A 歷史回測資料引擎模組
 
 詳見 spec/JGOD_Python_Interface_Spec.md 的 Path A Engine 章節。
 未來實作需參考 structured_books/Path A  歷史回測撈取資料＋分析_AI知識庫版_v1_CORRECTED.md

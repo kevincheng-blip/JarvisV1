@@ -1,0 +1,34 @@
+# Path E v1 Paper Trading Configuration
+# Taiwan Equities Paper Trading Demo
+
+mode: "PAPER"  # DRY_RUN or PAPER
+
+symbols:
+  - "2330"
+  - "2317"
+  - "2454"
+
+initial_cash: 1000000.0
+
+# 風險限制
+max_position_pct: 0.2  # 單檔最大部位不超過淨值 20%
+max_order_pct: 0.05    # 單筆下單金額不超過淨值 5%
+
+# 資料來源設定
+data_feed_type: "mock"
+bar_interval: "1d"  # 日線
+
+# 策略設定
+signal_engine_type: "placeholder"  # v1 使用 placeholder 策略
+strategy_params:
+  strategy_type: "simple_ma"  # "cash_only" or "simple_ma"
+  ma_period: 20
+  position_size: 0.1
+
+# 執行設定
+execution_mode: "sim"
+
+# 日誌設定
+log_dir: "logs/path_e"
+experiment_name: "path_e_tw_paper_v1"
+

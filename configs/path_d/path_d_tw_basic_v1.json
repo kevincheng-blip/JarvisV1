@@ -1,0 +1,29 @@
+{
+  "experiment_name": "path_d_tw_basic_v1",
+  "data_source": "finmind",
+  "mode": "basic",
+  "episodes": 10,
+  "max_steps_per_episode": 3,
+  "gamma": 0.99,
+  "learning_rate": 0.001,
+  "seed": 42,
+  "base_path_b_config": {
+    "train_start": "2020-01-01",
+    "train_end": "2022-12-31",
+    "test_start": "2023-01-01",
+    "test_end": "2023-12-31",
+    "walkforward_window": "2y",
+    "walkforward_step": "6m",
+    "universe": ["2330.TW", "2317.TW", "2454.TW"],
+    "rebalance_frequency": "M",
+    "data_source": "finmind",
+    "mode": "basic",
+    "alpha_config_set": [
+      {
+        "name": "default_alpha_set",
+        "alpha_config": {}
+      }
+    ]
+  }
+}
+

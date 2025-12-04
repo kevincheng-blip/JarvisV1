@@ -1,0 +1,133 @@
+indicator_groups:
+  price:
+    description: "P 系列，使用 FinMind 日線價量與技術指標推導"
+    indicators:
+      - { code: "P01", name: "趨勢斜率",         source: "finmind_price",      status: "implemented" }
+      - { code: "P02", name: "多頭均線排列",     source: "finmind_price",      status: "implemented" }
+      - { code: "P03", name: "均線糾結突破",     source: "finmind_price",      status: "implemented" }
+      - { code: "P04", name: "K 棒結構",         source: "finmind_price",      status: "implemented" }
+      - { code: "P05", name: "支撐壓力",         source: "finmind_price",      status: "implemented" }
+      - { code: "P06", name: "缺口",             source: "finmind_price",      status: "implemented" }
+      - { code: "P07", name: "量能結構",         source: "finmind_price",      status: "implemented" }
+      - { code: "P08", name: "量價背離",         source: "finmind_price",      status: "implemented" }
+      - { code: "P09", name: "布林通道",         source: "finmind_price",      status: "implemented" }
+      - { code: "P10", name: "RSI/KD/MACD 動能", source: "finmind_price",      status: "implemented" }
+      - { code: "P11", name: "ATR 波動度",       source: "finmind_price",      status: "implemented" }
+      - { code: "P12", name: "VAP 套牢壓力",     source: "derived_price_vap",  status: "todo" }
+
+  capital:
+    description: "C 系列，三大法人 + 大戶/散戶 + 融資券"
+    indicators:
+      - { code: "C01", name: "外資買賣超",           source: "finmind_institutional",        status: "implemented" }
+      - { code: "C02", name: "投信買賣超",           source: "finmind_institutional",        status: "implemented" }
+      - { code: "C03", name: "自營商買賣超",         source: "finmind_institutional",        status: "implemented" }
+      - { code: "C04", name: "大戶持股比",           source: "finmind_shareholding",         status: "implemented" }
+      - { code: "C05", name: "散戶比率",             source: "finmind_shareholding",         status: "implemented" }
+      - { code: "C06", name: "分點籌碼",             source: "finmind_day_trading",          status: "todo" }
+      - { code: "C07", name: "主力成本",             source: "derived_from_price_and_branch",status: "todo" }
+      - { code: "C08", name: "融資",                 source: "finmind_margin_short",         status: "implemented" }
+      - { code: "C09", name: "融券",                 source: "finmind_margin_short",         status: "implemented" }
+
+  fundamental:
+    description: "F 系列，營收 + 財報 + 現金流"
+    indicators:
+      - { code: "F01", name: "營收成長",             source: "finmind_month_revenue",        status: "implemented" }
+      - { code: "F02", name: "毛利率",               source: "finmind_financial_statement",  status: "implemented" }
+      - { code: "F03", name: "營益率",               source: "finmind_financial_statement",  status: "implemented" }
+      - { code: "F04", name: "EPS",                 source: "finmind_financial_statement",  status: "implemented" }
+      - { code: "F05", name: "自由現金流 FCF",      source: "finmind_cash_flow",            status: "implemented" }
+      - { code: "F06", name: "ROE/ROA",             source: "finmind_financial_statement",  status: "implemented" }
+      - { code: "F07", name: "負債比",               source: "finmind_balance_sheet",        status: "implemented" }
+      - { code: "F08", name: "股東權益成長",         source: "finmind_balance_sheet",        status: "implemented" }
+
+  catalyst:
+    description: "K 系列，題材與事件（先以 placeholder，未來接 NLP/News）"
+    indicators:
+      - { code: "K01", name: "法說會 Guidance",      source: "news/nlp",                     status: "placeholder" }
+      - { code: "K02", name: "新訂單/AI/伺服器",    source: "news/nlp",                     status: "placeholder" }
+      - { code: "K03", name: "併購/擴產",           source: "news/nlp",                     status: "placeholder" }
+      - { code: "K04", name: "大客戶導入",           source: "news/nlp",                     status: "placeholder" }
+      - { code: "K05", name: "政策題材",             source: "news/nlp",                     status: "placeholder" }
+      - { code: "K06", name: "ETF 變動",            source: "etf/fund_flow",                status: "placeholder" }
+      - { code: "K07", name: "熱門題材強度",        source: "news/nlp + social",            status: "placeholder" }
+
+  sentiment:
+    description: "S 系列，大盤/匯率/全球情緒"
+    indicators:
+      - { code: "S01", name: "台積電方向",           source: "finmind_price_2330",           status: "todo" }
+      - { code: "S02", name: "NASDAQ 方向",          source: "yahoo/us_index",               status: "placeholder" }
+      - { code: "S03", name: "台幣匯率",             source: "finmind_fx",                   status: "todo" }
+      - { code: "S04", name: "美債殖利率 10Y",       source: "us_treasury_api",              status: "placeholder" }
+      - { code: "S05", name: "VIX",                  source: "yahoo/vix",                    status: "placeholder" }
+      - { code: "S06", name: "大盤成交量",           source: "finmind_index",                status: "todo" }
+
+  quant:
+    description: "Q 系列，Sharpe/MDD/波動等風控指標（從價量衍生）"
+    indicators:
+      - { code: "Q01", name: "Sharpe Ratio",         source: "derived_from_price",           status: "todo" }
+      - { code: "Q02", name: "波動度 Volatility",    source: "derived_from_price",           status: "implemented" }
+      - { code: "Q03", name: "最大回撤 MDD",         source: "derived_from_price",           status: "todo" }
+      - { code: "Q04", name: "Beta",                 source: "price + market_index",         status: "placeholder" }
+      - { code: "Q05", name: "因子暴露",             source: "factor_engine",                status: "placeholder" }
+      - { code: "Q06", name: "持股集中度",           source: "portfolio_engine",             status: "placeholder" }
+
+  derivatives_microstructure:
+    description: "X 系列，衍生品 + orderbook 微觀因子（先 placeholder）"
+    indicators:
+      - { code: "X01", name: "個股 IV Level",        source: "options_api",                  status: "placeholder" }
+      - { code: "X02", name: "IV Skew",              source: "options_api",                  status: "placeholder" }
+      - { code: "X03", name: "Put/Call Ratio",       source: "options_api",                  status: "placeholder" }
+      - { code: "X04", name: "指數 VIX 等價指標",   source: "vol_index",                    status: "placeholder" }
+      - { code: "X05", name: "期貨正逆價差",         source: "futures",                      status: "placeholder" }
+      - { code: "X06", name: "期貨基差變化",         source: "futures",                      status: "placeholder" }
+      - { code: "X07", name: "外資期貨淨部位",       source: "futures_cftc",                 status: "placeholder" }
+      - { code: "X08", name: "外資期貨部位變化率",   source: "futures_cftc",                 status: "placeholder" }
+      - { code: "X09", name: "成交筆數集中度",       source: "tick_data",                    status: "placeholder" }
+      - { code: "X10", name: "Orderbook Imbalance",  source: "orderbook_engine",             status: "placeholder" }
+      - { code: "X11", name: "五檔更新速度",         source: "orderbook_engine",             status: "placeholder" }
+      - { code: "X12", name: "當沖比率",             source: "finmind_day_trading",          status: "todo" }
+      - { code: "X13", name: "one-tick trades 比例", source: "tick_data",                    status: "placeholder" }
+      - { code: "X14", name: "大單成交占比",         source: "tick_data",                    status: "placeholder" }
+      - { code: "X15", name: "開盤撮合不平衡",       source: "pre_open_orderbook",           status: "placeholder" }
+      - { code: "X16", name: "收盤撮合不平衡",       source: "closing_auction",              status: "placeholder" }
+
+  meta:
+    description: "M 系列，從前面所有指標推導出的綜合分數（先由程式計算，FinMind 不直接提供）"
+    indicators:
+      - { code: "M01", name: "Price_Composite_Score",        source: "derived_meta", status: "todo" }
+      - { code: "M02", name: "Capital_Composite_Score",      source: "derived_meta", status: "todo" }
+      - { code: "M03", name: "Fundamental_Composite_Score",  source: "derived_meta", status: "todo" }
+      - { code: "M04", name: "Catalyst_Score",               source: "derived_meta", status: "placeholder" }
+      - { code: "M05", name: "Sentiment_Score",              source: "derived_meta", status: "placeholder" }
+      - { code: "M06", name: "Quant_Risk_Score",             source: "derived_meta", status: "placeholder" }
+      - { code: "M07", name: "Growth_Quality_Score",         source: "derived_meta", status: "placeholder" }
+      - { code: "M08", name: "Value_Attractiveness",         source: "derived_meta", status: "placeholder" }
+      - { code: "M09", name: "Momentum_Score",               source: "derived_meta", status: "placeholder" }
+      - { code: "M10", name: "Capital_Stability",            source: "derived_meta", status: "placeholder" }
+      - { code: "M11", name: "Liquidity_Quality",            source: "derived_meta", status: "placeholder" }
+      - { code: "M12", name: "Volatility_Regime",            source: "derived_meta", status: "placeholder" }
+      - { code: "M13", name: "Index_Correlation",            source: "derived_meta", status: "placeholder" }
+      - { code: "M14", name: "Sector_Relative_Strength",     source: "derived_meta", status: "placeholder" }
+      - { code: "M15", name: "ETF_Flow_Impact",              source: "derived_meta", status: "placeholder" }
+      - { code: "M16", name: "ShortTerm_Overheat",           source: "derived_meta", status: "placeholder" }
+      - { code: "M17", name: "Pullback_Potential",           source: "derived_meta", status: "placeholder" }
+      - { code: "M18", name: "Reversal_Potential",           source: "derived_meta", status: "placeholder" }
+      - { code: "M19", name: "Institutional_Consensus",      source: "derived_meta", status: "placeholder" }
+      - { code: "M20", name: "News_Risk_Score",              source: "derived_meta", status: "placeholder" }
+      - { code: "M21", name: "Crowded_Trade",                source: "derived_meta", status: "placeholder" }
+      - { code: "M22", name: "Margin_of_Safety",             source: "derived_meta", status: "placeholder" }
+      - { code: "M23", name: "Cycle_Position",               source: "derived_meta", status: "placeholder" }
+      - { code: "M24", name: "Dividend_Stability",           source: "derived_meta", status: "placeholder" }
+      - { code: "M25", name: "Shareholder_Structure_Health", source: "derived_meta", status: "placeholder" }
+      - { code: "M26", name: "Leverage_Risk",                source: "derived_meta", status: "placeholder" }
+      - { code: "M27", name: "Cash_Buffer",                  source: "derived_meta", status: "placeholder" }
+      - { code: "M28", name: "Valuation_Bubble_Risk",        source: "derived_meta", status: "placeholder" }
+      - { code: "M29", name: "Bull_Bear_Balance",            source: "derived_meta", status: "placeholder" }
+      - { code: "M30", name: "Swing_Structure_Quality",      source: "derived_meta", status: "placeholder" }
+      - { code: "M31", name: "Operator_Control_Maturity",    source: "derived_meta", status: "placeholder" }
+      - { code: "M32", name: "Reward_Risk_Ratio",            source: "derived_meta", status: "placeholder" }
+      - { code: "M33", name: "Strategy_Fit",                 source: "derived_meta", status: "placeholder" }
+      - { code: "M34", name: "Trading_Cost_Impact",          source: "derived_meta", status: "placeholder" }
+      - { code: "M35", name: "Systematic_Risk_Exposure",     source: "derived_meta", status: "placeholder" }
+      - { code: "M36", name: "Idiosyncratic_Risk",           source: "derived_meta", status: "placeholder" }
+

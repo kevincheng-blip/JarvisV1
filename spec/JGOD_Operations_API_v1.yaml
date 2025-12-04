@@ -1,0 +1,342 @@
+# J-GOD Operations API v1.0
+#
+# 此文件定義 J-GOD 系統對外提供的操作（operations）清單。
+# 這些操作可以透過 CLI 腳本執行，未來可整合到 n8n、CI/CD、或其他自動化系統。
+#
+# 版本: 1.0
+# 最後更新: 2025-12-04
+
+operations:
+  # ============================================================
+  # Path B Operations
+  # ============================================================
+  
+  - name: run_path_b_walkforward
+    description: "執行 Path B Walk-Forward Analysis，包含 Governance 規則評估"
+    type: cli
+    command: |
+      PYTHONPATH=. python scripts/run_jgod_path_b.py \
+        --name {experiment_name} \
+        --start-date {start_date} \
+        --end-date {end_date} \
+        --walkforward-window {walkforward_window} \
+        --walkforward-step {walkforward_step} \
+        --universe {universe} \
+        --data-source {data_source} \
+        --mode {mode} \
+        --rebalance-frequency {rebalance_frequency} \
+        --output-dir {output_dir}
+    inputs:
+      - name: experiment_name
+        type: string
+        required: true
+        description: "實驗名稱（用於輸出目錄命名）"
+        example: "path_b_demo"
+      
+      - name: start_date
+        type: string
+        required: true
+        description: "回測開始日期 (YYYY-MM-DD)"
+        example: "2024-01-01"
+      
+      - name: end_date
+        type: string
+        required: true
+        description: "回測結束日期 (YYYY-MM-DD)"
+        example: "2024-12-31"
+      
+      - name: walkforward_window
+        type: string
+        required: true
+        description: "Walk-forward 視窗大小（例如 '6m', '1y'）"
+        example: "6m"
+      
+      - name: walkforward_step
+        type: string
+        required: true
+        description: "Walk-forward 步長（例如 '1m', '3m'）"
+        example: "3m"
+      
+      - name: universe
+        type: string
+        required: true
+        description: "股票代碼列表（逗號分隔）"
+        example: "2330.TW,2317.TW,2454.TW"
+      
+      - name: data_source
+        type: string
+        required: false
+        default: "mock"
+        choices: ["mock", "finmind"]
+        description: "資料來源"
+        example: "finmind"
+      
+      - name: mode
+        type: string
+        required: false
+        default: "basic"
+        choices: ["basic", "extreme"]
+        description: "系統模式（basic 或 extreme）"
+        example: "basic"
+      
+      - name: rebalance_frequency
+        type: string
+        required: false
+        default: "M"
+        choices: ["D", "W", "M"]
+        description: "再平衡頻率（D=每日, W=每週, M=每月）"
+        example: "M"
+      
+      - name: output_dir
+        type: string
+        required: false
+        default: "output/path_b"
+        description: "輸出目錄"
+        example: "output/path_b"
+    
+    outputs:
+      - type: directory
+        path_pattern: "{output_dir}/{experiment_name}"
+        description: "實驗結果目錄"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/*.csv"
+        description: "Window 結果 CSV 檔案"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/*.json"
+        description: "執行結果 JSON 檔案（包含 summary 和 governance summary）"
+  
+  # ============================================================
+  # Path C Operations
+  # ============================================================
+  
+  - name: run_path_c_scenario_experiment
+    description: "執行 Path C 批次場景驗證實驗，會呼叫 Path B 多次並進行排名"
+    type: cli
+    command: |
+      PYTHONPATH=. python scripts/run_jgod_path_c.py \
+        --name {experiment_name} \
+        --config {config_path} \
+        --output-dir {output_dir}
+    inputs:
+      - name: experiment_name
+        type: string
+        required: true
+        description: "實驗名稱"
+        example: "tw_equities_v1"
+      
+      - name: config_path
+        type: string
+        required: false
+        description: "Scenario 配置 JSON 檔案路徑（如果未提供，使用預設 scenarios）"
+        example: "configs/path_c/path_c_tw_equities_v1.json"
+      
+      - name: output_dir
+        type: string
+        required: false
+        default: "output/path_c"
+        description: "輸出目錄"
+        example: "output/path_c"
+    
+    outputs:
+      - type: directory
+        path_pattern: "{output_dir}/{experiment_name}"
+        description: "實驗結果目錄"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/{experiment_name}_rankings.csv"
+        description: "Scenario 排名表（CSV 格式）"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/{experiment_name}_summary.json"
+        description: "實驗總結（JSON 格式）"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/{experiment_name}_report.md"
+        description: "完整報告（Markdown 格式，包含前 3 名詳細資訊）"
+  
+  # ============================================================
+  # Path D Operations
+  # ============================================================
+  
+  - name: run_path_d_train
+    description: "訓練 Path D RL Agent，自動優化治理參數"
+    type: cli
+    command: |
+      PYTHONPATH=. python scripts/run_jgod_path_d.py train \
+        --name {experiment_name} \
+        --config {config_path} \
+        --output-dir {output_dir}
+    inputs:
+      - name: experiment_name
+        type: string
+        required: true
+        description: "實驗名稱"
+        example: "path_d_tw_basic_v1"
+      
+      - name: config_path
+        type: string
+        required: false
+        description: "訓練配置 JSON 檔案路徑（如果未提供，使用預設配置）"
+        example: "configs/path_d/path_d_tw_basic_v1.json"
+      
+      - name: output_dir
+        type: string
+        required: false
+        default: "output/path_d"
+        description: "輸出目錄"
+        example: "output/path_d"
+    
+    outputs:
+      - type: directory
+        path_pattern: "{output_dir}/{experiment_name}"
+        description: "訓練結果目錄"
+      
+      - type: file
+        path_pattern: "models/path_d/{experiment_name}/best_policy.npz"
+        description: "最佳 Policy 檔案（用於後續 eval）"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/train_result.json"
+        description: "訓練結果 JSON（包含 episode_rewards, metrics）"
+  
+  - name: run_path_d_eval
+    description: "評估訓練好的 Path D RL Policy，在真實市場上測試"
+    type: cli
+    command: |
+      PYTHONPATH=. python scripts/run_jgod_path_d.py eval \
+        --name {experiment_name} \
+        --config {config_path} \
+        --policy-path {policy_path} \
+        --output-dir {output_dir}
+    inputs:
+      - name: experiment_name
+        type: string
+        required: true
+        description: "評估實驗名稱"
+        example: "path_d_tw_basic_v1_eval"
+      
+      - name: config_path
+        type: string
+        required: false
+        description: "評估配置 JSON 檔案路徑（可重用訓練配置）"
+        example: "configs/path_d/path_d_tw_basic_v1.json"
+      
+      - name: policy_path
+        type: string
+        required: true
+        description: "訓練好的 Policy 檔案路徑"
+        example: "models/path_d/path_d_tw_basic_v1/best_policy.npz"
+      
+      - name: output_dir
+        type: string
+        required: false
+        default: "output/path_d"
+        description: "輸出目錄"
+        example: "output/path_d"
+    
+    outputs:
+      - type: directory
+        path_pattern: "{output_dir}/{experiment_name}"
+        description: "評估結果目錄"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/eval_result.json"
+        description: "評估結果 JSON（包含 episode_rewards, metrics）"
+  
+  # ============================================================
+  # Path A Operations (Optional)
+  # ============================================================
+  
+  - name: run_path_a_experiment
+    description: "執行 Path A 單一回測實驗（較少直接使用，通常由 Path B 呼叫）"
+    type: cli
+    command: |
+      PYTHONPATH=. python scripts/run_path_a_experiment.py \
+        --name {experiment_name} \
+        --start-date {start_date} \
+        --end-date {end_date} \
+        --universe {universe} \
+        --data-source {data_source} \
+        --mode {mode} \
+        --output-dir {output_dir}
+    inputs:
+      - name: experiment_name
+        type: string
+        required: true
+        description: "實驗名稱"
+        example: "path_a_demo"
+      
+      - name: start_date
+        type: string
+        required: true
+        description: "回測開始日期 (YYYY-MM-DD)"
+        example: "2024-01-01"
+      
+      - name: end_date
+        type: string
+        required: true
+        description: "回測結束日期 (YYYY-MM-DD)"
+        example: "2024-01-31"
+      
+      - name: universe
+        type: string
+        required: true
+        description: "股票代碼列表（逗號分隔）"
+        example: "2330.TW,2317.TW,2454.TW"
+      
+      - name: data_source
+        type: string
+        required: false
+        default: "mock"
+        choices: ["mock", "finmind"]
+        description: "資料來源"
+        example: "mock"
+      
+      - name: mode
+        type: string
+        required: false
+        default: "basic"
+        choices: ["basic", "extreme"]
+        description: "系統模式"
+        example: "basic"
+      
+      - name: output_dir
+        type: string
+        required: false
+        default: "output/path_a"
+        description: "輸出目錄"
+        example: "output/path_a"
+    
+    outputs:
+      - type: directory
+        path_pattern: "{output_dir}/{experiment_name}"
+        description: "實驗結果目錄"
+      
+      - type: file
+        path_pattern: "{output_dir}/{experiment_name}/*.json"
+        description: "回測結果 JSON 檔案"
+
+# ============================================================
+# 使用說明
+# ============================================================
+#
+# 1. 所有 command 中的 {變數} 需要在執行時替換為實際值
+#
+# 2. 未來擴充方向：
+#    - 支援 HTTP API 呼叫（非 CLI）
+#    - 支援 WebSocket 即時狀態更新
+#    - 支援批次作業（一次提交多個實驗）
+#    - 支援實驗排程（cron-like）
+#
+# 3. 錯誤處理：
+#    - 所有操作應返回明確的 exit code（0 = 成功，非 0 = 失敗）
+#    - 錯誤訊息應寫入 stderr
+#    - 詳細錯誤日誌應寫入 output_dir 下的 error.log
+#
+# 4. 輸出格式：
+#    - CSV 檔案應包含完整的資料與 metadata
+#    - JSON 檔案應遵循 jgod/path_*/path_*_types.py 中定義的結構
+#    - Markdown 報告應包含視覺化提示（表格、圖表位置說明）
+

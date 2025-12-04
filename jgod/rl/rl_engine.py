@@ -1,4 +1,16 @@
-"""強化學習引擎模組
+"""
+# LEGACY: do not use for new development
+
+此檔案為舊版 RL Engine 定義，目前未被使用。
+實際的 RL 實作位於 jgod/path_d/ 目錄下（Path D RL Engine）。
+
+Path D 的正確使用方式：
+- 使用 jgod.path_d.path_d_engine.PathDEngine
+- 使用 jgod.path_d 下的所有模組
+
+此檔案保留僅為向後相容性，新開發請勿使用。
+
+強化學習引擎模組
 
 詳見 spec/JGOD_Python_Interface_Spec.md 的 RL Engine 章節。
 未來實作需參考 structured_books/雙引擎與自主演化閉環_AI知識庫版_v1_CORRECTED.md

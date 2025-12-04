@@ -1,7 +1,5 @@
 """
-Prediction Engine for J-GOD
-
-提供股票上漲概率判斷、Rule-Based Filter 等功能。
+Rule-Based Filters for Prediction Engine
 """
 
 from jgod.prediction.rules.stock_upside_filter_v1 import (
@@ -15,7 +13,8 @@ from jgod.prediction.rules.stock_upside_filter_60_v1 import (
 
 __all__ = [
     "StockUpsideFilterV1",
-    "StockUpsideFilter60V1",
     "StockUpsideResult",
     "IndicatorScore",
+    "StockUpsideFilter60V1",
 ]
+
