@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { CoverageHeatmapPanel } from "../components/CoverageHeatmapPanel";
 import { PredictionSummaryPanel } from "../components/PredictionSummaryPanel";
 import { PredictionTimelinePanel } from "../components/PredictionTimelinePanel";
+import { SmartWatchlist } from "../components/SmartWatchlist";
 import { WatchlistPanel } from "../components/WatchlistPanel";
 import { api } from "../api/client";
 import type { CoverageResponse, Prediction } from "../types";
@@ -25,7 +26,8 @@ export function DashboardPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [coverage, setCoverage] = useState<CoverageResponse | undefined>();
   const [loading, setLoading] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState<string | undefined>();
+  const [selectedSymbol, setSelectedSymbol] = useState<string>("2330");
+  const [timelineSymbol, setTimelineSymbol] = useState<string>("2330");
 
   const handleLoad = async () => {
     setLoading(true);
@@ -84,35 +86,48 @@ export function DashboardPage() {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-        <div>
-          <WatchlistPanel
-            predictions={predictions}
-            loading={loading}
+      <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+        {/* Left: Smart Watchlist */}
+        <div style={{ width: "256px", flexShrink: 0 }}>
+          <SmartWatchlist
+            selectedSymbol={timelineSymbol}
+            onSelectSymbol={setTimelineSymbol}
           />
-          {predictions.length > 0 && (
-            <div style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
-              Click on a symbol to view details (coming soon)
-            </div>
-          )}
         </div>
-        
-        <PredictionSummaryPanel
-          prediction={selectedPrediction}
-          loading={loading}
-        />
-      </div>
 
-      <div>
-        <CoverageHeatmapPanel />
-      </div>
+        {/* Right: Main Content */}
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+            <div>
+              <WatchlistPanel
+                predictions={predictions}
+                loading={loading}
+              />
+              {predictions.length > 0 && (
+                <div style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
+                  Click on a symbol to view details (coming soon)
+                </div>
+              )}
+            </div>
+            
+            <PredictionSummaryPanel
+              prediction={selectedPrediction}
+              loading={loading}
+            />
+          </div>
 
-      <div style={{ marginTop: "20px" }}>
-        <PredictionTimelinePanel
-          symbol="2330"
-          startDate="2024-01-01"
-          endDate="2024-12-31"
-        />
+          <div>
+            <CoverageHeatmapPanel />
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <PredictionTimelinePanel
+              symbol={timelineSymbol}
+              startDate="2024-01-01"
+              endDate="2024-12-31"
+            />
+          </div>
+        </div>
       </div>
 
       <div style={{ marginTop: "20px", padding: "12px", background: "#fff3cd", borderRadius: "8px", fontSize: "12px" }}>
