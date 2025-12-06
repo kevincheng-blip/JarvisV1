@@ -169,8 +169,8 @@ async def get_prediction_by_symbol(
 @router.get("/predictions/{symbol}/timeline", response_model=PredictionTimelineResponse)
 async def get_prediction_timeline(
     symbol: str,
-    start_date: date = Query(..., description="Start date (YYYY-MM-DD)"),
-    end_date: date = Query(..., description="End date (YYYY-MM-DD)"),
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
 ):
     """
     Get prediction timeline for a specific symbol within a date range.
@@ -178,6 +178,17 @@ async def get_prediction_timeline(
     Returns a time series of predictions (score, signal) for the symbol.
     Used by UI for trend analysis and historical prediction visualization.
     """
+    # 手動解析日期，避免 FastAPI 將 symbol 誤判為日期
+    try:
+        start_date_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # 將變數名稱統一
+    start_date = start_date_dt
+    end_date = end_date_dt
+    
     # Validate date range
     if start_date > end_date:
         raise HTTPException(
