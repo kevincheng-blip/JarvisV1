@@ -114,10 +114,13 @@ def check_data_availability(
     """
     Check if daily_bar and indicator_snapshots are available.
     
+    Relaxed logic: only skip if count == 0.
+    If count > 0, always proceed to prediction.
+    
     Returns:
         (is_available, reason)
     """
-    # Check daily_bar
+    # Check daily_bar - only skip if count == 0
     daily_bar = (
         session.query(DailyBar)
         .filter(DailyBar.symbol == symbol, DailyBar.date == as_of_date)
@@ -127,7 +130,7 @@ def check_data_availability(
     if not daily_bar:
         return False, f"No daily_bar for {symbol} on {as_of_date}"
     
-    # Check indicator_snapshots (at least min_indicators)
+    # Check indicator_snapshots - only skip if count == 0
     indicator_count = (
         session.query(IndicatorSnapshot)
         .filter(
@@ -137,9 +140,19 @@ def check_data_availability(
         .count()
     )
     
-    if indicator_count < min_indicators:
-        return False, f"Only {indicator_count} indicators (need at least {min_indicators})"
+    # Log indicator count for debugging (min_indicators shown but not used as threshold)
+    logger.info(
+        "Indicator count for %s %s: %d (min_indicators=%d, not used as threshold)",
+        symbol,
+        as_of_date,
+        indicator_count,
+        min_indicators,
+    )
     
+    if indicator_count == 0:
+        return False, f"No indicators for {symbol} on {as_of_date}"
+    
+    # If count > 0, always proceed (min_indicators threshold disabled)
     return True, "OK"
 
 
