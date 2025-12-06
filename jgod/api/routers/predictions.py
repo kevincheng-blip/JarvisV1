@@ -49,6 +49,85 @@ def load_universe(universe_file: str) -> List[dict]:
     return data.get("universe", [])
 
 
+# --- Timeline endpoint FIRST (to avoid being swallowed by {date}/{symbol}) ---
+@router.get("/predictions/timeline/{symbol}", response_model=PredictionTimelineResponse)
+async def get_prediction_timeline(
+    symbol: str,
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+):
+    """
+    Get prediction timeline for a specific symbol within a date range.
+    
+    Returns a time series of predictions (score, signal) for the symbol.
+    Used by UI for trend analysis and historical prediction visualization.
+    
+    Example:
+        GET /api/predictions/timeline/2330?start_date=2024-01-01&end_date=2024-12-31
+    """
+    # 手動解析日期，避免 FastAPI 將 symbol 誤判為日期
+    try:
+        start_date_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # 將變數名稱統一
+    start_date = start_date_dt
+    end_date = end_date_dt
+    
+    # Validate date range
+    if start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail=f"start_date ({start_date}) must be before or equal to end_date ({end_date})",
+        )
+    
+    # Query predictions from DB
+    session_gen = get_session()
+    session = next(session_gen)
+    try:
+        predictions = (
+            session.query(PredictionSnapshot)
+            .filter(
+                PredictionSnapshot.symbol == symbol,
+                PredictionSnapshot.date >= start_date,
+                PredictionSnapshot.date <= end_date,
+            )
+            .order_by(PredictionSnapshot.date.asc())
+            .all()
+        )
+        
+        # Map to timeline points
+        points = []
+        for pred in predictions:
+            # Use score if available, fallback to total_score
+            score_value = pred.score if pred.score is not None else (pred.total_score or 0.0)
+            
+            # Use signal if available, fallback to verdict
+            signal_value = pred.signal if pred.signal is not None else (pred.verdict or "UNKNOWN")
+            
+            points.append(
+                PredictionTimelinePoint(
+                    date=pred.date,
+                    score=score_value,
+                    signal=signal_value,
+                )
+            )
+        
+        # Return response (empty list if no data, not 404)
+        return PredictionTimelineResponse(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            points=points,
+        )
+        
+    finally:
+        session.close()
+
+
+# --- Existing dynamic routes below ---
 @router.get("/predictions/{date}")
 async def get_predictions_by_date(
     date: str,
@@ -161,83 +240,6 @@ async def get_prediction_by_symbol(
             result["raw_payload"] = pred.raw_payload
         
         return result
-        
-    finally:
-        session.close()
-
-
-@router.get("/predictions/timeline/{symbol}", response_model=PredictionTimelineResponse)
-async def get_prediction_timeline(
-    symbol: str,
-    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
-    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
-):
-    """
-    Get prediction timeline for a specific symbol within a date range.
-    
-    Returns a time series of predictions (score, signal) for the symbol.
-    Used by UI for trend analysis and historical prediction visualization.
-    
-    Example:
-        GET /api/predictions/timeline/2330?start_date=2024-01-01&end_date=2024-12-31
-    """
-    # 手動解析日期，避免 FastAPI 將 symbol 誤判為日期
-    try:
-        start_date_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end_date_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    
-    # 將變數名稱統一
-    start_date = start_date_dt
-    end_date = end_date_dt
-    
-    # Validate date range
-    if start_date > end_date:
-        raise HTTPException(
-            status_code=400,
-            detail=f"start_date ({start_date}) must be before or equal to end_date ({end_date})",
-        )
-    
-    # Query predictions from DB
-    session_gen = get_session()
-    session = next(session_gen)
-    try:
-        predictions = (
-            session.query(PredictionSnapshot)
-            .filter(
-                PredictionSnapshot.symbol == symbol,
-                PredictionSnapshot.date >= start_date,
-                PredictionSnapshot.date <= end_date,
-            )
-            .order_by(PredictionSnapshot.date.asc())
-            .all()
-        )
-        
-        # Map to timeline points
-        points = []
-        for pred in predictions:
-            # Use score if available, fallback to total_score
-            score_value = pred.score if pred.score is not None else (pred.total_score or 0.0)
-            
-            # Use signal if available, fallback to verdict
-            signal_value = pred.signal if pred.signal is not None else (pred.verdict or "UNKNOWN")
-            
-            points.append(
-                PredictionTimelinePoint(
-                    date=pred.date,
-                    score=score_value,
-                    signal=signal_value,
-                )
-            )
-        
-        # Return response (empty list if no data, not 404)
-        return PredictionTimelineResponse(
-            symbol=symbol,
-            start_date=start_date,
-            end_date=end_date,
-            points=points,
-        )
         
     finally:
         session.close()
