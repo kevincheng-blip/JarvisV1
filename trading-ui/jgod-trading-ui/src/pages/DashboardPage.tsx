@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { CoverageHeatmapPanel } from "../components/CoverageHeatmapPanel";
 import { PredictionSummaryPanel } from "../components/PredictionSummaryPanel";
 import { PredictionTimelinePanel } from "../components/PredictionTimelinePanel";
+import { SignalPanel } from "../components/SignalPanel";
 import { SmartWatchlist } from "../components/SmartWatchlist";
 import { WatchlistPanel } from "../components/WatchlistPanel";
 import { api } from "../api/client";
@@ -126,6 +127,10 @@ export function DashboardPage() {
               startDate="2024-01-01"
               endDate="2024-12-31"
             />
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <SignalPanel symbol={timelineSymbol} />
           </div>
         </div>
       </div>

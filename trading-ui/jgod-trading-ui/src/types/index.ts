@@ -71,3 +71,14 @@ export interface PredictionTimelineResponse {
   points: PredictionTimelinePoint[];
 }
 
+// Latest prediction types
+export interface LatestPrediction {
+  symbol: string;
+  date: string;
+  score: number;
+  signal: string;
+  positive_factors: string[];
+  negative_factors: string[];
+  risk_flags: string[];
+}
+

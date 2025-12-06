@@ -3,7 +3,7 @@
  */
 
 import axios from "axios";
-import type { CoverageResponse, IndicatorSnapshot, Prediction, PredictionTimelineResponse } from "../types";
+import type { CoverageResponse, IndicatorSnapshot, LatestPrediction, Prediction, PredictionTimelineResponse } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -91,6 +91,21 @@ export const api = {
           end_date: params.endDate,
         },
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get latest prediction for a specific symbol
+   */
+  getLatestPrediction: async (symbol: string, date?: string): Promise<LatestPrediction> => {
+    const params: any = {};
+    if (date) {
+      params.date = date;
+    }
+    const response = await client.get<LatestPrediction>(
+      `/api/predictions/latest/${symbol}`,
+      { params }
     );
     return response.data;
   },
