@@ -166,7 +166,7 @@ async def get_prediction_by_symbol(
         session.close()
 
 
-@router.get("/predictions/{symbol}/timeline", response_model=PredictionTimelineResponse)
+@router.get("/predictions/timeline/{symbol}", response_model=PredictionTimelineResponse)
 async def get_prediction_timeline(
     symbol: str,
     start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
@@ -177,6 +177,9 @@ async def get_prediction_timeline(
     
     Returns a time series of predictions (score, signal) for the symbol.
     Used by UI for trend analysis and historical prediction visualization.
+    
+    Example:
+        GET /api/predictions/timeline/2330?start_date=2024-01-01&end_date=2024-12-31
     """
     # 手動解析日期，避免 FastAPI 將 symbol 誤判為日期
     try:
