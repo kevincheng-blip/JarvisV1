@@ -6,9 +6,11 @@ Build 100-indicator dict for StockUpsideFilter60V1.evaluate()
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Dict, Any, Optional
+import time
 
 import numpy as np
 import pandas as pd
@@ -46,7 +48,31 @@ class StockIndicatorBuilder100:
 
     def __init__(self, finmind_token: Optional[str] = None, config: Optional[IndicatorBuilderConfig] = None):
         self.config = config or IndicatorBuilderConfig()
-        self.client = FinMindClient(FinMindClientConfig(api_token=finmind_token))
+        # Use new FinMindClient API (backward compatible)
+        self.client = FinMindClient(finmind_token=finmind_token)
+        # 每秒最多 1 次 API
+        self._api_calls = deque()
+        self._max_calls_per_sec = 1
+
+    def _rate_limit(self) -> None:
+        """簡單的每秒節流：最多 self._max_calls_per_sec 次"""
+        now = time.time()
+        # 清理 1 秒前的紀錄
+        while self._api_calls and now - self._api_calls[0] > 1.0:
+            self._api_calls.popleft()
+
+        if len(self._api_calls) >= self._max_calls_per_sec:
+            # 算還要睡多久
+            sleep_for = 1.0 - (now - self._api_calls[0])
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+            # 清掉過期的，再更新 now
+            now = time.time()
+            while self._api_calls and now - self._api_calls[0] > 1.0:
+                self._api_calls.popleft()
+
+        # 記錄這次呼叫時間
+        self._api_calls.append(time.time())
 
     # ======================================================================
     # Public API
@@ -61,21 +87,36 @@ class StockIndicatorBuilder100:
         """
         start_price = as_of - timedelta(days=self.config.lookback_days_price)
         start_capital = as_of - timedelta(days=self.config.lookback_days_capital)
-        start_fundamental = as_of.replace(year=as_of.year - 2)
+        
+        # Handle leap year edge case: 2024-02-29 → 2022-02-29 doesn't exist
+        try:
+            start_fundamental = as_of.replace(year=as_of.year - 2)
+        except ValueError:
+            safe_date = as_of - timedelta(days=1)
+            start_fundamental = safe_date.replace(year=safe_date.year - 2)
 
         # 1) 基本價量
+        self._rate_limit()
         price_df = self.client.get_daily_price(stock_id, start_price, as_of)
 
         # 2) 三大法人 + 融資券 + 持股結構
+        self._rate_limit()
         inst_df = self.client.get_institutional_investors(stock_id, start_capital, as_of)
+        self._rate_limit()
         margin_df = self.client.get_margin_short(stock_id, start_capital, as_of)
+        self._rate_limit()
         share_df = self.client.get_shareholding(stock_id, start_capital, as_of)
+        self._rate_limit()
         daytrade_df = self.client.get_day_trading(stock_id, start_capital, as_of)
 
         # 3) 營收 & 財報
+        self._rate_limit()
         revenue_df = self.client.get_month_revenue(stock_id, start_fundamental, as_of)
+        self._rate_limit()
         fs_df = self.client.get_financial_statement(stock_id, start_fundamental, as_of)
+        self._rate_limit()
         bs_df = self.client.get_balance_sheet(stock_id, start_fundamental, as_of)
+        self._rate_limit()
         cf_df = self.client.get_cash_flow(stock_id, start_fundamental, as_of)
 
         indicators: Dict[str, Any] = {}
@@ -261,10 +302,32 @@ class StockIndicatorBuilder100:
         if not margin_df.empty:
             margin_df = margin_df.sort_values("date")
             if len(margin_df) >= 2:
-                margin_df["margin_change"] = margin_df["MarginPurchaseToday"].diff()
-                margin_df["short_change"] = margin_df["ShortSaleToday"].diff()
-                out["C08"] = float(margin_df["margin_change"].iloc[-1])
-                out["C09"] = float(margin_df["short_change"].iloc[-1])
+                # C08: 融資變化（使用 FinMind 正確欄位）
+                if "MarginPurchaseTodayBalance" in margin_df.columns and "MarginPurchaseYesterdayBalance" in margin_df.columns:
+                    margin_df["margin_change"] = (
+                        margin_df["MarginPurchaseTodayBalance"] - margin_df["MarginPurchaseYesterdayBalance"]
+                    )
+                elif "MarginPurchaseTodayBalance" in margin_df.columns:
+                    # 退而求其次，用當日餘額的 diff 當作變化量
+                    margin_df["margin_change"] = margin_df["MarginPurchaseTodayBalance"].diff()
+                else:
+                    # 若欄位仍不存在，避免拋錯，先設為 0
+                    margin_df["margin_change"] = 0.0
+                
+                # C09: 融券變化（使用 FinMind 正確欄位）
+                if "ShortSaleTodayBalance" in margin_df.columns and "ShortSaleYesterdayBalance" in margin_df.columns:
+                    margin_df["short_change"] = (
+                        margin_df["ShortSaleTodayBalance"] - margin_df["ShortSaleYesterdayBalance"]
+                    )
+                elif "ShortSaleTodayBalance" in margin_df.columns:
+                    # 退而求其次，用當日餘額的 diff 當作變化量
+                    margin_df["short_change"] = margin_df["ShortSaleTodayBalance"].diff()
+                else:
+                    # 若欄位仍不存在，避免拋錯，先設為 0
+                    margin_df["short_change"] = 0.0
+                
+                out["C08"] = float(margin_df["margin_change"].iloc[-1]) if "margin_change" in margin_df.columns else 0.0
+                out["C09"] = float(margin_df["short_change"].iloc[-1]) if "short_change" in margin_df.columns else 0.0
 
         # C04, C05: 大戶/散戶比例（FinMind 欄位 dependent）
         if not share_df.empty:
@@ -298,10 +361,18 @@ class StockIndicatorBuilder100:
         # F01: 營收成長（近 3 月 avg YoY）
         if not revenue_df.empty:
             revenue_df = revenue_df.sort_values("date")
-            revenue_df["YoY"] = revenue_df["revenue"].pct_change(12)
-            last3 = revenue_df["YoY"].tail(3).dropna()
-            if not last3.empty:
-                out["F01"] = float(last3.mean() * 100)
+            # 動態偵測營收欄位
+            revenue_col = None
+            for col in ["revenue", "Revenue", "revenue_amount", "operating_revenue"]:
+                if col in revenue_df.columns:
+                    revenue_col = col
+                    break
+            
+            if revenue_col:
+                revenue_df["YoY"] = revenue_df[revenue_col].pct_change(12)
+                last3 = revenue_df["YoY"].tail(3).dropna()
+                if not last3.empty:
+                    out["F01"] = float(last3.mean() * 100)
 
         # 財報資料會依 FinMind 欄位命名調整，這裡給示意邏輯
         # F02: 毛利率
@@ -310,56 +381,130 @@ class StockIndicatorBuilder100:
         if not fs_df.empty:
             fs_df = fs_df.sort_values("date")
             last_fs = fs_df.iloc[-1]
-            # 以下欄位名稱需依實際 FinMind 欄位修正
-            if "gross_profit" in last_fs and "operating_revenue" in last_fs:
-                gp = last_fs["gross_profit"]
-                rev = last_fs["operating_revenue"]
-                out["F02"] = float((gp / rev) * 100) if rev else 0.0
-            if "operating_income" in last_fs and "operating_revenue" in last_fs:
-                op = last_fs["operating_income"]
-                rev = last_fs["operating_revenue"]
-                out["F03"] = float((op / rev) * 100) if rev else 0.0
-            if "eps" in last_fs:
-                out["F04"] = float(last_fs["eps"])
+            
+            # F02: 毛利率 - 動態偵測欄位
+            gross_profit_col = None
+            revenue_col_fs = None
+            for col in ["gross_profit", "GrossProfit", "gross_profit_amount"]:
+                if col in last_fs:
+                    gross_profit_col = col
+                    break
+            for col in ["operating_revenue", "OperatingRevenue", "revenue", "Revenue"]:
+                if col in last_fs:
+                    revenue_col_fs = col
+                    break
+            
+            if gross_profit_col and revenue_col_fs:
+                gp = float(last_fs.get(gross_profit_col, 0.0))
+                rev = float(last_fs.get(revenue_col_fs, 0.0))
+                if rev != 0:
+                    out["F02"] = (gp / rev) * 100
+            
+            # F03: 營益率 - 動態偵測欄位
+            operating_income_col = None
+            for col in ["operating_income", "OperatingIncome", "operating_profit"]:
+                if col in last_fs:
+                    operating_income_col = col
+                    break
+            
+            if operating_income_col and revenue_col_fs:
+                op = float(last_fs.get(operating_income_col, 0.0))
+                rev = float(last_fs.get(revenue_col_fs, 0.0))
+                if rev != 0:
+                    out["F03"] = (op / rev) * 100
+            
+            # F04: EPS
+            eps_col = None
+            for col in ["eps", "EPS", "earnings_per_share"]:
+                if col in last_fs:
+                    eps_col = col
+                    break
+            if eps_col:
+                out["F04"] = float(last_fs[eps_col])
 
         # F05: FCF（營運現金流 - 資本支出）
         if not cf_df.empty:
             cf_df = cf_df.sort_values("date")
             last_cf = cf_df.iloc[-1]
-            # 假設欄位名稱 operating_cash_flow, capital_expenditure
-            ocf = float(last_cf.get("operating_cash_flow", 0.0))
-            capex = float(last_cf.get("capital_expenditure", 0.0))
+            
+            # 動態偵測現金流欄位
+            ocf_col = None
+            capex_col = None
+            for col in ["operating_cash_flow", "OperatingCashFlow", "cash_flow_from_operations"]:
+                if col in last_cf:
+                    ocf_col = col
+                    break
+            for col in ["capital_expenditure", "CapitalExpenditure", "capex", "investment_cash_flow"]:
+                if col in last_cf:
+                    capex_col = col
+                    break
+            
+            ocf = float(last_cf.get(ocf_col, 0.0)) if ocf_col else 0.0
+            capex = float(last_cf.get(capex_col, 0.0)) if capex_col else 0.0
             out["F05"] = ocf - capex
 
         # F06, F07, F08：ROE/ROA/負債比/股東權益成長
         if not bs_df.empty:
             bs_df = bs_df.sort_values("date")
             last_bs = bs_df.iloc[-1]
-            # 欄位名稱示意，需依實際 FinMind 欄位修正
-            total_assets = float(last_bs.get("total_assets", 0.0))
-            total_equity = float(last_bs.get("total_equity", 0.0))
-            total_liabilities = float(last_bs.get("total_liabilities", 0.0))
+            
+            # 動態偵測資產負債表欄位
+            total_assets_col = None
+            total_equity_col = None
+            total_liabilities_col = None
+            
+            for col in ["total_assets", "TotalAssets", "assets", "Assets"]:
+                if col in bs_df.columns:
+                    total_assets_col = col
+                    break
+            
+            for col in ["equity", "Equity", "total_equity", "TotalEquity", "total_equity_and_liabilities"]:
+                if col in bs_df.columns:
+                    total_equity_col = col
+                    break
+            
+            for col in ["total_liabilities", "TotalLiabilities", "liabilities", "Liabilities"]:
+                if col in bs_df.columns:
+                    total_liabilities_col = col
+                    break
+
+            total_assets = float(last_bs.get(total_assets_col, 0.0)) if total_assets_col else 0.0
+            total_equity = float(last_bs.get(total_equity_col, 0.0)) if total_equity_col else 0.0
+            total_liabilities = float(last_bs.get(total_liabilities_col, 0.0)) if total_liabilities_col else 0.0
 
             # F07: 負債比
-            if total_assets:
+            if total_assets and total_assets != 0:
                 out["F07"] = (total_liabilities / total_assets) * 100
 
-            # F06: ROE/ROA（v1 可以先用近一年 EPS * 股本估算 or 用 fs_df 的 net_income）
-            if not fs_df.empty:
-                net_income = float(fs_df.sort_values("date").iloc[-1].get("net_income", 0.0))
-                if total_equity:
+            # F06: ROE（使用 net_income / total_equity）
+            if not fs_df.empty and total_equity and total_equity != 0 and total_equity_col:
+                # 動態偵測淨利欄位
+                net_income_col = None
+                for col in ["net_income", "NetIncome", "profit_after_tax", "net_profit"]:
+                    if col in fs_df.columns:
+                        net_income_col = col
+                        break
+                
+                if net_income_col:
+                    fs_sorted = fs_df.sort_values("date")
+                    last_fs_row = fs_sorted.iloc[-1]
+                    net_income = float(last_fs_row.get(net_income_col, 0.0))
                     roe = net_income / total_equity
                     out["F06"] = roe * 100
 
             # F08: 股東權益成長（YoY）
-            bs_df_eq = bs_df[["date", "total_equity"]].dropna()
-            if len(bs_df_eq) >= 5:
-                bs_df_eq = bs_df_eq.sort_values("date")
-                # 取最近兩個年度點
-                last2 = bs_df_eq.tail(2)
-                eq_prev, eq_last = last2["total_equity"].iloc[0], last2["total_equity"].iloc[1]
-                if eq_prev:
-                    out["F08"] = (eq_last / eq_prev - 1) * 100
+            if total_equity_col:
+                equity_col = total_equity_col
+                bs_df_eq = bs_df[["date", equity_col]].dropna()
+                if len(bs_df_eq) >= 5:
+                    bs_df_eq = bs_df_eq.sort_values("date")
+                    # 取最近兩個年度點
+                    last2 = bs_df_eq.tail(2)
+                    if len(last2) >= 2:
+                        eq_prev = last2[equity_col].iloc[0]
+                        eq_last = last2[equity_col].iloc[1]
+                        if eq_prev and eq_prev != 0:
+                            out["F08"] = (eq_last / eq_prev - 1) * 100
 
         return out
 
