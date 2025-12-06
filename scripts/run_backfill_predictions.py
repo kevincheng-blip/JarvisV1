@@ -12,13 +12,13 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import typer
 from sqlalchemy.orm import Session
 
 # Add project root to path
@@ -40,11 +40,63 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create Typer app
-app = typer.Typer(
-    name="backfill-predictions",
-    help="Backfill prediction snapshots from indicator snapshots",
-)
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="Backfill prediction snapshots from indicator snapshots",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Use default dates and all active stocks
+  PYTHONPATH=. python scripts/run_backfill_predictions.py
+
+  # Specify date range
+  PYTHONPATH=. python scripts/run_backfill_predictions.py --start-date 2024-01-01 --end-date 2024-12-31
+
+  # Specify specific symbols
+  PYTHONPATH=. python scripts/run_backfill_predictions.py --symbols 2330,2454,2317
+
+  # Force rebuild existing predictions
+  PYTHONPATH=. python scripts/run_backfill_predictions.py --symbols 2330 --force
+        """,
+    )
+    
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        default="2024-01-01",
+        help="Start date (YYYY-MM-DD), default: 2024-01-01",
+    )
+    
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default="2024-12-31",
+        help="End date (YYYY-MM-DD), default: 2024-12-31",
+    )
+    
+    parser.add_argument(
+        "--symbols",
+        type=str,
+        default=None,
+        help="Comma-separated stock symbols (e.g. 2330,2454,2317). If not provided, uses all active stocks from database.",
+    )
+    
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force rebuild predictions even if snapshots already exist",
+    )
+    
+    parser.add_argument(
+        "--min-indicators",
+        type=int,
+        default=90,
+        help="Minimum number of indicators required (default: 90)",
+    )
+    
+    return parser.parse_args()
 
 
 def load_symbols_from_db(session: Session) -> List[str]:
@@ -327,51 +379,22 @@ def generate_date_range(start_date: date, end_date: date) -> List[date]:
     return dates
 
 
-@app.command()
-def main(
-    start_date: str = typer.Option(
-        "2024-01-01",
-        "--start-date",
-        help="Start date (YYYY-MM-DD)",
-    ),
-    end_date: str = typer.Option(
-        "2024-12-31",
-        "--end-date",
-        help="End date (YYYY-MM-DD)",
-    ),
-    symbols: Optional[str] = typer.Option(
-        None,
-        "--symbols",
-        help="Comma-separated stock symbols (e.g. 2330,2454). If not provided, uses all active stocks from database.",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        help="Force rebuild predictions even if snapshots already exist",
-    ),
-    min_indicators: int = typer.Option(
-        90,
-        "--min-indicators",
-        help="Minimum number of indicators required (default: 90)",
-    ),
-):
-    """
-    Backfill prediction snapshots from indicator snapshots.
+def main():
+    """Main function"""
+    args = parse_args()
     
-    This script processes all symbol × date combinations and generates
-    prediction snapshots using StockUpsideFilter60V1.
-    """
     # Parse dates
     try:
-        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+        start_date_obj = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+        end_date_obj = datetime.strptime(args.end_date, "%Y-%m-%d").date()
     except ValueError as e:
         logger.error(f"Invalid date format: {e}")
-        raise typer.BadParameter(f"Invalid date format. Use YYYY-MM-DD. Error: {e}")
+        logger.error("Date format must be YYYY-MM-DD (e.g. 2024-01-01)")
+        sys.exit(1)
     
     if start_date_obj > end_date_obj:
-        logger.error(f"Start date ({start_date}) must be before end date ({end_date})")
-        raise typer.BadParameter("Start date must be before end date")
+        logger.error(f"Start date ({args.start_date}) must be before end date ({args.end_date})")
+        sys.exit(1)
     
     # Initialize database
     logger.info("Initializing database...")
@@ -382,9 +405,9 @@ def main(
     session = next(session_gen)
     
     try:
-        if symbols:
+        if args.symbols:
             # Parse user-provided symbols
-            symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
+            symbol_list = [s.strip() for s in args.symbols.split(",") if s.strip()]
             logger.info(f"Using provided symbols: {symbol_list}")
         else:
             # Load from database
@@ -426,7 +449,7 @@ def main(
                 
                 # Check data availability
                 is_available, reason = check_data_availability(
-                    session, symbol, as_of_date, min_indicators=min_indicators
+                    session, symbol, as_of_date, min_indicators=args.min_indicators
                 )
                 
                 if not is_available:
@@ -440,7 +463,7 @@ def main(
                     filter_instance,
                     symbol,
                     as_of_date,
-                    force=force,
+                    force=args.force,
                 )
                 
                 if success:
@@ -455,7 +478,7 @@ def main(
                         )
                         .first()
                     )
-                    if existing and not force:
+                    if existing and not args.force:
                         total_skipped_exists += 1
                     else:
                         total_errors += 1
@@ -474,4 +497,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app()
+    main()
