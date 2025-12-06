@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 # Add project root to path
@@ -109,51 +110,55 @@ def check_data_availability(
     session: Session,
     symbol: str,
     as_of_date: date,
-    min_indicators: int = 90,
-) -> tuple[bool, str]:
+    min_indicators: int,
+    stats: Dict[str, int],
+) -> bool:
     """
-    Check if daily_bar and indicator_snapshots are available.
-    
-    Relaxed logic: only skip if count == 0.
-    If count > 0, always proceed to prediction.
-    
-    Returns:
-        (is_available, reason)
+    檢查該 symbol+date 是否有足夠資料可做預測。
+
+    新版規則（2025-12-06）：
+    - 不再要求 daily_bars 一定要存在
+    - 只要有 indicator_snapshots（>0），就視為資料足夠，可以做 prediction
+    - 如果完全沒有 indicators（==0），才視為 insufficient_data
     """
-    # Check daily_bar - only skip if count == 0
-    daily_bar = (
-        session.query(DailyBar)
+
+    # 可選：保留 daily_bars 的 count 只做 debug 用，不作為條件
+    daily_bar_count = (
+        session.query(func.count(DailyBar.id))
         .filter(DailyBar.symbol == symbol, DailyBar.date == as_of_date)
-        .first()
+        .scalar()
     )
-    
-    if not daily_bar:
-        return False, f"No daily_bar for {symbol} on {as_of_date}"
-    
-    # Check indicator_snapshots - only skip if count == 0
+
     indicator_count = (
-        session.query(IndicatorSnapshot)
+        session.query(func.count(IndicatorSnapshot.id))
         .filter(
             IndicatorSnapshot.symbol == symbol,
             IndicatorSnapshot.date == as_of_date,
         )
-        .count()
+        .scalar()
     )
-    
-    # Log indicator count for debugging (min_indicators shown but not used as threshold)
+
     logger.info(
-        "Indicator count for %s %s: %d (min_indicators=%d, not used as threshold)",
+        "Data availability for %s %s -> daily_bars: %d, indicators: %d (min_indicators=%d, not used as threshold)",
         symbol,
         as_of_date,
+        daily_bar_count,
         indicator_count,
         min_indicators,
     )
-    
+
+    # ✅ 新規則：只看 indicators
     if indicator_count == 0:
-        return False, f"No indicators for {symbol} on {as_of_date}"
-    
-    # If count > 0, always proceed (min_indicators threshold disabled)
-    return True, "OK"
+        stats["insufficient_data"] += 1
+        logger.warning(
+            "Skipping %s %s: no indicators found (indicator_count=0)",
+            symbol,
+            as_of_date,
+        )
+        return False
+
+    # 只要有 1 筆以上指標，就一定要進 prediction
+    return True
 
 
 def load_indicators_from_db(
@@ -446,6 +451,9 @@ def main():
         total_combinations = len(symbol_list) * len(dates)
         current = 0
         
+        # Stats dict for check_data_availability
+        stats = {"insufficient_data": 0}
+        
         logger.info(f"Starting backfill for {len(symbol_list)} symbols × {len(dates)} dates = {total_combinations} combinations")
         
         for symbol in symbol_list:
@@ -461,13 +469,12 @@ def main():
                     )
                 
                 # Check data availability
-                is_available, reason = check_data_availability(
-                    session, symbol, as_of_date, min_indicators=args.min_indicators
+                is_available = check_data_availability(
+                    session, symbol, as_of_date, args.min_indicators, stats
                 )
                 
                 if not is_available:
-                    logger.debug(f"  {symbol} {as_of_date}: {reason}")
-                    total_skipped_data += 1
+                    total_skipped_data = stats["insufficient_data"]
                     continue
                 
                 # Build and save prediction
@@ -495,6 +502,9 @@ def main():
                         total_skipped_exists += 1
                     else:
                         total_errors += 1
+        
+        # Final update of skipped data count from stats
+        total_skipped_data = stats["insufficient_data"]
         
         logger.info("=" * 70)
         logger.info("✅ Backfill completed!")
