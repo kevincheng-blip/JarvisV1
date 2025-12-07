@@ -28,6 +28,15 @@ from .path_a_error_bridge import PathAErrorBridge as PathAErrorBridgeImpl
 from .mock_data_loader import MockPathADataLoader
 from .finmind_loader import FinMindPathADataLoader, FinMindClient
 
+# Path A v1 - Backtest Engine
+from .path_a_engine_v1 import (
+    PathAEngineV1,
+    TradeRecord,
+    DailyPositionSnapshot,
+    PerformanceMetrics,
+    BacktestResult,
+)
+
 __all__ = [
     "PathAConfig",
     "PathADailyInput",
@@ -43,5 +52,11 @@ __all__ = [
     "MockPathADataLoader",
     "FinMindPathADataLoader",
     "FinMindClient",
+    # Path A v1
+    "PathAEngineV1",
+    "TradeRecord",
+    "DailyPositionSnapshot",
+    "PerformanceMetrics",
+    "BacktestResult",
 ]
 

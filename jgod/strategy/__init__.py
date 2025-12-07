@@ -5,6 +5,11 @@ Strategy Engine - 策略引擎
 from .base_strategy import BaseStrategy, Signal, SignalType
 from .breakout_strategy import BreakoutStrategy
 from .ai_signal_bridge import AISignalBridge
+from .strategy_engine_v1 import (
+    StrategyEngineV1,
+    StrategySignal,
+    DailySignalSet,
+)
 
 __all__ = [
     "BaseStrategy",
@@ -12,5 +17,8 @@ __all__ = [
     "SignalType",
     "BreakoutStrategy",
     "AISignalBridge",
+    "StrategyEngineV1",
+    "StrategySignal",
+    "DailySignalSet",
 ]
 

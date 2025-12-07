@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, universe
+from jgod.api.routers import indicators, predictions, universe, strategy, decision
 
 app = FastAPI(
     title="J-GOD Simulation API",
@@ -35,6 +35,8 @@ app.add_middleware(
 app.include_router(predictions.router, prefix="/api", tags=["predictions"])
 app.include_router(indicators.router, prefix="/api", tags=["indicators"])
 app.include_router(universe.router, prefix="/api", tags=["universe"])
+app.include_router(strategy.router, prefix="/api", tags=["strategy"])
+app.include_router(decision.router, prefix="/api", tags=["decision"])
 
 
 @app.get("/")
