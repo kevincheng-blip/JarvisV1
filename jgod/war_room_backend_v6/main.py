@@ -3,6 +3,7 @@ War Room Backend v6.0 - FastAPI 啟動器
 專為 Next.js 前端設計的戰情室後端
 """
 import logging
+import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,18 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("war_room")
+
+# 檢查 API Key 設定
+WAR_ROOM_API_KEY = os.getenv("WAR_ROOM_API_KEY")
+if not WAR_ROOM_API_KEY:
+    logger.warning(
+        "⚠️  WAR_ROOM_API_KEY environment variable is not set. "
+        "War Room API v6.0 is running WITHOUT authentication protection. "
+        "This is only suitable for local development. "
+        "DO NOT deploy to production without setting the API key."
+    )
+else:
+    logger.info("✓ War Room API v6.0 authentication protection is enabled")
 
 # 建立 FastAPI 應用
 app = FastAPI(
@@ -63,27 +76,14 @@ logger.info(f"[MAIN] Provider Manager initialized with {len(provider_manager.pro
 
 @app.get("/health")
 async def health_check():
-    """健康檢查端點"""
-    return {
-        "status": "healthy",
-        "version": "6.0.0",
-        "active_sessions": len(websocket_manager.get_all_sessions()),
-        "providers": list(provider_manager.providers.keys()),
-    }
+    """健康檢查端點（不需要 API Key，已精簡內容）"""
+    return {"status": "ok"}
 
 
 @app.get("/")
 async def root():
-    """根路徑"""
-    return {
-        "name": "J-GOD War Room Backend v6.0",
-        "version": "6.0.0",
-        "endpoints": {
-            "health": "/health",
-            "create_session": "POST /api/v6/war-room/session",
-            "websocket": "WS /ws/v6/war-room/{session_id}",
-        },
-    }
+    """根路徑（不需要 API Key，已精簡內容）"""
+    return "J-GOD War Room Backend v6.0"
 
 
 if __name__ == "__main__":

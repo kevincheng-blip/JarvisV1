@@ -1,7 +1,7 @@
 """
 War Room API 路由
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from typing import Optional
 import logging
 import uuid
@@ -9,6 +9,7 @@ import uuid
 from jgod.war_room_backend.websocket_manager import manager
 from jgod.war_room_backend.engine.war_room_engine import WarRoomEngineBackend
 from jgod.war_room_backend.models import WarRoomEvent
+from jgod.war_room_backend.auth import require_api_key_header, require_api_key_websocket
 
 logger = logging.getLogger("war_room_backend.routers")
 
@@ -18,22 +19,30 @@ engine = WarRoomEngineBackend()
 
 @router.get("/health")
 async def health_check():
-    """健康檢查"""
-    return {"status": "ok", "service": "war_room_backend_v5.0"}
+    """健康檢查（不需要 API Key）"""
+    return {"status": "ok"}
 
 
 @router.post("/api/war-room/session")
-async def create_session():
-    """建立新的戰情室會話"""
+async def create_session(api_key: str = Depends(require_api_key_header)):
+    """建立新的戰情室會話（需要 API Key）"""
     session_id = str(uuid.uuid4())
     return {"session_id": session_id}
 
 
 @router.websocket("/ws/war-room/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str):
-    """WebSocket 端點 - 真正即時串流版本"""
+async def websocket_endpoint(
+    websocket: WebSocket,
+    session_id: str,
+    api_key: Optional[str] = Query(None, description="API Key for WebSocket authentication")
+):
+    """WebSocket 端點 - 真正即時串流版本（需要 API Key）"""
+    # 驗證 API Key（內部會處理 accept，如果驗證通過）
+    await require_api_key_websocket(websocket, api_key)
+    
     connection_id = str(uuid.uuid4())
     
+    # manager.connect 可能會再次 accept，但不會有問題（已經 accept 的會直接返回）
     await manager.connect(websocket, connection_id, session_id)
     logger.info(f"WebSocket connected: {connection_id} for session {session_id}")
     

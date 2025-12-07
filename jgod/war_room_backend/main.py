@@ -2,6 +2,7 @@
 War Room Backend v5.0 - FastAPI 主程式
 """
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,6 +16,18 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("war_room_backend")
+
+# 檢查 API Key 設定
+WAR_ROOM_API_KEY = os.getenv("WAR_ROOM_API_KEY")
+if not WAR_ROOM_API_KEY:
+    logger.warning(
+        "⚠️  WAR_ROOM_API_KEY environment variable is not set. "
+        "War Room API v5.0 is running WITHOUT authentication protection. "
+        "This is only suitable for local development. "
+        "DO NOT deploy to production without setting the API key."
+    )
+else:
+    logger.info("✓ War Room API v5.0 authentication protection is enabled")
 
 # 建立 FastAPI 應用
 app = FastAPI(

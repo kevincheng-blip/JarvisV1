@@ -6,7 +6,7 @@ import uuid
 import asyncio
 import logging
 from typing import Dict, Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Query
 from pydantic import BaseModel
 
 from jgod.war_room_v6.core.engine_v6 import (
@@ -16,6 +16,7 @@ from jgod.war_room_v6.core.engine_v6 import (
 )
 from jgod.war_room.providers import ProviderManager
 from jgod.war_room_backend_v6.websocket_manager import WebSocketManager
+from jgod.war_room_backend.auth import require_api_key_header, require_api_key_websocket
 
 logger = logging.getLogger("war_room")
 
@@ -61,9 +62,12 @@ class CreateSessionResponse(BaseModel):
 
 
 @router.post("/session", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest):
+async def create_session(
+    request: CreateSessionRequest,
+    api_key: str = Depends(require_api_key_header)
+):
     """
-    建立新的戰情室 Session
+    建立新的戰情室 Session（需要 API Key）
     
     前端先呼叫此 API 取得 session_id，然後用該 session_id 連線 WebSocket
     """
@@ -84,9 +88,13 @@ async def create_session(request: CreateSessionRequest):
 # === WebSocket API ===
 
 @router.websocket("/ws/v6/war-room/{session_id}")
-async def war_room_websocket(websocket: WebSocket, session_id: str):
+async def war_room_websocket(
+    websocket: WebSocket,
+    session_id: str,
+    api_key: Optional[str] = Query(None, description="API Key for WebSocket authentication")
+):
     """
-    War Room WebSocket 端點
+    War Room WebSocket 端點（需要 API Key）
     
     流程：
     1. 前端連線到此 WebSocket
@@ -95,6 +103,9 @@ async def war_room_websocket(websocket: WebSocket, session_id: str):
     4. 後端持續推送事件（session_start, role_start, role_chunk, role_done, summary）
     5. 所有事件完成後，WebSocket 保持連線（前端可選擇關閉）
     """
+    # 驗證 API Key
+    await require_api_key_websocket(websocket, api_key)
+    
     if not websocket_manager:
         await websocket.close(code=1011, reason="WebSocket manager not initialized")
         return
