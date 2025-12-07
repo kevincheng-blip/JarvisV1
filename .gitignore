@@ -101,3 +101,16 @@ build/
 # *.parquet
 # Add specific large files here if needed
 
+# ============================================
+# Frontend build artifacts and cache
+# ============================================
+trading-ui/jgod-trading-ui/dist/
+trading-ui/jgod-trading-ui/build/
+trading-ui/jgod-trading-ui/.vite/
+trading-ui/jgod-trading-ui/.cache/
+trading-ui/jgod-trading-ui/.parcel-cache/
+trading-ui/jgod-trading-ui/coverage/
+trading-ui/jgod-trading-ui/.nyc_output/
+trading-ui/jgod-trading-ui/.env.local
+trading-ui/jgod-trading-ui/.env.*.local
+

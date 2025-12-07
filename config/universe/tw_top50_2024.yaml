@@ -1,0 +1,114 @@
+# J-GOD Universe: Taiwan Top 50 Stocks (2024)
+# 台股市值前 50 大核心組合（範例清單，可自行擴充）
+
+universe:
+  - symbol: "2330"
+    name_zh: "台積電"
+    name_en: "Taiwan Semiconductor Manufacturing"
+    sector_zh: "晶圓代工"
+    sector_en: "Foundry"
+  
+  - symbol: "2317"
+    name_zh: "鴻海"
+    name_en: "Hon Hai Precision Industry"
+    sector_zh: "電子製造"
+    sector_en: "Electronics Manufacturing"
+  
+  - symbol: "2454"
+    name_zh: "聯發科"
+    name_en: "MediaTek"
+    sector_zh: "IC 設計"
+    sector_en: "IC Design"
+  
+  - symbol: "3711"
+    name_zh: "日月光投控"
+    name_en: "ASE Technology"
+    sector_zh: "封測"
+    sector_en: "OSAT"
+  
+  - symbol: "2303"
+    name_zh: "聯電"
+    name_en: "United Microelectronics"
+    sector_zh: "晶圓代工"
+    sector_en: "Foundry"
+  
+  - symbol: "2382"
+    name_zh: "廣達"
+    name_en: "Quanta Computer"
+    sector_zh: "筆電代工"
+    sector_en: "Notebook ODM"
+  
+  - symbol: "2308"
+    name_zh: "台達電"
+    name_en: "Delta Electronics"
+    sector_zh: "電源管理"
+    sector_en: "Power Management"
+  
+  - symbol: "2881"
+    name_zh: "富邦金"
+    name_en: "Fubon Financial"
+    sector_zh: "金融"
+    sector_en: "Financial"
+  
+  - symbol: "2882"
+    name_zh: "國泰金"
+    name_en: "Cathay Financial"
+    sector_zh: "金融"
+    sector_en: "Financial"
+  
+  - symbol: "2891"
+    name_zh: "中信金"
+    name_en: "CTBC Financial"
+    sector_zh: "金融"
+    sector_en: "Financial"
+  
+  - symbol: "1301"
+    name_zh: "台塑"
+    name_en: "Formosa Plastics"
+    sector_zh: "石化"
+    sector_en: "Petrochemicals"
+  
+  - symbol: "6505"
+    name_zh: "台塑化"
+    name_en: "Formosa Petrochemical"
+    sector_zh: "石化"
+    sector_en: "Petrochemicals"
+  
+  - symbol: "1303"
+    name_zh: "南亞"
+    name_en: "Nan Ya Plastics"
+    sector_zh: "石化"
+    sector_en: "Petrochemicals"
+  
+  - symbol: "2603"
+    name_zh: "長榮"
+    name_en: "Evergreen Marine"
+    sector_zh: "航運"
+    sector_en: "Shipping"
+  
+  - symbol: "2412"
+    name_zh: "中華電"
+    name_en: "Chunghwa Telecom"
+    sector_zh: "電信"
+    sector_en: "Telecommunications"
+  
+  - symbol: "3045"
+    name_zh: "台灣大"
+    name_en: "Taiwan Mobile"
+    sector_zh: "電信"
+    sector_en: "Telecommunications"
+  
+  - symbol: "1216"
+    name_zh: "統一"
+    name_en: "Uni-President"
+    sector_zh: "食品"
+    sector_en: "Food & Beverage"
+  
+  - symbol: "1101"
+    name_zh: "台泥"
+    name_en: "Taiwan Cement"
+    sector_zh: "水泥"
+    sector_en: "Cement"
+
+# TODO: 請自行補充其餘 32 檔，完成 50 檔清單
+

@@ -1,0 +1,35 @@
+{
+  "label": {
+    "symbol": "代號",
+    "name": "名稱",
+    "price": "價格",
+    "change": "漲跌",
+    "change_pct": "漲跌幅",
+    "volume": "成交量",
+    "verdict": "評級",
+    "total_score": "總分",
+    "sector": "產業",
+    "date": "日期",
+    "load": "載入",
+    "loading": "載入中...",
+    "simulation_only": "僅模擬交易，不連結真實券商"
+  },
+  "verdict": {
+    "STRONG_BUY": "強烈買進",
+    "BUY": "買進",
+    "NEUTRAL": "中性",
+    "AVOID": "避開",
+    "SHORT": "做空"
+  },
+  "coverage": {
+    "full": "完整",
+    "partial": "部分",
+    "missing": "缺失"
+  },
+  "panel": {
+    "watchlist": "自選股清單",
+    "prediction_summary": "決策摘要",
+    "coverage_heatmap": "資料覆蓋狀態"
+  }
+}
+

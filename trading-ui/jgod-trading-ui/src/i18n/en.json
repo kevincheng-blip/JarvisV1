@@ -1,0 +1,35 @@
+{
+  "label": {
+    "symbol": "Symbol",
+    "name": "Name",
+    "price": "Price",
+    "change": "Change",
+    "change_pct": "Change %",
+    "volume": "Volume",
+    "verdict": "Verdict",
+    "total_score": "Total Score",
+    "sector": "Sector",
+    "date": "Date",
+    "load": "Load",
+    "loading": "Loading...",
+    "simulation_only": "Simulation Mode Only - Not connected to real brokers"
+  },
+  "verdict": {
+    "STRONG_BUY": "Strong Buy",
+    "BUY": "Buy",
+    "NEUTRAL": "Neutral",
+    "AVOID": "Avoid",
+    "SHORT": "Short"
+  },
+  "coverage": {
+    "full": "Full",
+    "partial": "Partial",
+    "missing": "Missing"
+  },
+  "panel": {
+    "watchlist": "Watchlist",
+    "prediction_summary": "Prediction Summary",
+    "coverage_heatmap": "Coverage Heatmap"
+  }
+}
+
