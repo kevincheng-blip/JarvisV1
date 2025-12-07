@@ -6,7 +6,7 @@ import uuid
 import asyncio
 import logging
 from typing import Dict, Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Query, Request
 from pydantic import BaseModel
 
 from jgod.war_room_v6.core.engine_v6 import (
@@ -16,7 +16,12 @@ from jgod.war_room_v6.core.engine_v6 import (
 )
 from jgod.war_room.providers import ProviderManager
 from jgod.war_room_backend_v6.websocket_manager import WebSocketManager
-from jgod.war_room_backend.auth import require_api_key_header, require_api_key_websocket
+from jgod.war_room_backend.auth import (
+    require_api_key_header,
+    require_api_key_websocket,
+    check_http_rate_limit,
+    check_websocket_rate_limit,
+)
 
 logger = logging.getLogger("war_room")
 
@@ -63,21 +68,25 @@ class CreateSessionResponse(BaseModel):
 
 @router.post("/session", response_model=CreateSessionResponse)
 async def create_session(
-    request: CreateSessionRequest,
+    request_data: CreateSessionRequest,
+    http_request: Request,
     api_key: str = Depends(require_api_key_header)
 ):
     """
-    建立新的戰情室 Session（需要 API Key）
+    建立新的戰情室 Session（需要 API Key 和 Rate Limit 檢查）
     
     前端先呼叫此 API 取得 session_id，然後用該 session_id 連線 WebSocket
     """
+    # 檢查 Rate Limit（在 API Key 驗證之後）
+    check_http_rate_limit(api_key=api_key, request=http_request)
+    
     if not engine:
         raise HTTPException(status_code=500, detail="Engine not initialized")
     
     # 產生 session_id
     session_id = str(uuid.uuid4())
     
-    logger.info(f"[API] Session created: {session_id}, mode={request.mode}, providers={request.enabled_providers}")
+    logger.info(f"[API] Session created: {session_id}, mode={request_data.mode}, providers={request_data.enabled_providers}")
     
     return CreateSessionResponse(
         session_id=session_id,
@@ -94,7 +103,7 @@ async def war_room_websocket(
     api_key: Optional[str] = Query(None, description="API Key for WebSocket authentication")
 ):
     """
-    War Room WebSocket 端點（需要 API Key）
+    War Room WebSocket 端點（需要 API Key 和 Rate Limit 檢查）
     
     流程：
     1. 前端連線到此 WebSocket
@@ -103,6 +112,9 @@ async def war_room_websocket(
     4. 後端持續推送事件（session_start, role_start, role_chunk, role_done, summary）
     5. 所有事件完成後，WebSocket 保持連線（前端可選擇關閉）
     """
+    # 先檢查 Rate Limit（在連線建立前）
+    await check_websocket_rate_limit(websocket, api_key)
+    
     # 驗證 API Key
     await require_api_key_websocket(websocket, api_key)
     

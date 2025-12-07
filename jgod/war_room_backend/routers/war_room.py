@@ -1,7 +1,7 @@
 """
 War Room API 路由
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, Request
 from typing import Optional
 import logging
 import uuid
@@ -9,7 +9,12 @@ import uuid
 from jgod.war_room_backend.websocket_manager import manager
 from jgod.war_room_backend.engine.war_room_engine import WarRoomEngineBackend
 from jgod.war_room_backend.models import WarRoomEvent
-from jgod.war_room_backend.auth import require_api_key_header, require_api_key_websocket
+from jgod.war_room_backend.auth import (
+    require_api_key_header,
+    require_api_key_websocket,
+    check_http_rate_limit,
+    check_websocket_rate_limit,
+)
 
 logger = logging.getLogger("war_room_backend.routers")
 
@@ -24,8 +29,14 @@ async def health_check():
 
 
 @router.post("/api/war-room/session")
-async def create_session(api_key: str = Depends(require_api_key_header)):
-    """建立新的戰情室會話（需要 API Key）"""
+async def create_session(
+    request: Request,
+    api_key: str = Depends(require_api_key_header)
+):
+    """建立新的戰情室會話（需要 API Key 和 Rate Limit 檢查）"""
+    # 檢查 Rate Limit（在 API Key 驗證之後）
+    check_http_rate_limit(api_key=api_key, request=request)
+    
     session_id = str(uuid.uuid4())
     return {"session_id": session_id}
 
@@ -36,7 +47,10 @@ async def websocket_endpoint(
     session_id: str,
     api_key: Optional[str] = Query(None, description="API Key for WebSocket authentication")
 ):
-    """WebSocket 端點 - 真正即時串流版本（需要 API Key）"""
+    """WebSocket 端點 - 真正即時串流版本（需要 API Key 和 Rate Limit 檢查）"""
+    # 先檢查 Rate Limit（在連線建立前）
+    await check_websocket_rate_limit(websocket, api_key)
+    
     # 驗證 API Key（內部會處理 accept，如果驗證通過）
     await require_api_key_websocket(websocket, api_key)
     
