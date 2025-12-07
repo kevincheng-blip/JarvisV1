@@ -31,9 +31,13 @@ app = FastAPI(
 )
 
 # 設定 CORS（允許 Next.js 前端連線）
+# Only allow localhost origins for security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生產環境請改為特定域名
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
