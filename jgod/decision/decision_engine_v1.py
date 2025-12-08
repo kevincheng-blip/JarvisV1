@@ -101,14 +101,25 @@ class DecisionEngineV1:
     - 產出 PortfolioPlan（目標部位配置表）
     """
     
-    def __init__(self, strategy_engine: Optional[StrategyEngineV1] = None):
+    def __init__(
+        self,
+        strategy_engine: Optional[StrategyEngineV1] = None,
+        risk_config_dict: Optional[Dict] = None,
+    ):
         """
         初始化 Decision Engine
         
         Args:
             strategy_engine: StrategyEngineV1 實例（如果為 None，則自動建立）
+            risk_config_dict: RiskConfig 參數字典（可選），會作為預設值使用
+                - long_budget
+                - short_budget
+                - max_weight_per_symbol
+                - min_score
+                - allow_short
         """
         self.strategy_engine = strategy_engine or StrategyEngineV1()
+        self.risk_config_dict = risk_config_dict or {}
     
     def _calculate_weights_with_cap(
         self,
@@ -196,11 +207,11 @@ class DecisionEngineV1:
         self,
         date: date,
         universe: Optional[List[str]] = None,
-        long_budget: float = 0.6,
-        short_budget: float = 0.2,
-        max_weight_per_symbol: float = 0.10,
-        min_score: float = 0.0,
-        allow_short: bool = True,
+        long_budget: Optional[float] = None,
+        short_budget: Optional[float] = None,
+        max_weight_per_symbol: Optional[float] = None,
+        min_score: Optional[float] = None,
+        allow_short: Optional[bool] = None,
     ) -> PortfolioPlan:
         """
         產生指定日期的目標部位配置表
@@ -208,15 +219,21 @@ class DecisionEngineV1:
         Args:
             date: 日期
             universe: 股票池（如果為 None，則取得所有有預測的股票）
-            long_budget: Long 總預算（預設 0.6 = 60%）
-            short_budget: Short 總預算（預設 0.2 = 20%）
-            max_weight_per_symbol: 單檔最大權重（預設 0.10 = 10%）
-            min_score: 最低分數門檻（預設 0.0）
-            allow_short: 是否允許放空（預設 True）
+            long_budget: Long 總預算（如果為 None，使用 risk_config_dict 或預設 0.6）
+            short_budget: Short 總預算（如果為 None，使用 risk_config_dict 或預設 0.2）
+            max_weight_per_symbol: 單檔最大權重（如果為 None，使用 risk_config_dict 或預設 0.10）
+            min_score: 最低分數門檻（如果為 None，使用 risk_config_dict 或預設 0.0）
+            allow_short: 是否允許放空（如果為 None，使用 risk_config_dict 或預設 True）
         
         Returns:
             PortfolioPlan: 目標部位配置表
         """
+        # 優先順序：參數 > risk_config_dict > 預設值
+        long_budget = long_budget if long_budget is not None else self.risk_config_dict.get("long_budget", 0.6)
+        short_budget = short_budget if short_budget is not None else self.risk_config_dict.get("short_budget", 0.2)
+        max_weight_per_symbol = max_weight_per_symbol if max_weight_per_symbol is not None else self.risk_config_dict.get("max_weight_per_symbol", 0.10)
+        min_score = min_score if min_score is not None else self.risk_config_dict.get("min_score", 0.0)
+        allow_short = allow_short if allow_short is not None else self.risk_config_dict.get("allow_short", True)
         # 取得 DailySignalSet
         signal_set = self.strategy_engine.generate_signals_for_date(
             date=date,
