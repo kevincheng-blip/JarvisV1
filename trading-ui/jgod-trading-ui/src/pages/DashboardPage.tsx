@@ -12,6 +12,7 @@ import { PredictionTimelinePanel } from "../components/PredictionTimelinePanel";
 import { SignalPanel } from "../components/SignalPanel";
 import { PolicyPanel } from "../components/PolicyPanel";
 import { PolicyEvolutionPanel } from "../components/PolicyEvolutionPanel";
+import { ErrorDoctrinePanel } from "../components/ErrorDoctrinePanel";
 import { SmartWatchlist } from "../components/SmartWatchlist";
 import { WatchlistPanel } from "../components/WatchlistPanel";
 import { api } from "../api/client";
@@ -137,6 +138,10 @@ export function DashboardPage() {
 
           <div style={{ marginTop: "20px" }}>
             <PolicyPanel />
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <ErrorDoctrinePanel />
           </div>
         </div>
       </div>

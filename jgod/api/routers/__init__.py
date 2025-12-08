@@ -7,6 +7,7 @@ J-GOD API Routers
 from jgod.api.routers import (
     backtest,
     decision,
+    error_review,
     indicators,
     policy,
     predictions,
@@ -17,6 +18,7 @@ from jgod.api.routers import (
 __all__ = [
     "backtest",
     "decision",
+    "error_review",
     "indicators",
     "policy",
     "predictions",

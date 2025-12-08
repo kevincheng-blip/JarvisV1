@@ -56,6 +56,7 @@ class ErrorLearningEngine:
         *,
         draft_output_path: Path | str | None = None,
         report_output_dir: Path | str | None = None,
+        error_reports_jsonl_path: Path | str | None = None,
         enable_doctrine_suggestions: bool = True,
         max_doctrine_hits: int = 5,
     ) -> None:
@@ -64,8 +65,10 @@ class ErrorLearningEngine:
         Args:
             draft_output_path: Path to draft knowledge items JSONL file.
                               Default: knowledge_base/jgod_knowledge_drafts.jsonl
-            report_output_dir: Directory for error analysis reports.
+            report_output_dir: Directory for error analysis reports (Markdown).
                               Default: error_logs/reports/
+            error_reports_jsonl_path: Path to unified error reports JSONL file.
+                                     Default: data/error_learning/error_reports.jsonl
             enable_doctrine_suggestions: Enable Doctrine knowledge base integration.
                                         When True, error analysis will include
                                         relevant suggestions from the 14 doctrine books.
@@ -84,6 +87,12 @@ class ErrorLearningEngine:
             report_output_dir = project_root / "error_logs" / "reports"
         self.report_output_dir = Path(report_output_dir)
         self.report_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Unified error reports JSONL file
+        if error_reports_jsonl_path is None:
+            error_reports_jsonl_path = project_root / "data" / "error_learning" / "error_reports.jsonl"
+        self.error_reports_jsonl_path = Path(error_reports_jsonl_path)
+        self.error_reports_jsonl_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Doctrine integration settings
         self.enable_doctrine_suggestions = enable_doctrine_suggestions
@@ -730,7 +739,63 @@ class ErrorLearningEngine:
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(''.join(report_lines))
         
+        # Also save to unified JSONL file for API access
+        self._save_to_jsonl(event, analysis)
+        
         return report_path
+    
+    def _save_to_jsonl(self, event: ErrorEvent, analysis: ErrorAnalysisResult) -> None:
+        """Save error analysis result to unified JSONL file
+        
+        This creates a machine-readable record that can be queried by the API.
+        
+        Args:
+            event: ErrorEvent that was analyzed
+            analysis: ErrorAnalysisResult from analysis
+        """
+        try:
+            # Create unified record
+            record = {
+                "id": event.id,
+                "timestamp": event.timestamp.isoformat() if isinstance(event.timestamp, datetime) else str(event.timestamp),
+                "symbol": event.symbol,
+                "timeframe": event.timeframe,
+                "side": event.side,
+                "error_type": event.error_type,
+                "predicted_outcome": event.predicted_outcome,
+                "actual_outcome": event.actual_outcome,
+                "pnl": event.pnl,
+                "tags": event.tags,
+                "notes": event.notes,
+                "analysis": {
+                    "classification": analysis.classification,
+                    "utilization_gap_reasons": analysis.utilization_gap_reasons,
+                    "knowledge_gap_notes": analysis.knowledge_gap_notes,
+                    "follow_up_actions": analysis.follow_up_actions,
+                    "doctrine_suggestions": [
+                        {
+                            "book_id": hit.book_id,
+                            "section_id": hit.section_id,
+                            "title": hit.title,
+                            "summary": hit.summary,
+                            "core_principles": hit.core_principles,
+                            "risk_rules": hit.risk_rules,
+                            "tags": hit.tags
+                        }
+                        for hit in analysis.doctrine_suggestions
+                    ]
+                },
+                "created_at": analysis.created_at.isoformat() if isinstance(analysis.created_at, datetime) else str(analysis.created_at)
+            }
+            
+            # Append to JSONL file
+            with open(self.error_reports_jsonl_path, 'a', encoding='utf-8') as f:
+                json_line = json.dumps(record, ensure_ascii=False)
+                f.write(json_line + '\n')
+                
+        except Exception as e:
+            # Log but don't fail the report generation
+            logger.warning(f"Failed to save error report to JSONL: {e}", exc_info=True)
     
     def process_and_report(self, event: ErrorEvent) -> ErrorAnalysisResult:
         """Process error event and generate complete report

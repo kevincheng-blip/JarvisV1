@@ -14,6 +14,9 @@ const client = axios.create({
   },
 });
 
+// Export client for use in hooks
+export const apiClient = client;
+
 export const api = {
   /**
    * Get predictions for all symbols on a specific date
