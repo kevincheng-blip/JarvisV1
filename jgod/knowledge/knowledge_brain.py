@@ -64,11 +64,22 @@ class KnowledgeItem:
         return result
 
 
+# Default knowledge base files (multiple sources)
+DEFAULT_KNOWLEDGE_FILES = [
+    "knowledge_base/jgod_knowledge_v1.jsonl",
+    "knowledge_base/jgod_doctrine_knowledge_v1.jsonl",
+]
+
+
 class KnowledgeBrain:
     """J-GOD Knowledge Brain v1
     
     A knowledge query system for structured knowledge items (formulas, rules,
     concepts, etc.) stored in JSONL format.
+    
+    Supports loading from multiple knowledge base files, including:
+    - Default knowledge base: knowledge_base/jgod_knowledge_v1.jsonl
+    - Doctrine knowledge base: knowledge_base/jgod_doctrine_knowledge_v1.jsonl
     
     Usage:
         brain = KnowledgeBrain()
@@ -76,68 +87,105 @@ class KnowledgeBrain:
         rules = brain.get_rules(tag="risk")
         formulas = brain.get_formulas(tag="performance")
         results = brain.search("Sharpe Ratio", type="FORMULA")
+        doctrine_results = brain.search_doctrine("風控規則")
     """
     
-    def __init__(self, path: Optional[Union[str, Path]] = None):
+    def __init__(self, path: Optional[Union[str, Path, List[Union[str, Path]]]] = None):
         """Initialize KnowledgeBrain
         
         Args:
-            path: Path to knowledge base JSONL file. If None, uses default path:
-                  knowledge_base/jgod_knowledge_v1.jsonl
+            path: Path(s) to knowledge base JSONL file(s). If None, uses default paths:
+                  - knowledge_base/jgod_knowledge_v1.jsonl
+                  - knowledge_base/jgod_doctrine_knowledge_v1.jsonl
+                  
+                  Can be:
+                  - Single string/Path: Single file path
+                  - List of strings/Paths: Multiple file paths
         """
         if path is None:
-            # Default path: knowledge_base/jgod_knowledge_v1.jsonl (relative to project root)
+            # Default: use multiple knowledge base files
             project_root = Path(__file__).parent.parent.parent
-            path = project_root / "knowledge_base" / "jgod_knowledge_v1.jsonl"
+            self.paths = [project_root / p for p in DEFAULT_KNOWLEDGE_FILES]
+        elif isinstance(path, (str, Path)):
+            # Single path (backward compatibility)
+            self.paths = [Path(path)]
+        else:
+            # List of paths
+            self.paths = [Path(p) for p in path]
         
-        self.path = Path(path)
         self._items: List[KnowledgeItem] = []
         self._by_id: Dict[str, KnowledgeItem] = {}
         self._by_type: Dict[str, List[KnowledgeItem]] = {}
         self._loaded: bool = False
     
     def load(self) -> None:
-        """Load knowledge items from JSONL file
+        """Load knowledge items from JSONL file(s)
+        
+        Loads from multiple files if multiple paths were provided.
+        Merges all entries into a single in-memory index.
         
         Raises:
-            FileNotFoundError: If knowledge base file does not exist
+            FileNotFoundError: If no knowledge base files exist (only warns if some files are missing)
             json.JSONDecodeError: If JSON parsing fails
         """
-        if not self.path.exists():
-            # Create empty file if it doesn't exist
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.touch()
-            self._items = []
-            self._by_id = {}
-            self._by_type = {}
-            self._loaded = True
-            return
-        
         self._items = []
         self._by_id = {}
         self._by_type = {}
         
-        with open(self.path, 'r', encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                
-                try:
-                    data = json.loads(line)
-                    item = KnowledgeItem.from_dict(data)
-                    self._items.append(item)
-                    self._by_id[item.id] = item
+        total_loaded = 0
+        for path in self.paths:
+            if not path.exists():
+                # Warn but continue loading other files
+                print(f"Warning: Knowledge base file not found: {path} (skipping)")
+                continue
+            
+            # Ensure parent directory exists (for new files)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            file_loaded = 0
+            with open(path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
                     
-                    # Index by type
-                    if item.type not in self._by_type:
-                        self._by_type[item.type] = []
-                    self._by_type[item.type].append(item)
-                    
-                except json.JSONDecodeError as e:
-                    # Skip invalid JSON lines but log error
-                    print(f"Warning: Failed to parse line {line_num} in {self.path}: {e}")
-                    continue
+                    try:
+                        data = json.loads(line)
+                        item = KnowledgeItem.from_dict(data)
+                        
+                        # Skip if duplicate ID (later files override earlier ones)
+                        if item.id in self._by_id:
+                            # Update existing item
+                            old_item = self._by_id[item.id]
+                            # Remove old item from type index
+                            if old_item.type in self._by_type:
+                                self._by_type[old_item.type] = [
+                                    i for i in self._by_type[old_item.type] if i.id != item.id
+                                ]
+                            # Remove old item from items list
+                            self._items = [i for i in self._items if i.id != item.id]
+                        
+                        self._items.append(item)
+                        self._by_id[item.id] = item
+                        
+                        # Index by type
+                        if item.type not in self._by_type:
+                            self._by_type[item.type] = []
+                        self._by_type[item.type].append(item)
+                        
+                        file_loaded += 1
+                        total_loaded += 1
+                        
+                    except json.JSONDecodeError as e:
+                        # Skip invalid JSON lines but log error
+                        print(f"Warning: Failed to parse line {line_num} in {path}: {e}")
+                        continue
+            
+            if file_loaded > 0:
+                print(f"Loaded {file_loaded} knowledge items from {path.name}")
+        
+        if total_loaded == 0:
+            print(f"Warning: No knowledge items loaded from any of the specified files")
         
         self._loaded = True
     
@@ -145,7 +193,8 @@ class KnowledgeBrain:
                query: Optional[str] = None,
                type: Optional[str] = None,
                tags: Optional[List[str]] = None,
-               limit: int = 20) -> List[KnowledgeItem]:
+               limit: int = 20,
+               require_doctrine: bool = False) -> List[KnowledgeItem]:
         """Search knowledge items with multiple filters
         
         Args:
@@ -153,6 +202,7 @@ class KnowledgeBrain:
             type: Filter by knowledge type (FORMULA, RULE, CONCEPT, etc.)
             tags: Filter by tags (items must match at least one tag)
             limit: Maximum number of results to return
+            require_doctrine: If True, only search items with "DOCTRINE" tag
         
         Returns:
             List of KnowledgeItem matching the criteria
@@ -166,11 +216,21 @@ class KnowledgeBrain:
             
             # Find formulas about performance
             formulas = brain.search(type="FORMULA", tags=["performance"])
+            
+            # Search only in Doctrine knowledge base
+            doctrine_results = brain.search(query="風控", require_doctrine=True)
         """
         if not self._loaded:
             self.load()
         
         candidates = self._items
+        
+        # Filter by Doctrine requirement
+        if require_doctrine:
+            candidates = [
+                item for item in candidates
+                if "DOCTRINE" in [tag.upper() for tag in item.tags]
+            ]
         
         # Filter by type
         if type:
@@ -330,10 +390,28 @@ class KnowledgeBrain:
         return len(self._items)
     
     def reload(self) -> None:
-        """Reload knowledge items from file
+        """Reload knowledge items from file(s)
         
         Useful when knowledge base has been updated externally.
         """
         self._loaded = False
         self.load()
+    
+    def search_doctrine(self, query: str, top_k: int = 10) -> List[KnowledgeItem]:
+        """Search only in Doctrine knowledge base
+        
+        Convenience method that searches only items tagged with "DOCTRINE".
+        
+        Args:
+            query: Keyword to search in title, description, and raw_text
+            top_k: Maximum number of results to return (alias for limit)
+        
+        Returns:
+            List of KnowledgeItem from Doctrine knowledge base matching the query
+        
+        Example:
+            # Search for risk rules in Doctrine knowledge base
+            doctrine_rules = brain.search_doctrine("風控規則")
+        """
+        return self.search(query=query, limit=top_k, require_doctrine=True)
 
