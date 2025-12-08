@@ -1,0 +1,40 @@
+{
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "capital": 1000000,
+  "experiments": [
+    {
+      "name": "exp_lb50_sb10",
+      "long_budget": 0.5,
+      "short_budget": 0.10,
+      "max_weight_per_symbol": 0.10,
+      "min_score": 0.0,
+      "allow_short": true
+    },
+    {
+      "name": "exp_lb60_sb15",
+      "long_budget": 0.6,
+      "short_budget": 0.15,
+      "max_weight_per_symbol": 0.10,
+      "min_score": 0.0,
+      "allow_short": true
+    },
+    {
+      "name": "exp_lb70_sb15",
+      "long_budget": 0.7,
+      "short_budget": 0.15,
+      "max_weight_per_symbol": 0.10,
+      "min_score": 0.0,
+      "allow_short": true
+    },
+    {
+      "name": "exp_lb80_sb20",
+      "long_budget": 0.8,
+      "short_budget": 0.20,
+      "max_weight_per_symbol": 0.10,
+      "min_score": 0.0,
+      "allow_short": true
+    }
+  ]
+}
+

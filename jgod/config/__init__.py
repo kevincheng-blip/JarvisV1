@@ -1,7 +1,11 @@
 """
-J-GOD 配置模組
+J-GOD Config Utilities
+
+配置檔案載入工具。
 """
-from .env_loader import load_env
 
-__all__ = ["load_env"]
+from jgod.config.experiment_config_loader import load_experiment_config
 
+__all__ = [
+    "load_experiment_config",
+]
