@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, universe, strategy, decision
+from jgod.api.routers import indicators, predictions, universe, strategy, decision, policy
 
 app = FastAPI(
     title="J-GOD Simulation API",

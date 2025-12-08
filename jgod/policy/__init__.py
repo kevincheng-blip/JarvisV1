@@ -17,6 +17,10 @@ from jgod.policy.policy_writer_v1 import (
     PolicySuggestion,
     PolicyWriterV1,
 )
+from jgod.policy.policy_reward_adapter_v1 import (
+    PolicyRewardSample,
+    PolicyRewardAdapterV1,
+)
 
 __all__ = [
     "PolicyScoreConfig",
@@ -24,5 +28,7 @@ __all__ = [
     "PolicyLogReaderV1",
     "PolicySuggestion",
     "PolicyWriterV1",
+    "PolicyRewardSample",
+    "PolicyRewardAdapterV1",
 ]
 
