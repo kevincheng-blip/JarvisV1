@@ -16,6 +16,14 @@ from typing import Dict, List, Literal, Optional
 
 from jgod.strategy import StrategyEngineV1, DailySignalSet, StrategySignal
 
+# Import risk config loader
+try:
+    from jgod.decision.risk_config_loader import load_risk_config
+except ImportError:
+    # Fallback if module not found
+    def load_risk_config(path: str) -> Optional[Dict]:
+        return None
+
 
 @dataclass
 class RiskConfig:
@@ -219,15 +227,31 @@ class DecisionEngineV1:
             allow_short=allow_short,
         )
         
-        # 過濾：只保留 base_score >= min_score 的候選
-        long_candidates = [
-            sig for sig in signal_set.long_candidates
-            if sig.base_score >= min_score
-        ]
-        short_candidates = [
-            sig for sig in signal_set.short_candidates
-            if sig.base_score >= min_score
-        ] if allow_short else []
+        # 過濾：長空對稱 + 針對 SHORT 用 rank_score / 絕對值門檻
+        # LONG: 只接受「分數為正」且「大於等於 min_score」
+        long_candidates = []
+        for sig in signal_set.long_candidates:
+            if sig.base_score is None:
+                continue
+            if sig.base_score <= 0:
+                continue
+            if sig.base_score < min_score:
+                continue
+            long_candidates.append(sig)
+        
+        # SHORT: 只接受「分數為負」，但門檻用絕對值 / rank_score
+        # rank_score 在 StrategyEngineV1 已經是 abs(score)
+        short_candidates = []
+        if allow_short:
+            for sig in signal_set.short_candidates:
+                if sig.base_score is None:
+                    continue
+                if sig.base_score >= 0:
+                    continue
+                # rank_score 在 StrategyEngineV1 已經是 abs(score)
+                if sig.rank_score < min_score:
+                    continue
+                short_candidates.append(sig)
         
         # 計算 Long 權重
         long_weights = self._calculate_weights_with_cap(

@@ -137,18 +137,15 @@ class StrategyEngineV1:
         signal_upper = raw_signal.upper()
         
         # LONG 訊號
-        if signal_upper in ["STRONG_BUY", "BUY", "STRONG_BUY_BUY"]:
+        if signal_upper in ["STRONG_BUY", "BUY"]:
             return "LONG"
         
         # SHORT 訊號
         if signal_upper in ["SHORT", "STRONG_SHORT", "SELL"]:
             return "SHORT"
         
-        # FLAT / 中立
-        if signal_upper in ["NEUTRAL", "AVOID", "HOLD", "FLAT"]:
-            return "FLAT"
-        
-        # 預設 FLAT
+        # FLAT / 中立（AVOID, HOLD, NEUTRAL 等）直接跳過，不加入 candidates
+        # 預設也回傳 FLAT
         return "FLAT"
     
     def _evaluate_risk_flags(self, risk_flags_json: Optional[Dict]) -> Literal["LOW", "MEDIUM", "HIGH"]:
@@ -239,15 +236,31 @@ class StrategyEngineV1:
                 raw_signal = snap.verdict or snap.signal
                 side = self._map_signal_to_side(raw_signal)
                 
+                # 如果是 FLAT（NEUTRAL, AVOID, HOLD 等），直接跳過
+                if side == "FLAT":
+                    continue
+                
                 # 取得 score
                 base_score = snap.score or snap.total_score or 0.0
                 
-                # 如果 score 低於門檻，跳過
-                if base_score < min_score:
+                # 長空對稱 + 用絕對值門檻的過濾邏輯
+                # LONG: 只接受「分數為正」且「絕對值大於等於門檻」
+                # SHORT: 只接受「分數為負」且「絕對值大於等於門檻」
+                if side == "LONG":
+                    # LONG 必須 score > 0 且 abs(score) >= min_score
+                    if base_score <= 0 or abs(base_score) < min_score:
+                        continue
+                elif side == "SHORT":
+                    # SHORT 必須 score < 0 且 abs(score) >= min_score
+                    if base_score >= 0 or abs(base_score) < min_score:
+                        continue
+                else:
+                    # 其他情況（理論上不會到這裡，因為 FLAT 已經跳過）
                     continue
                 
                 # v1: rank_score = base_score（未來可加權）
-                rank_score = base_score
+                # 對於 SHORT，rank_score 用絕對值，這樣排序時才會正確（大的在前）
+                rank_score = abs(base_score) if side == "SHORT" else base_score
                 
                 # 評估風險標記
                 risk_flags_summary = self._evaluate_risk_flags(snap.risk_flags_json)

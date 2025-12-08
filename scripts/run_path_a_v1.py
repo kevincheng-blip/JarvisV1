@@ -11,6 +11,7 @@ Run J-GOD Path A v1 Backtest Engine
 
 import argparse
 import json
+import logging
 import sys
 import uuid
 from datetime import date, datetime
@@ -21,7 +22,11 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
+from jgod.decision.risk_config_loader import load_risk_config
 from jgod.path_a.path_a_engine_v1 import PathAEngineV1
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def print_backtest_result(result, show_equity_curve_sample: int = 5):
@@ -136,6 +141,12 @@ Examples:
         help="Disable short positions",
     )
     
+    parser.add_argument(
+        "--risk-config-file",
+        type=str,
+        help="Path to RiskConfig YAML file (overrides other risk parameters)",
+    )
+    
     args = parser.parse_args()
     
     # Parse dates
@@ -149,6 +160,27 @@ Examples:
     if start_date >= end_date:
         print(f"❌ Error: start_date must be before end_date")
         sys.exit(1)
+    
+    # 載入 RiskConfig（如果提供）
+    risk_config_dict = None
+    if args.risk_config_file:
+        try:
+            risk_config_dict = load_risk_config(args.risk_config_file)
+            if risk_config_dict:
+                logger.info(f"RiskConfig loaded from YAML: {args.risk_config_file}")
+                # YAML 值會覆蓋 CLI 參數
+                args.long_budget = risk_config_dict.get("long_budget", args.long_budget)
+                args.short_budget = risk_config_dict.get("short_budget", args.short_budget)
+                args.max_weight_per_symbol = risk_config_dict.get("max_weight_per_symbol", args.max_weight_per_symbol)
+                args.min_score = risk_config_dict.get("min_score", args.min_score)
+                if "allow_short" in risk_config_dict:
+                    args.no_short = not risk_config_dict["allow_short"]
+        except FileNotFoundError:
+            logger.error(f"RiskConfig file not found: {args.risk_config_file}")
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"Failed to load RiskConfig: {e}")
+            sys.exit(1)
     
     # Initialize Path A Engine
     decision_config = {

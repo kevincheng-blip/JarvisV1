@@ -175,8 +175,9 @@ class PathAEngineV1:
         self.slippage_long = slippage_long
         self.slippage_short = slippage_short
         
-        # 初始化 Decision Engine
-        self.decision_engine = DecisionEngineV1()
+        # 初始化 Decision Engine（如果 decision_config 有提供，會傳給 DecisionEngine）
+        # DecisionEngineV1 現在支援從 risk_config_dict 載入參數
+        self.decision_engine = DecisionEngineV1(risk_config_dict=decision_config)
         self.decision_config = decision_config
         
         # 當前持倉狀態 {symbol: DailyPositionSnapshot}

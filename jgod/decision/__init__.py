@@ -16,11 +16,13 @@ from jgod.decision.decision_engine_v1 import (
     PortfolioPlan,
     RiskConfig,
 )
+from jgod.decision.risk_config_loader import load_risk_config
 
 __all__ = [
     "DecisionEngineV1",
     "PositionPlan",
     "PortfolioPlan",
     "RiskConfig",
+    "load_risk_config",
 ]
 
