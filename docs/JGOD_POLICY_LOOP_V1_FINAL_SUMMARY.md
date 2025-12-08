@@ -611,7 +611,52 @@ const data = await response.json();
 
 ---
 
-**版本**: Policy Loop v1.0  
+## v2 升級概覽
+
+### Policy Loop v2 新增功能
+
+**版本**: Policy Loop v2.0  
+**完成日期**: 2024-12  
+
+Policy Loop v2 在 v1 基礎上實現了**「自動實驗 + 自動產生建議 RiskConfig + 自動驗證」**的一鍵腳本。
+
+#### 主要改進
+
+1. **配置檔驅動實驗**
+   - 新增 `config/path_a_experiments_v1.json` 配置檔
+   - 支援定義多組實驗參數組合
+   - 批次執行更靈活
+
+2. **批次實驗腳本升級**
+   - `scripts/run_path_a_batch_v2.py` 支援從配置檔讀取
+   - 支援實驗標籤（tag）
+   - 更清晰的輸出格式
+
+3. **一鍵自動化腳本**
+   - `scripts/run_policy_loop_v2.py` 實現完整自動化
+   - 自動執行：實驗 → 分析 → 建議 → 驗證
+   - 輸出完整的摘要報告
+
+#### 使用範例
+
+```bash
+# 一鍵執行完整 Policy Loop
+PYTHONPATH=. python scripts/run_policy_loop_v2.py
+
+# 自訂配置檔和參數
+PYTHONPATH=. python scripts/run_policy_loop_v2.py \
+  --config-file config/path_a_experiments_v1.json \
+  --sharpe-weight 0.8 \
+  --maxdd-weight 0.2
+```
+
+#### 相關文件
+
+- `docs/JGOD_POLICY_LOOP_V2_SPEC.md` - v2 設計規格
+
+---
+
+**版本**: Policy Loop v1.0 / v2.0  
 **完成日期**: 2024-12  
 **維護者**: J-GOD Development Team
 
