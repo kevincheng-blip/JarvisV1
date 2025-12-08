@@ -270,17 +270,29 @@ def main():
     if args.symbols:
         user_symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
         universe_symbols = [s["symbol"] for s in universe]
-        final_symbols = [s for s in user_symbols if s in universe_symbols]
         
-        if not final_symbols:
-            raise ValueError(
-                f"None of the provided symbols ({user_symbols}) were found in universe. "
-                f"Available symbols: {universe_symbols[:10]}{'...' if len(universe_symbols) > 10 else ''}"
+        # Skip universe validation entirely — allow any symbols
+        # Keep only optional logging
+        missing = [s for s in user_symbols if s not in universe_symbols]
+        if missing:
+            logging.warning(
+                f"Symbols {missing} not found in universe. Proceeding anyway (universe check disabled)."
             )
         
+        # Create universe entries for all user symbols (including those not in original universe)
+        # For symbols not in universe, create minimal dict entries
+        final_symbols = user_symbols
+        universe_dict = {s["symbol"]: s for s in universe}
+        universe = []
+        for symbol in final_symbols:
+            if symbol in universe_dict:
+                universe.append(universe_dict[symbol])
+            else:
+                # Create minimal entry for symbols not in universe
+                universe.append({"symbol": symbol})
+        
         logger.info(f"Overriding universe symbols: {final_symbols}")
-        universe = [s for s in universe if s["symbol"] in final_symbols]
-        logger.info(f"Filtered to {len(universe)} stocks")
+        logger.info(f"Processing {len(universe)} stocks (including {len(missing)} not in original universe)")
     
     # Initialize indicator builder
     token = os.getenv("FINMIND_API_TOKEN")
