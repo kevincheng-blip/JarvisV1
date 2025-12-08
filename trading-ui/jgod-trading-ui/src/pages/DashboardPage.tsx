@@ -10,6 +10,7 @@ import { CoverageHeatmapPanel } from "../components/CoverageHeatmapPanel";
 import { PredictionSummaryPanel } from "../components/PredictionSummaryPanel";
 import { PredictionTimelinePanel } from "../components/PredictionTimelinePanel";
 import { SignalPanel } from "../components/SignalPanel";
+import { PolicyPanel } from "../components/PolicyPanel";
 import { SmartWatchlist } from "../components/SmartWatchlist";
 import { WatchlistPanel } from "../components/WatchlistPanel";
 import { api } from "../api/client";
@@ -131,6 +132,10 @@ export function DashboardPage() {
 
           <div style={{ marginTop: "20px" }}>
             <SignalPanel symbol={timelineSymbol} />
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <PolicyPanel />
           </div>
         </div>
       </div>
