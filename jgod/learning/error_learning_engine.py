@@ -26,7 +26,7 @@ from jgod.learning.error_event import (
     CLASS_KNOWLEDGE_GAP,
     CLASS_UNKNOWN
 )
-from jgod.war_room.knowledge_gateway import get_knowledge_brain
+from jgod.council_chamber.knowledge_gateway import get_knowledge_brain
 from jgod.knowledge.knowledge_brain import KnowledgeBrain, KnowledgeItem
 from jgod.learning.doctrine_helper import get_doctrine_suggestions
 
