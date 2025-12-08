@@ -28,6 +28,16 @@
    - 分階段遷移計劃
    - API 合約與服務邊界
 
+5. **`docs/JGOD_BACKTEST_SERVICE_V1_SPEC.md`**
+   - Backtest Service v1 API 規格
+   - Path A 回測 HTTP API 介面
+   - 使用範例與架構設計
+
+6. **`docs/JGOD_WAR_ROOM_EVOLUTION_PANEL_V1.md`**
+   - Policy Evolution Panel v1 規格
+   - 策略進化追蹤面板
+   - 歷史實驗比較功能
+
 ---
 
 ## ✅ 完整閉環功能清單
@@ -429,6 +439,7 @@ Policy Writer 產生的建議，包含最佳實驗資訊和建議配置。
 - [Policy Loop v1 最終總結](./JGOD_POLICY_LOOP_V1_FINAL_SUMMARY.md)
 - [Policy Service v1 完成報告](./JGOD_POLICY_SERVICE_V1_COMPLETION_REPORT.md)
 - [Backtest Service v1 API 規格](./JGOD_BACKTEST_SERVICE_V1_SPEC.md)
+- [War Room Evolution Panel v1](./JGOD_WAR_ROOM_EVOLUTION_PANEL_V1.md)
 - [微服務設計藍圖](./JGOD_Microservices_Design_v1.md)
 
 ### 系統架構
