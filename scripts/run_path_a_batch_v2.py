@@ -10,7 +10,9 @@ Run J-GOD Path A v1 Backtest - Batch Mode v2
 """
 
 import argparse
+import json
 import sys
+import uuid
 from datetime import date, datetime
 from pathlib import Path
 
@@ -51,10 +53,39 @@ def run_single_experiment(
     try:
         result = engine.run_backtest(start_date=start_date, end_date=end_date)
         
+        # 寫入 log（模擬 run_path_a_v1.py 的邏輯）
+        config_params = {
+            "initial_capital": capital,
+            "long_budget": decision_config["long_budget"],
+            "short_budget": decision_config["short_budget"],
+            "max_weight_per_symbol": decision_config["max_weight_per_symbol"],
+            "min_score": decision_config["min_score"],
+            "allow_short": decision_config["allow_short"],
+        }
+        
+        run_id = uuid.uuid4().hex
+        log_record = engine.generate_log_record(
+            run_id=run_id,
+            config_params=config_params,
+            backtest_result=result,
+        )
+        
+        # 如果有 tag，加入到 log_record（可選欄位）
+        if tag:
+            log_record["experiment_tag"] = tag
+        
+        # 寫入 JSON Lines 檔案
+        log_file_path = project_root / "data" / "path_a_backtest_logs.jsonl"
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(log_file_path, "a", encoding="utf-8") as f:
+            json_line = json.dumps(log_record, ensure_ascii=False)
+            f.write(json_line + "\n")
+        
         # 準備結果摘要
         summary = {
             "name": experiment["name"],
-            "run_id": None,  # 會在寫入 log 時產生
+            "run_id": run_id,
             "success": True,
             "result": result,
             "config": decision_config,
