@@ -136,6 +136,30 @@ class ErrorEvent:
 
 
 @dataclass
+class DoctrineHit:
+    """Doctrine knowledge suggestion hit
+    
+    Represents a matched Doctrine knowledge item from the 14 doctrine books.
+    
+    Attributes:
+        book_id: Book ID from doctrine (e.g., "book_01", "book_07")
+        section_id: Section ID within the book
+        title: Title of the doctrine section
+        summary: Summary from Doctrine's ai_summary
+        core_principles: Core principles from Doctrine's ai_core_principles
+        risk_rules: Risk rules from Doctrine's ai_risk_rules
+        tags: Tags from the doctrine knowledge entry
+    """
+    book_id: str
+    section_id: str
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    core_principles: List[str] = field(default_factory=list)
+    risk_rules: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
+
+
+@dataclass
 class ErrorAnalysisResult:
     """Error analysis result data structure
     
@@ -152,6 +176,7 @@ class ErrorAnalysisResult:
         follow_up_actions: List of recommended follow-up actions
         raw_query: Query string used to search the knowledge base
         created_at: When this analysis was created (datetime or ISO format string)
+        doctrine_suggestions: List of Doctrine knowledge suggestions (optional, added by Doctrine integration)
     """
     event_id: str
     classification: str  # UTILIZATION_GAP / FORM_INSUFFICIENT / KNOWLEDGE_GAP / UNKNOWN
@@ -163,6 +188,7 @@ class ErrorAnalysisResult:
     follow_up_actions: List[str] = field(default_factory=list)
     raw_query: str = ""
     created_at: str | datetime = field(default_factory=datetime.now)
+    doctrine_suggestions: List[DoctrineHit] = field(default_factory=list)
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ErrorAnalysisResult:
@@ -182,6 +208,21 @@ class ErrorAnalysisResult:
             except:
                 pass
         
+        # Parse doctrine_suggestions if present
+        doctrine_suggestions = []
+        if "doctrine_suggestions" in data:
+            for hit_data in data.get("doctrine_suggestions", []):
+                if isinstance(hit_data, dict):
+                    doctrine_suggestions.append(DoctrineHit(
+                        book_id=hit_data.get("book_id", ""),
+                        section_id=hit_data.get("section_id", ""),
+                        title=hit_data.get("title"),
+                        summary=hit_data.get("summary"),
+                        core_principles=hit_data.get("core_principles", []),
+                        risk_rules=hit_data.get("risk_rules", []),
+                        tags=hit_data.get("tags", [])
+                    ))
+        
         return cls(
             event_id=data.get("event_id", ""),
             classification=data.get("classification", CLASS_UNKNOWN),
@@ -192,7 +233,8 @@ class ErrorAnalysisResult:
             draft_concept_suggestions=data.get("draft_concept_suggestions", []),
             follow_up_actions=data.get("follow_up_actions", []),
             raw_query=data.get("raw_query", ""),
-            created_at=created_at
+            created_at=created_at,
+            doctrine_suggestions=doctrine_suggestions
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -218,6 +260,21 @@ class ErrorAnalysisResult:
             result["created_at"] = self.created_at.isoformat()
         else:
             result["created_at"] = str(self.created_at)
+        
+        # Include doctrine_suggestions if present
+        if self.doctrine_suggestions:
+            result["doctrine_suggestions"] = [
+                {
+                    "book_id": hit.book_id,
+                    "section_id": hit.section_id,
+                    "title": hit.title,
+                    "summary": hit.summary,
+                    "core_principles": hit.core_principles,
+                    "risk_rules": hit.risk_rules,
+                    "tags": hit.tags
+                }
+                for hit in self.doctrine_suggestions
+            ]
         
         return result
 

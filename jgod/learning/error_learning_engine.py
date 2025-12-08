@@ -2,11 +2,18 @@
 
 This module provides the ErrorLearningEngine class that analyzes prediction errors
 by querying the Knowledge Brain and classifying root causes.
+
+Also integrates with Doctrine knowledge base to provide relevant suggestions
+from the 14 doctrine books (風控規則、錯誤模式等).
+
+This integration allows error analysis results to reference specific doctrine
+sections, core principles, and risk rules that are relevant to the error being analyzed.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -20,7 +27,10 @@ from jgod.learning.error_event import (
     CLASS_UNKNOWN
 )
 from jgod.war_room.knowledge_gateway import get_knowledge_brain
-from jgod.knowledge.knowledge_brain import KnowledgeItem
+from jgod.knowledge.knowledge_brain import KnowledgeBrain, KnowledgeItem
+from jgod.learning.doctrine_helper import get_doctrine_suggestions
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorLearningEngine:
@@ -31,6 +41,9 @@ class ErrorLearningEngine:
     - Utilization Gap: Rules exist but weren't used
     - Form Insufficient: Only concepts exist, no executable rules
     - Knowledge Gap: No relevant knowledge exists
+    
+    Also integrates with Doctrine knowledge base to provide relevant suggestions
+    from the 14 doctrine books (風控規則、錯誤模式等).
     
     Example:
         engine = ErrorLearningEngine()
@@ -43,6 +56,8 @@ class ErrorLearningEngine:
         *,
         draft_output_path: Path | str | None = None,
         report_output_dir: Path | str | None = None,
+        enable_doctrine_suggestions: bool = True,
+        max_doctrine_hits: int = 5,
     ) -> None:
         """Initialize ErrorLearningEngine
         
@@ -51,6 +66,12 @@ class ErrorLearningEngine:
                               Default: knowledge_base/jgod_knowledge_drafts.jsonl
             report_output_dir: Directory for error analysis reports.
                               Default: error_logs/reports/
+            enable_doctrine_suggestions: Enable Doctrine knowledge base integration.
+                                        When True, error analysis will include
+                                        relevant suggestions from the 14 doctrine books.
+                                        Default: True
+            max_doctrine_hits: Maximum number of Doctrine suggestions to include.
+                              Default: 5
         """
         project_root = Path(__file__).parent.parent.parent
         
@@ -64,14 +85,30 @@ class ErrorLearningEngine:
         self.report_output_dir = Path(report_output_dir)
         self.report_output_dir.mkdir(parents=True, exist_ok=True)
         
+        # Doctrine integration settings
+        self.enable_doctrine_suggestions = enable_doctrine_suggestions
+        self.max_doctrine_hits = max_doctrine_hits
+        
         # Initialize knowledge brain (lazy load)
         self._knowledge_brain = None
     
     @property
-    def knowledge_brain(self):
-        """Get or create KnowledgeBrain instance (lazy loading)"""
+    def knowledge_brain(self) -> KnowledgeBrain:
+        """Get or create KnowledgeBrain instance (lazy loading)
+        
+        Loads both default knowledge base and Doctrine knowledge base.
+        """
         if self._knowledge_brain is None:
-            self._knowledge_brain = get_knowledge_brain()
+            try:
+                self._knowledge_brain = get_knowledge_brain()
+            except Exception as e:
+                logger.warning(f"Failed to load KnowledgeBrain: {e}")
+                # Create a minimal KnowledgeBrain instance to avoid crashes
+                self._knowledge_brain = KnowledgeBrain()
+                try:
+                    self._knowledge_brain.load()
+                except Exception:
+                    pass  # If loading fails, engine will continue without Doctrine suggestions
         return self._knowledge_brain
     
     def analyze_error(self, event: ErrorEvent) -> ErrorAnalysisResult:
@@ -247,6 +284,37 @@ class ErrorLearningEngine:
             raw_query=query,
             created_at=datetime.now()
         )
+        
+        # Add Doctrine suggestions if enabled
+        if self.enable_doctrine_suggestions:
+            try:
+                # Build human summary from analysis results
+                human_summary_parts = []
+                if analysis.knowledge_gap_notes:
+                    human_summary_parts.append(" ".join(analysis.knowledge_gap_notes[:2]))
+                if analysis.utilization_gap_reasons:
+                    human_summary_parts.append(" ".join(analysis.utilization_gap_reasons[:2]))
+                if event.notes:
+                    human_summary_parts.append(event.notes[:200])
+                human_summary = " ".join(human_summary_parts) if human_summary_parts else None
+                
+                # Query Doctrine knowledge base
+                doctrine_suggestions = get_doctrine_suggestions(
+                    brain=self.knowledge_brain,
+                    error_type=event.error_type,
+                    symbol=event.symbol,
+                    human_summary=human_summary,
+                    max_hits=self.max_doctrine_hits
+                )
+                
+                analysis.doctrine_suggestions = doctrine_suggestions
+                
+            except Exception as e:
+                # Log but don't fail the entire analysis
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to query Doctrine suggestions: {e}", exc_info=True)
+                analysis.doctrine_suggestions = []
         
         return analysis
     
@@ -630,7 +698,31 @@ class ErrorLearningEngine:
             report_lines.append(f"- {action}\n")
         
         report_lines.append("\n---\n\n")
-        report_lines.append("## 7. 查詢資訊\n\n")
+        
+        # Add Doctrine suggestions section if available
+        if analysis.doctrine_suggestions:
+            report_lines.append("## 7. Doctrine 聖經建議\n\n")
+            report_lines.append("以下建議來自 J-GOD 14 本聖經中的相關內容：\n\n")
+            
+            for i, hit in enumerate(analysis.doctrine_suggestions, 1):
+                report_lines.append(f"### 建議 {i}: {hit.title or '未命名'}\n\n")
+                report_lines.append(f"- **來源**: {hit.book_id} / {hit.section_id}\n")
+                if hit.summary:
+                    report_lines.append(f"- **摘要**: {hit.summary[:300]}\n")
+                if hit.core_principles:
+                    report_lines.append(f"- **核心原則**:\n")
+                    for principle in hit.core_principles[:5]:
+                        report_lines.append(f"  - {principle[:200]}\n")
+                if hit.risk_rules:
+                    report_lines.append(f"- **風控規則**:\n")
+                    for rule in hit.risk_rules[:5]:
+                        report_lines.append(f"  - {rule[:200]}\n")
+                if hit.tags:
+                    report_lines.append(f"- **標籤**: {', '.join(hit.tags[:5])}\n")
+                report_lines.append("\n")
+        
+        report_lines.append("\n---\n\n")
+        report_lines.append("## 8. 查詢資訊\n\n")
         report_lines.append(f"**查詢字串**: `{analysis.raw_query}`\n\n")
         report_lines.append(f"**查詢時間**: {analysis.created_at}\n\n")
         
