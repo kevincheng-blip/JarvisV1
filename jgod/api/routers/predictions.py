@@ -342,9 +342,10 @@ async def get_top_n_short(
         if not name_map and db:
             try:
                 from jgod.storage.models import Stock
-                stocks = db.query(Stock).filter(Stock.stock_id.in_([item.symbol for item in raw_items])).all()
+                symbols = [item.symbol for item in raw_items]
+                stocks = db.query(Stock).filter(Stock.symbol.in_(symbols)).all()
                 for stock in stocks:
-                    name_map[stock.stock_id] = getattr(stock, 'name_zh', None) or getattr(stock, 'name', None) or ""
+                    name_map[stock.symbol] = getattr(stock, 'name_zh', None) or getattr(stock, 'name', None) or ""
             except Exception:
                 pass
         

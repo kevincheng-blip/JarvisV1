@@ -13,7 +13,6 @@ import { useWarRoomStore } from '../../../store/warRoomStore';
 export function TopLongPanel() {
   const { data: predictions, isLoading, isError, error } = useTopLongPredictions(30);
   const { selectedSymbol, setSelectedSymbol } = useWarRoomStore();
-  const { selectedSymbol, setSelectedSymbol } = useWarRoomStore();
 
   if (isLoading) {
     return (
