@@ -7,6 +7,7 @@ J-GOD API Routers
 from jgod.api.routers import (
     backtest,
     decision,
+    decision_ab,
     error_review,
     error_replay,
     indicators,
@@ -20,6 +21,7 @@ from jgod.api.routers import (
 __all__ = [
     "backtest",
     "decision",
+    "decision_ab",
     "error_review",
     "error_replay",
     "indicators",

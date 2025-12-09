@@ -1,0 +1,13 @@
+[
+  {
+    "experiment_id": "AB_PATHA_2024_Q1",
+    "description": "Path A, 2024 Q1, Taiwan Top 200 universe",
+    "start_date": "2024-01-01",
+    "end_date": "2024-03-31",
+    "universe": "TW_TOP200",
+    "path_a_config_id": "PATHA_V1",
+    "decision_config_id": "DECISION_DEFAULT_V1",
+    "run_modes": ["RAW_ONLY", "DECISION_ON"]
+  }
+]
+

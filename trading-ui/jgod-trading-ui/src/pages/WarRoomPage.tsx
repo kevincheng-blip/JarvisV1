@@ -14,6 +14,7 @@ import { AggregateRisk } from '../components/war-room/macro/AggregateRisk';
 import { EquityCurve } from '../components/war-room/macro/EquityCurve';
 import { FinalOrders } from '../components/war-room/macro/FinalOrders';
 import { ExposureHeatmap } from '../components/war-room/macro/ExposureHeatmap';
+import { DecisionEffectCard } from '../components/war-room/macro/DecisionEffectCard';
 
 // Micro Layer Widgets
 import { TopLongPanel } from '../components/war-room/micro/TopLongPanel';
@@ -43,6 +44,7 @@ export function WarRoomPage() {
       macroLayer={
         <>
           <PolicyHealthV2 />
+          <DecisionEffectCard />
           <AggregateRisk />
           <EquityCurve />
           <ExposureHeatmap />

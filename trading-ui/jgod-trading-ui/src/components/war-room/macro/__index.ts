@@ -7,4 +7,5 @@ export { AggregateRisk } from './AggregateRisk';
 export { EquityCurve } from './EquityCurve';
 export { FinalOrders } from './FinalOrders';
 export { ExposureHeatmap } from './ExposureHeatmap';
+export { DecisionEffectCard } from './DecisionEffectCard';
 
