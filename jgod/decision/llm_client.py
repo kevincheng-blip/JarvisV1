@@ -1,13 +1,13 @@
 """
 Decision Layer v1 - LLM Client
 
-封裝 LLM 呼叫（可重用現有 client 或實作簡單版本）
+封裝 LLM 呼叫（重用現有 API clients）
 """
 
 import json
 import logging
 import time
-from typing import Protocol, Optional
+from typing import Optional
 
 from jgod.decision.config import DecisionConfig
 from jgod.decision.models import LlmDecisionResponse
@@ -15,91 +15,108 @@ from jgod.decision.models import LlmDecisionResponse
 logger = logging.getLogger(__name__)
 
 
-class DecisionLlmClient(Protocol):
-    """LLM Client 介面（Protocol）"""
-    def ask(self, prompt: str, model: str, timeout: int = 30) -> str:
-        """呼叫 LLM 並回傳回應"""
-        ...
-
-
-class SimpleOpenAIClient:
-    """簡單的 OpenAI Client 封裝
+def _get_provider(model_name: str):
+    """根據模型名稱取得對應的 Provider
     
-    注意：如果專案中已有 openai_client，應該重用該模組
-    這裡提供一個簡單的實作作為 fallback
+    Args:
+        model_name: 模型名稱（例如 "gpt-4o-mini", "gemini-2.5-flash"）
+    
+    Returns:
+        Provider 實例（GPTProvider, GeminiProvider 等）
     """
+    model_lower = model_name.lower()
     
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key
+    # OpenAI / GPT 模型
+    if "gpt" in model_lower or "openai" in model_lower:
         try:
-            import openai
-            self.openai = openai
-            if api_key:
-                self.openai.api_key = api_key
+            from api_clients.openai_client import GPTProvider
+            return GPTProvider(model=model_name)
         except ImportError:
-            logger.warning("OpenAI library not installed. LLM features will be disabled.")
-            self.openai = None
+            logger.warning("OpenAI client not available")
+            return None
     
-    def ask(self, prompt: str, model: str = "gpt-4o-mini", timeout: int = 30) -> str:
-        """呼叫 OpenAI API"""
-        if not self.openai:
-            raise RuntimeError("OpenAI library not available")
-        
+    # Gemini 模型
+    elif "gemini" in model_lower:
         try:
-            # 嘗試使用新版 OpenAI API (v1.0+)
-            from openai import OpenAI
-            client = OpenAI(api_key=self.api_key)
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a financial analysis assistant."},
-                    {"role": "user", "content": prompt}
-                ],
-                timeout=timeout,
-                temperature=0.3,  # 降低隨機性，提高穩定性
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            logger.error(f"OpenAI API call failed: {e}")
-            raise
+            from api_clients.gemini_client import GeminiProvider
+            return GeminiProvider(model=model_name)
+        except ImportError:
+            logger.warning("Gemini client not available")
+            return None
+    
+    # Claude 模型
+    elif "claude" in model_lower:
+        try:
+            from api_clients.anthropic_client import ClaudeProvider
+            return ClaudeProvider()
+        except ImportError:
+            logger.warning("Claude client not available")
+            return None
+    
+    else:
+        # 預設使用 GPT
+        logger.warning(f"Unknown model {model_name}, falling back to GPT")
+        try:
+            from api_clients.openai_client import GPTProvider
+            return GPTProvider(model="gpt-4o-mini")
+        except ImportError:
+            return None
 
 
 class DecisionLlmWrapper:
     """Decision Layer LLM Wrapper
     
     封裝 LLM 呼叫，包含 retry 邏輯和錯誤處理
+    重用現有的 API clients (GPTProvider, GeminiProvider 等)
     """
     
-    def __init__(self, config: DecisionConfig, client: Optional[DecisionLlmClient] = None):
+    def __init__(self, config: DecisionConfig, provider=None):
+        """
+        Args:
+            config: DecisionConfig 配置
+            provider: 可選的 Provider 實例（如果不提供，會根據 config.llm_model 自動選擇）
+        """
         self.config = config
-        self.client = client
-        if not self.client:
-            # 預設使用 SimpleOpenAIClient（需要環境變數 OPENAI_API_KEY）
-            import os
-            api_key = os.getenv("OPENAI_API_KEY")
-            if api_key:
-                self.client = SimpleOpenAIClient(api_key=api_key)
-            else:
-                logger.warning("No OpenAI API key found. LLM features will be disabled.")
-                self.client = None
+        self.provider = provider
+        
+        if not self.provider:
+            # 根據配置的模型名稱自動選擇 Provider
+            self.provider = _get_provider(config.llm_model)
+            
+            if not self.provider:
+                logger.warning(f"Could not initialize provider for model {config.llm_model}. LLM features will be disabled.")
     
     def call_llm(self, prompt: str) -> Optional[LlmDecisionResponse]:
         """呼叫 LLM 並解析回應
         
+        Args:
+            prompt: 完整的 Prompt 字串（包含 system + user content）
+        
         Returns:
             LlmDecisionResponse 或 None（失敗時）
         """
-        if not self.client or not self.config.enable_llm:
-            logger.info("LLM disabled or client not available, using fallback")
+        if not self.provider or not self.config.enable_llm:
+            logger.info("LLM disabled or provider not available, using fallback")
             return None
+        
+        # 將完整 prompt 分為 system 和 user 部分
+        # 簡單策略：如果 prompt 包含 "=== 輸入資料 ==="，之前的是 system，之後的是 user
+        if "=== 輸入資料 ===" in prompt:
+            parts = prompt.split("=== 輸入資料 ===", 1)
+            system_prompt = parts[0].strip()
+            user_prompt = "=== 輸入資料 ===" + parts[1] if len(parts) > 1 else prompt
+        else:
+            # 如果沒有明確分隔，全部當作 user prompt
+            system_prompt = "You are a financial analysis assistant."
+            user_prompt = prompt
         
         last_error = None
         for attempt in range(self.config.llm_max_retries + 1):
             try:
-                response_text = self.client.ask(
-                    prompt=prompt,
-                    model=self.config.llm_model,
-                    timeout=self.config.llm_timeout
+                # 使用 Provider 的 ask 方法（統一介面：system_prompt, user_prompt）
+                response_text = self.provider.ask(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt
                 )
                 
                 # 解析 JSON 回應
