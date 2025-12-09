@@ -1,0 +1,71 @@
+# Doctrine Alert Rules Configuration v1
+# 
+# This file defines risk alert rules based on Doctrine principles.
+# Rules are evaluated by DoctrineAlertEngineV1 to generate alerts.
+
+rules:
+  - id: POSITION_MAX_WEIGHT
+    enabled: true
+    severity: warning
+    metric_name: position_weight
+    threshold: 0.15
+    direction: gt
+    source: position
+    doctrine_refs:
+      - book_id: B01
+        section_id: S12
+        rule_id: R03
+    tags:
+      - position
+      - concentration
+    description: "單一持股權重上限：超過 15% 需警示"
+
+  - id: CONFLICT_HIGH_WARNING
+    enabled: true
+    severity: warning
+    metric_name: conflict_score
+    threshold: 70.0
+    direction: ge
+    source: conflict
+    doctrine_refs:
+      - book_id: B03
+        section_id: S08
+        rule_id: R15
+    tags:
+      - conflict
+      - strategy
+    description: "策略衝突分數 >= 70：策略分歧明顯"
+
+  - id: CONFLICT_CRITICAL
+    enabled: true
+    severity: critical
+    metric_name: conflict_score
+    threshold: 85.0
+    direction: ge
+    source: conflict
+    doctrine_refs:
+      - book_id: B03
+        section_id: S08
+        rule_id: R16
+    tags:
+      - conflict
+      - strategy
+      - critical
+    description: "策略衝突分數 >= 85：策略分歧嚴重，需特別注意"
+
+  - id: PREDICTION_HIGH_CONFIDENCE_WARNING
+    enabled: true
+    severity: warning
+    metric_name: final_score
+    threshold: 90.0
+    direction: ge
+    source: prediction
+    doctrine_refs:
+      - book_id: B02
+        section_id: S05
+        rule_id: R10
+    tags:
+      - prediction
+      - confidence
+    description: "Final Score 過高（>= 90）且帶有 warning 標記時警告"
+
