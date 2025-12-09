@@ -1,28 +1,39 @@
 """
-J-GOD Decision & Risk Engine v1
+J-GOD Decision Layer v1
 
-統一入口：從 DailySignalSet 產生目標部位配置表 PortfolioPlan。
+Raw Score → Final Score（Doctrine 仲裁層）
 
-設計目標：
-- 讀取 Strategy & Signal Engine v1 產出的 DailySignalSet
-- 套用簡單但合理的風險規則
-- 計算每檔股票的 target_weight、多空總曝險等
-- 未來 Path A / War Room / Execution 都只讀這裡
+主要組件：
+- DecisionEngineV1: 核心決策引擎
+- RawScoreItem: Raw Score 輸入
+- DecisionOutput: Final Score 輸出
+- generate_final_predictions: 整合函式
 """
 
-from jgod.decision.decision_engine_v1 import (
-    DecisionEngineV1,
-    PositionPlan,
-    PortfolioPlan,
-    RiskConfig,
+from jgod.decision.models import (
+    RawScoreItem,
+    DecisionOutput,
+    DecisionBatchResult,
+    DoctrineFlag,
 )
-from jgod.decision.risk_config_loader import load_risk_config
+from jgod.decision.config import DecisionConfig
+from jgod.decision.engine import DecisionEngineV1
+from jgod.decision.integration_policy import (
+    generate_final_predictions,
+    convert_to_top_n_items,
+)
 
 __all__ = [
+    # Models
+    "RawScoreItem",
+    "DecisionOutput",
+    "DecisionBatchResult",
+    "DoctrineFlag",
+    # Config
+    "DecisionConfig",
+    # Engine
     "DecisionEngineV1",
-    "PositionPlan",
-    "PortfolioPlan",
-    "RiskConfig",
-    "load_risk_config",
+    # Integration
+    "generate_final_predictions",
+    "convert_to_top_n_items",
 ]
-
