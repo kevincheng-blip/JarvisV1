@@ -21,25 +21,22 @@ const apiClient = axios.create({
 /**
  * Fetch final orders
  */
-export function useFinalOrders() {
-  const { selectedRunId } = useWarRoomStore();
-
+export function useFinalOrders(targetDate?: string) {
   return useQuery<FinalOrder[]>({
-    queryKey: ["finalOrders", selectedRunId],
+    queryKey: ["finalOrders", targetDate],
     queryFn: async () => {
-      const params: any = {};
-      if (selectedRunId) {
-        params.run_id = selectedRunId;
+      const params = new URLSearchParams();
+      if (targetDate) {
+        params.append("date", targetDate);
       }
+      
       const response = await apiClient.get<FinalOrder[]>(
-        `/api/v1/orders/final`,
-        { params }
+        `/api/v1/orders/final${params.toString() ? `?${params.toString()}` : ''}`
       );
       return response.data;
     },
     staleTime: 30000, // 30 seconds
     refetchOnWindowFocus: false,
-    enabled: true, // Always fetch, even if selectedRunId is null
   });
 }
 

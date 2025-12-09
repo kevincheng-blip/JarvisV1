@@ -20,20 +20,21 @@ const apiClient = axios.create({
 /**
  * Fetch top N long predictions
  */
-export function useTopLongPredictions(n: number = 30) {
-  const today = new Date().toISOString().split('T')[0];
+export function useTopLongPredictions(n: number = 30, targetDate?: string) {
+  const today = targetDate || new Date().toISOString().split('T')[0];
 
   return useQuery<TopLongItem[]>({
     queryKey: ["topLongPredictions", n, today],
     queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: n.toString(),
+      });
+      if (today) {
+        params.append("date", today);
+      }
+      
       const response = await apiClient.get<TopLongItem[]>(
-        `/api/v1/predictions/top-n/long`,
-        {
-          params: {
-            n,
-            date: today,
-          },
-        }
+        `/api/v1/predictions/top-n/long?${params.toString()}`
       );
       return response.data;
     },
@@ -45,20 +46,21 @@ export function useTopLongPredictions(n: number = 30) {
 /**
  * Fetch top N short predictions
  */
-export function useTopShortPredictions(n: number = 30) {
-  const today = new Date().toISOString().split('T')[0];
+export function useTopShortPredictions(n: number = 30, targetDate?: string) {
+  const today = targetDate || new Date().toISOString().split('T')[0];
 
   return useQuery<TopShortItem[]>({
     queryKey: ["topShortPredictions", n, today],
     queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: n.toString(),
+      });
+      if (today) {
+        params.append("date", today);
+      }
+      
       const response = await apiClient.get<TopShortItem[]>(
-        `/api/v1/predictions/top-n/short`,
-        {
-          params: {
-            n,
-            date: today,
-          },
-        }
+        `/api/v1/predictions/top-n/short?${params.toString()}`
       );
       return response.data;
     },

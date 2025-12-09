@@ -1,355 +1,305 @@
 """
-Prediction API Router
+Predictions API Router
 
-Endpoints for prediction snapshots (verdict, score, indicators).
+提供 TopN Predictions API（整合 Decision Layer）
 """
 
-import json
 import logging
 from datetime import date, datetime
-from pathlib import Path
 from typing import List, Optional
 
-import yaml
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy import desc
+from fastapi import APIRouter, Query, HTTPException
+from sqlalchemy.orm import Session
 
-from jgod.storage.db import get_session
-from jgod.storage.models import PredictionSnapshot, Stock
+from jgod.api.schemas.predictions import TopLongItem, TopShortItem, DoctrineFlag
+from jgod.decision.models import RawScoreItem, DecisionOutput, DoctrineFlag as DecisionDoctrineFlag
+from jgod.decision.config import DecisionConfig
+from jgod.decision.integration_policy import generate_final_predictions_for_date
+from jgod.council_chamber.knowledge_gateway import get_knowledge_brain
+try:
+    try:
+    from jgod.api.dependencies import get_db
+except ImportError:
+    # Fallback if dependencies module doesn't exist
+    def get_db():
+        yield None
+except ImportError:
+    # Fallback if dependencies module doesn't exist
+    def get_db():
+        yield None
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-# Pydantic models for timeline endpoint
-class PredictionTimelinePoint(BaseModel):
-    """Single point in prediction timeline"""
-    date: date
-    score: float
-    signal: str
+def _convert_decision_output_to_top_long_item(output: DecisionOutput) -> TopLongItem:
+    """將 DecisionOutput 轉換為 TopLongItem"""
+    # 轉換 DoctrineFlags
+    doctrine_flags = [
+        DoctrineFlag(
+            code=flag.code,
+            severity=flag.severity,
+            message=flag.message,
+            doctrine_refs=flag.doctrine_refs
+        )
+        for flag in output.doctrine_flags
+    ]
+    
+    # 判斷 risk_level（基於 doctrine_flags 的 severity）
+    risk_level = None
+    if output.doctrine_flags:
+        severities = [f.severity for f in output.doctrine_flags]
+        if "critical" in severities:
+            risk_level = "high"
+        elif "warning" in severities:
+            risk_level = "mid"
+        else:
+            risk_level = "low"
+    
+    return TopLongItem(
+        symbol=output.symbol,
+        name="",  # 將從 RawScoreItem 取得，這裡先留空
+        final_score=output.final_score,
+        raw_score=output.raw_score,
+        win_prob=None,  # 可由上層計算或從 RawScoreItem 取得
+        expected_return=None,
+        risk_level=risk_level,
+        doctrine_flags=doctrine_flags
+    )
 
 
-class PredictionTimelineResponse(BaseModel):
-    """Response for prediction timeline endpoint"""
-    symbol: str
-    start_date: date
-    end_date: date
-    points: List[PredictionTimelinePoint]
+def _convert_decision_output_to_top_short_item(output: DecisionOutput) -> TopShortItem:
+    """將 DecisionOutput 轉換為 TopShortItem"""
+    doctrine_flags = [
+        DoctrineFlag(
+            code=flag.code,
+            severity=flag.severity,
+            message=flag.message,
+            doctrine_refs=flag.doctrine_refs
+        )
+        for flag in output.doctrine_flags
+    ]
+    
+    risk_level = None
+    if output.doctrine_flags:
+        severities = [f.severity for f in output.doctrine_flags]
+        if "critical" in severities:
+            risk_level = "high"
+        elif "warning" in severities:
+            risk_level = "mid"
+        else:
+            risk_level = "low"
+    
+    return TopShortItem(
+        symbol=output.symbol,
+        name="",
+        final_score=output.final_score,
+        raw_score=output.raw_score,
+        risk_level=risk_level,
+        doctrine_flags=doctrine_flags
+    )
 
 
-# Pydantic models for latest prediction endpoint
-class LatestPrediction(BaseModel):
-    """Latest prediction result for a symbol"""
-    symbol: str
-    date: date
-    score: float
-    signal: str
-    positive_factors: List[str]
-    negative_factors: List[str]
-    risk_flags: List[str]
-
-
-def load_universe(universe_file: str) -> List[dict]:
-    """Load universe from YAML file"""
-    file_path = Path(universe_file)
-    if not file_path.exists():
+def _fetch_raw_scores_from_prediction_engine(trade_date: date, db: Session) -> List[RawScoreItem]:
+    """從 Prediction Engine 或資料庫取得 Raw Scores
+    
+    TODO: 這個函式需要根據實際的 Prediction Engine 實作來調整
+    目前提供一個 mock/placeholder 實作
+    """
+    try:
+        # 嘗試從資料庫取得預測結果
+        # 假設有 PredictionSnapshot 或類似模型
+        from jgod.database.models import PredictionSnapshot  # 如果存在
+        
+        predictions = db.query(PredictionSnapshot).filter(
+            PredictionSnapshot.date == trade_date
+        ).all()
+        
+        raw_items = []
+        for pred in predictions:
+            # 假設 PredictionSnapshot 有以下欄位
+            raw_items.append(RawScoreItem(
+                symbol=pred.symbol,
+                name=getattr(pred, 'name', None),
+                date=trade_date,
+                raw_score=getattr(pred, 'score', 0.0) or getattr(pred, 'raw_score', 0.0),
+                strategy_scores=getattr(pred, 'strategy_scores', {}),
+                risk_metrics=getattr(pred, 'risk_metrics', {}),
+                context_tags=getattr(pred, 'tags', [])
+            ))
+        
+        logger.info(f"Fetched {len(raw_items)} raw scores from database for date {trade_date}")
+        return raw_items
+    
+    except ImportError:
+        # 如果沒有 PredictionSnapshot 模型，使用 mock 資料
+        logger.warning("PredictionSnapshot model not found, using mock data")
+        # 返回空列表或 mock 資料（依需求）
         return []
-    
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    
-    return data.get("universe", [])
+    except Exception as e:
+        logger.error(f"Error fetching raw scores: {e}", exc_info=True)
+        return []
 
 
-# --- Timeline endpoint FIRST (to avoid being swallowed by {date}/{symbol}) ---
-@router.get("/predictions/timeline/{symbol}", response_model=PredictionTimelineResponse)
-async def get_prediction_timeline(
-    symbol: str,
-    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
-    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
-):
-    """
-    Get prediction timeline for a specific symbol within a date range.
+@router.get(
+    "/top-n/long",
+    response_model=List[TopLongItem],
+    summary="Get Top N Long Predictions",
+    description="取得經 Decision Layer 仲裁後的 Final Score 多頭排行榜"
+)
+async def get_top_n_long(
+    date: Optional[str] = Query(None, description="交易日期 (YYYY-MM-DD)，預設為今日"),
+    limit: int = Query(30, ge=1, le=200, description="回傳筆數，預設 30，最大 200"),
+    sort_by: str = Query("final_score", description="排序欄位: final_score 或 raw_score"),
+) -> List[TopLongItem]:
+    """取得 Top N Long Predictions"""
     
-    Returns a time series of predictions (score, signal) for the symbol.
-    Used by UI for trend analysis and historical prediction visualization.
+    # 解析日期
+    if date:
+        try:
+            trade_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    else:
+        trade_date = date.today()
     
-    Example:
-        GET /api/predictions/timeline/2330?start_date=2024-01-01&end_date=2024-12-31
-    """
-    # 手動解析日期，避免 FastAPI 將 symbol 誤判為日期
+    if db is None:
+        db = next(get_db())
+    
     try:
-        start_date_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end_date_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    
-    # 將變數名稱統一
-    start_date = start_date_dt
-    end_date = end_date_dt
-    
-    # Validate date range
-    if start_date > end_date:
-        raise HTTPException(
-            status_code=400,
-            detail=f"start_date ({start_date}) must be before or equal to end_date ({end_date})",
-        )
-    
-    # Query predictions from DB
-    session_gen = get_session()
-    session = next(session_gen)
-    try:
-        predictions = (
-            session.query(PredictionSnapshot)
-            .filter(
-                PredictionSnapshot.symbol == symbol,
-                PredictionSnapshot.date >= start_date,
-                PredictionSnapshot.date <= end_date,
-            )
-            .order_by(PredictionSnapshot.date.asc())
-            .all()
+        # 1. 取得 Raw Scores
+        raw_items = _fetch_raw_scores_from_prediction_engine(trade_date, db)
+        
+        if not raw_items:
+            logger.info(f"No raw scores found for date {trade_date}")
+            return []
+        
+        # 2. 過濾出多頭候選（raw_score > 0 或策略看多）
+        long_candidates = [
+            item for item in raw_items
+            if item.raw_score > 0  # 簡單規則：raw_score > 0 視為多頭
+        ]
+        
+        if not long_candidates:
+            logger.info(f"No long candidates found for date {trade_date}")
+            return []
+        
+        # 3. 呼叫 Decision Layer
+        config = DecisionConfig()  # 可從設定檔或環境變數讀取
+        knowledge_brain = get_knowledge_brain()
+        
+        decision_outputs = generate_final_predictions_for_date(
+            trade_date=trade_date,
+            raw_items=long_candidates,
+            config=config,
+            knowledge_brain=knowledge_brain
         )
         
-        # Map to timeline points
-        points = []
-        for pred in predictions:
-            # Use score if available, fallback to total_score
-            score_value = pred.score if pred.score is not None else (pred.total_score or 0.0)
-            
-            # Use signal if available, fallback to verdict
-            signal_value = pred.signal if pred.signal is not None else (pred.verdict or "UNKNOWN")
-            
-            points.append(
-                PredictionTimelinePoint(
-                    date=pred.date,
-                    score=score_value,
-                    signal=signal_value,
-                )
-            )
+        # 4. 轉換為 TopLongItem
+        top_items = []
+        name_map = {item.symbol: item.name for item in raw_items if item.name}
         
-        # Return response (empty list if no data, not 404)
-        return PredictionTimelineResponse(
-            symbol=symbol,
-            start_date=start_date,
-            end_date=end_date,
-            points=points,
-        )
+        for output in decision_outputs:
+            item = _convert_decision_output_to_top_long_item(output)
+            # 填入 name
+            if output.symbol in name_map:
+                item.name = name_map[output.symbol]
+            top_items.append(item)
         
-    finally:
-        session.close()
-
-
-@router.get("/predictions/latest/{symbol}", response_model=LatestPrediction)
-async def get_latest_prediction(
-    symbol: str,
-    date: Optional[str] = Query(default=None, description="As-of date (YYYY-MM-DD). If not provided, returns the latest available."),
-):
-    """
-    Get the latest prediction result for a specific symbol.
-    
-    Returns the most recent prediction snapshot, including score, signal,
-    positive/negative factors, and risk flags.
-    
-    Used by UI Signal Panel to display current prediction status.
-    
-    Example:
-        GET /api/predictions/latest/2330
-        GET /api/predictions/latest/2330?date=2024-12-01
-    """
-    session_gen = get_session()
-    session = next(session_gen)
-    try:
-        query = session.query(PredictionSnapshot).filter(
-            PredictionSnapshot.symbol == symbol
-        )
+        # 5. 排序
+        if sort_by == "final_score":
+            top_items.sort(key=lambda x: x.final_score, reverse=True)
+        elif sort_by == "raw_score":
+            top_items.sort(key=lambda x: x.raw_score, reverse=True)
         
-        # If date is provided, filter by <= date
-        if date:
-            try:
-                as_of_date = datetime.strptime(date, "%Y-%m-%d").date()
-                query = query.filter(PredictionSnapshot.date <= as_of_date)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        # 6. 取前 N 筆
+        result = top_items[:limit]
         
-        # Get the latest prediction (by date desc)
-        pred = query.order_by(desc(PredictionSnapshot.date)).first()
-        
-        if not pred:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No prediction found for symbol {symbol}",
-            )
-        
-        # Extract score
-        score_value = pred.score if pred.score is not None else (pred.total_score or 0.0)
-        
-        # Extract signal
-        signal_value = pred.signal if pred.signal is not None else (pred.verdict or "UNKNOWN")
-        
-        # Extract positive factors
-        positive_factors = []
-        if pred.positive_factors_json:
-            if isinstance(pred.positive_factors_json, list):
-                positive_factors = [str(item) for item in pred.positive_factors_json]
-            else:
-                positive_factors = [str(pred.positive_factors_json)]
-        elif pred.positive_indicators:
-            if isinstance(pred.positive_indicators, list):
-                positive_factors = [str(item) for item in pred.positive_indicators]
-            elif isinstance(pred.positive_indicators, str):
-                positive_factors = [item.strip() for item in pred.positive_indicators.split(",") if item.strip()]
-        
-        # Extract negative factors
-        negative_factors = []
-        if pred.negative_factors_json:
-            if isinstance(pred.negative_factors_json, list):
-                negative_factors = [str(item) for item in pred.negative_factors_json]
-            else:
-                negative_factors = [str(pred.negative_factors_json)]
-        elif pred.negative_indicators:
-            if isinstance(pred.negative_indicators, list):
-                negative_factors = [str(item) for item in pred.negative_indicators]
-            elif isinstance(pred.negative_indicators, str):
-                negative_factors = [item.strip() for item in pred.negative_indicators.split(",") if item.strip()]
-        
-        # Extract risk flags
-        risk_flags = []
-        if pred.risk_flags_json:
-            if isinstance(pred.risk_flags_json, list):
-                risk_flags = [str(item) for item in pred.risk_flags_json]
-            else:
-                risk_flags = [str(pred.risk_flags_json)]
-        
-        return LatestPrediction(
-            symbol=pred.symbol,
-            date=pred.date,
-            score=score_value,
-            signal=signal_value,
-            positive_factors=positive_factors,
-            negative_factors=negative_factors,
-            risk_flags=risk_flags,
-        )
-        
-    finally:
-        session.close()
-
-
-# --- Existing dynamic routes below ---
-@router.get("/predictions/{date}")
-async def get_predictions_by_date(
-    date: str,
-    universe: Optional[str] = Query(default="tw_top50_2024", description="Universe name"),
-):
-    """
-    Get predictions for all symbols in universe on a specific date.
-    
-    Used by UI A1 Watchlist Panel.
-    """
-    try:
-        # Parse date
-        as_of_date = datetime.strptime(date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {date}. Use YYYY-MM-DD")
-    
-    # Load universe
-    universe_file = f"config/universe/{universe}.yaml"
-    universe_data = load_universe(universe_file)
-    
-    if not universe_data:
-        raise HTTPException(status_code=404, detail=f"Universe not found: {universe}")
-    
-    # Create symbol lookup
-    symbol_to_info = {s["symbol"]: s for s in universe_data}
-    
-    # Query predictions from DB
-    session_gen = get_session()
-    session = next(session_gen)
-    try:
-        predictions = (
-            session.query(PredictionSnapshot)
-            .filter(PredictionSnapshot.date == as_of_date)
-            .all()
-        )
-        
-        # Build response
-        result = []
-        for pred in predictions:
-            symbol = pred.symbol
-            if symbol not in symbol_to_info:
-                continue  # Skip symbols not in universe
-            
-            info = symbol_to_info[symbol]
-            result.append({
-                "symbol": symbol,
-                "name_zh": info.get("name_zh"),
-                "name_en": info.get("name_en"),
-                "sector_zh": info.get("sector_zh"),
-                "sector_en": info.get("sector_en"),
-                "total_score": pred.total_score,
-                "verdict": pred.verdict,
-            })
-        
+        logger.info(f"Returning {len(result)} top long predictions for date {trade_date}")
         return result
+    
+    except Exception as e:
+        logger.error(f"Error in get_top_n_long: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get(
+    "/top-n/short",
+    response_model=List[TopShortItem],
+    summary="Get Top N Short Predictions",
+    description="取得經 Decision Layer 仲裁後的 Final Score 空頭/避險排行榜"
+)
+async def get_top_n_short(
+    date: Optional[str] = Query(None, description="交易日期 (YYYY-MM-DD)，預設為今日"),
+    limit: int = Query(30, ge=1, le=200, description="回傳筆數，預設 30，最大 200"),
+    sort_by: str = Query("final_score", description="排序欄位: final_score 或 raw_score"),
+) -> List[TopShortItem]:
+    """取得 Top N Short Predictions"""
+    
+    # 解析日期
+    if date:
+        try:
+            trade_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    else:
+        trade_date = date.today()
+    
+    if db is None:
+        db = next(get_db())
+    
+    try:
+        # 1. 取得 Raw Scores
+        raw_items = _fetch_raw_scores_from_prediction_engine(trade_date, db)
         
-    finally:
-        session.close()
-
-
-@router.get("/predictions/{date}/{symbol}")
-async def get_prediction_by_symbol(
-    date: str,
-    symbol: str,
-    include_payload: bool = Query(default=False, description="Include raw_payload"),
-):
-    """
-    Get prediction snapshot for a specific symbol on a specific date.
-    
-    Returns:
-        - total_score
-        - verdict
-        - positive_indicators
-        - negative_indicators
-        - raw_payload (optional)
-    """
-    try:
-        as_of_date = datetime.strptime(date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {date}. Use YYYY-MM-DD")
-    
-    session_gen = get_session()
-    session = next(session_gen)
-    try:
-        pred = (
-            session.query(PredictionSnapshot)
-            .filter(
-                PredictionSnapshot.symbol == symbol,
-                PredictionSnapshot.date == as_of_date,
-            )
-            .first()
+        if not raw_items:
+            logger.info(f"No raw scores found for date {trade_date}")
+            return []
+        
+        # 2. 過濾出空頭候選（raw_score < 0 或策略看空）
+        short_candidates = [
+            item for item in raw_items
+            if item.raw_score < 0  # 簡單規則：raw_score < 0 視為空頭
+        ]
+        
+        if not short_candidates:
+            logger.info(f"No short candidates found for date {trade_date}")
+            return []
+        
+        # 3. 呼叫 Decision Layer
+        config = DecisionConfig()
+        knowledge_brain = get_knowledge_brain()
+        
+        decision_outputs = generate_final_predictions_for_date(
+            trade_date=trade_date,
+            raw_items=short_candidates,
+            config=config,
+            knowledge_brain=knowledge_brain
         )
         
-        if not pred:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Prediction not found for {symbol} on {date}",
-            )
+        # 4. 轉換為 TopShortItem
+        top_items = []
+        name_map = {item.symbol: item.name for item in raw_items if item.name}
         
-        result = {
-            "symbol": pred.symbol,
-            "date": pred.date.isoformat(),
-            "total_score": pred.total_score,
-            "verdict": pred.verdict,
-            "positive_indicators": pred.positive_indicators or [],
-            "negative_indicators": pred.negative_indicators or [],
-        }
+        for output in decision_outputs:
+            item = _convert_decision_output_to_top_short_item(output)
+            if output.symbol in name_map:
+                item.name = name_map[output.symbol]
+            top_items.append(item)
         
-        if include_payload:
-            result["raw_payload"] = pred.raw_payload
+        # 5. 排序（空頭：final_score 越低越好，所以升序）
+        if sort_by == "final_score":
+            top_items.sort(key=lambda x: x.final_score, reverse=False)  # 升序
+        elif sort_by == "raw_score":
+            top_items.sort(key=lambda x: x.raw_score, reverse=False)  # 升序
         
+        # 6. 取前 N 筆
+        result = top_items[:limit]
+        
+        logger.info(f"Returning {len(result)} top short predictions for date {trade_date}")
         return result
-        
-    finally:
-        session.close()
-
+    
+    except Exception as e:
+        logger.error(f"Error in get_top_n_short: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

@@ -75,11 +75,12 @@ export interface EquityPoint {
 export interface FinalOrder {
   symbol: string;
   name: string;
-  side: 'buy' | 'sell' | 'hold';
-  size: number;              // 股數或金額
+  action: 'BUY' | 'SELL' | 'HOLD';
+  quantity: number;              // 股數或標準化單位
   confidence: number;        // 0~1
   final_score: number;
-  doctrine_flags: string[];  // e.g. ['close_to_limit', 'trend_overextended']
+  doctrine_flags: DoctrineFlag[];  // Doctrine 風險標籤
+  status?: 'PENDING' | 'EXECUTED' | 'CANCELLED';  // optional
 }
 
 // ============================================================================

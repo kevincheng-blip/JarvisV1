@@ -19,13 +19,20 @@ const apiClient = axios.create({
 
 /**
  * Fetch Doctrine alerts
+ * 
+ * @param symbol - 可選的股票代號，用於過濾該股票的警示
  */
-export function useDoctrineAlerts() {
+export function useDoctrineAlerts(symbol?: string | null) {
   return useQuery<DoctrineAlert[]>({
-    queryKey: ["doctrineAlerts"],
+    queryKey: ["doctrineAlerts", symbol],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      if (symbol) {
+        params.append("symbol", symbol);
+      }
+      
       const response = await apiClient.get<DoctrineAlert[]>(
-        `/api/v1/doctrine/alerts`
+        `/api/v1/doctrine/alerts${params.toString() ? `?${params.toString()}` : ''}`
       );
       return response.data;
     },

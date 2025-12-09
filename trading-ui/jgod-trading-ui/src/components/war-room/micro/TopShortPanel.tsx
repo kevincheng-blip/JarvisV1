@@ -88,8 +88,36 @@ export function TopShortPanel() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-bold text-red-600 dark:text-red-400">
-                  {pred.final_score.toFixed(2)}
+                <div className="flex items-center gap-2">
+                  <div className="text-lg font-bold text-red-600 dark:text-red-400">
+                    {pred.final_score.toFixed(2)}
+                  </div>
+                  {/* Doctrine Flags Icon */}
+                  {pred.doctrine_flags && pred.doctrine_flags.length > 0 && (
+                    <div className="relative group">
+                      <div className={`w-4 h-4 rounded-full ${
+                        pred.doctrine_flags.some(f => f.severity === 'critical')
+                          ? 'bg-red-500'
+                          : pred.doctrine_flags.some(f => f.severity === 'warning')
+                          ? 'bg-yellow-500'
+                          : 'bg-blue-500'
+                      }`} />
+                      {/* Tooltip */}
+                      <div className="absolute right-0 top-full mt-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="font-semibold mb-1">Doctrine 警示:</div>
+                        {pred.doctrine_flags.slice(0, 3).map((flag, idx) => (
+                          <div key={idx} className="mb-1">
+                            <div className="font-medium">{flag.message}</div>
+                            {flag.doctrine_refs && flag.doctrine_refs.length > 0 && (
+                              <div className="text-gray-400 text-xs">
+                                {flag.doctrine_refs.slice(0, 2).join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-500">
                   Raw: {pred.raw_score.toFixed(2)}

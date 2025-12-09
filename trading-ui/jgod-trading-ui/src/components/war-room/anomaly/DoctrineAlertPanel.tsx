@@ -7,9 +7,11 @@
  */
 
 import { useDoctrineAlerts } from '../../../hooks/war-room/useDoctrineAlerts';
+import { useWarRoomStore } from '../../../store/warRoomStore';
 
 export function DoctrineAlertPanel() {
-  const { data: alerts, isLoading, isError, error } = useDoctrineAlerts();
+  const { selectedSymbol } = useWarRoomStore();
+  const { data: alerts, isLoading, isError, error } = useDoctrineAlerts(selectedSymbol);
 
   const getAlertColor = (severity: string) => {
     switch (severity) {
@@ -56,6 +58,11 @@ export function DoctrineAlertPanel() {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         Doctrine 紅線警示
+        {selectedSymbol && (
+          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+            ({selectedSymbol})
+          </span>
+        )}
       </h3>
       {!alerts || alerts.length === 0 ? (
         <div className="text-gray-500 dark:text-gray-400 text-center py-8 text-sm">
