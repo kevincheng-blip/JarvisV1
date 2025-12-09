@@ -11,10 +11,11 @@
 
 import { useState, useMemo } from 'react';
 import { useErrorReview } from '../hooks/useErrorReview';
+import { useWarRoomStore } from '../store/warRoomStore';
 import type { ErrorReviewItem } from '../types/errorReview';
 
 export function ErrorDoctrinePanel() {
-  const [selectedErrorId, setSelectedErrorId] = useState<string | null>(null);
+  const { selectedErrorId, setSelectedErrorId } = useWarRoomStore();
   const [dateRange, setDateRange] = useState<'7' | '30' | '90' | 'all'>('30');
   const [symbolFilter, setSymbolFilter] = useState<string>('');
 
@@ -178,6 +179,9 @@ export function ErrorDoctrinePanel() {
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Doctrine
                     </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      操作
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -215,6 +219,14 @@ export function ErrorDoctrinePanel() {
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
                           {review.doctrine_hits.length} hits
                         </span>
+                      </td>
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setSelectedErrorId(review.id)}
+                          className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                        >
+                          Replay
+                        </button>
                       </td>
                     </tr>
                   ))}
