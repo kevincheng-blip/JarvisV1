@@ -14,6 +14,7 @@ from jgod.api.routers import (
     orders,
     policy,
     predictions,
+    signal_conflict,
     strategy,
     universe,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "orders",
     "policy",
     "predictions",
+    "signal_conflict",
     "strategy",
     "universe",
 ]
