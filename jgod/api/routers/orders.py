@@ -21,7 +21,17 @@ from jgod.decision.config import DecisionConfig
 from jgod.decision.integration_policy import generate_final_predictions_for_date
 from jgod.council_chamber.knowledge_gateway import get_knowledge_brain
 from jgod.api.routers.predictions import _fetch_raw_scores_from_prediction_engine
-from jgod.api.dependencies import get_db
+
+# Database dependencies
+try:
+    from jgod.api.dependencies import get_db
+except ImportError:
+    try:
+        from jgod.storage.db import get_session as get_db
+    except ImportError:
+        # Fallback: create a dummy get_db
+        def get_db():
+            yield None
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +172,8 @@ async def get_final_orders(
     
     # 取得資料庫連線（如果可用）
     try:
-        db = next(get_db())
+        db_gen = get_db()
+        db = next(db_gen) if db_gen else None
     except Exception:
         db = None
     
@@ -196,9 +207,23 @@ async def get_final_orders(
         )
         
         # 4. 轉換為 FinalOrderItem
-        name_map = {item.symbol: item.name for item in raw_items if item.name}
-        final_orders = []
+        # 建立 symbol -> name 映射
+        name_map = {}
+        for item in raw_items:
+            if item.name:
+                name_map[item.symbol] = item.name
         
+        # 如果 name_map 為空，嘗試從 universe 或 Stock 模型取得
+        if not name_map and db:
+            try:
+                from jgod.storage.models import Stock
+                stocks = db.query(Stock).filter(Stock.stock_id.in_([item.symbol for item in raw_items])).all()
+                for stock in stocks:
+                    name_map[stock.stock_id] = getattr(stock, 'name_zh', None) or getattr(stock, 'name', None) or ""
+            except Exception:
+                pass
+        
+        final_orders = []
         for output in decision_outputs:
             name = name_map.get(output.symbol, "")
             order_item = _convert_decision_output_to_final_order(output, name)

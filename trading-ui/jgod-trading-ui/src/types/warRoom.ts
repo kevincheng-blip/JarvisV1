@@ -29,7 +29,7 @@ export interface TopShortItem {
   final_score: number;
   raw_score: number;
   risk_level?: 'low' | 'mid' | 'high';
-  doctrine_flags: string[];
+  doctrine_flags: DoctrineFlag[]; // Doctrine 風險標籤
 }
 
 // ============================================================================

@@ -9,24 +9,27 @@ from datetime import date, datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Query, HTTPException
-from sqlalchemy.orm import Session
+try:
+    from sqlalchemy.orm import Session
+except ImportError:
+    Session = None  # Fallback if SQLAlchemy not available
 
 from jgod.api.schemas.predictions import TopLongItem, TopShortItem, DoctrineFlag
 from jgod.decision.models import RawScoreItem, DecisionOutput, DoctrineFlag as DecisionDoctrineFlag
 from jgod.decision.config import DecisionConfig
 from jgod.decision.integration_policy import generate_final_predictions_for_date
 from jgod.council_chamber.knowledge_gateway import get_knowledge_brain
+
+# Database dependencies
 try:
-    try:
     from jgod.api.dependencies import get_db
 except ImportError:
-    # Fallback if dependencies module doesn't exist
-    def get_db():
-        yield None
-except ImportError:
-    # Fallback if dependencies module doesn't exist
-    def get_db():
-        yield None
+    try:
+        from jgod.storage.db import get_session as get_db
+    except ImportError:
+        # Fallback: create a dummy get_db
+        def get_db():
+            yield None
 
 logger = logging.getLogger(__name__)
 
@@ -101,41 +104,83 @@ def _convert_decision_output_to_top_short_item(output: DecisionOutput) -> TopSho
     )
 
 
-def _fetch_raw_scores_from_prediction_engine(trade_date: date, db: Session) -> List[RawScoreItem]:
+def _fetch_raw_scores_from_prediction_engine(trade_date: date, db) -> List[RawScoreItem]:
     """從 Prediction Engine 或資料庫取得 Raw Scores
     
     TODO: 這個函式需要根據實際的 Prediction Engine 實作來調整
-    目前提供一個 mock/placeholder 實作
+    目前提供一個實作，從 PredictionSnapshot 資料庫模型取得
     """
+    if db is None:
+        logger.warning(f"Database not available, returning empty raw scores for date {trade_date}")
+        return []
+    
     try:
         # 嘗試從資料庫取得預測結果
-        # 假設有 PredictionSnapshot 或類似模型
-        from jgod.database.models import PredictionSnapshot  # 如果存在
+        from jgod.storage.models import PredictionSnapshot
+        from jgod.storage.db import get_session
         
-        predictions = db.query(PredictionSnapshot).filter(
+        # 如果 db 是 generator，取得 session
+        if hasattr(db, '__next__'):
+            session = next(db)
+        else:
+            session = db
+        
+        predictions = session.query(PredictionSnapshot).filter(
             PredictionSnapshot.date == trade_date
         ).all()
         
         raw_items = []
         for pred in predictions:
-            # 假設 PredictionSnapshot 有以下欄位
+            # 取得 score（優先使用 score，否則用 total_score）
+            score_value = pred.score if hasattr(pred, 'score') and pred.score is not None else (pred.total_score or 0.0)
+            
+            # 嘗試解析 strategy_scores（如果是 JSON）
+            strategy_scores = {}
+            if hasattr(pred, 'strategy_scores_json') and pred.strategy_scores_json:
+                try:
+                    import json
+                    if isinstance(pred.strategy_scores_json, str):
+                        strategy_scores = json.loads(pred.strategy_scores_json)
+                    elif isinstance(pred.strategy_scores_json, dict):
+                        strategy_scores = pred.strategy_scores_json
+                except Exception:
+                    pass
+            
+            # 嘗試取得 risk_metrics
+            risk_metrics = {}
+            if hasattr(pred, 'risk_metrics_json') and pred.risk_metrics_json:
+                try:
+                    import json
+                    if isinstance(pred.risk_metrics_json, str):
+                        risk_metrics = json.loads(pred.risk_metrics_json)
+                    elif isinstance(pred.risk_metrics_json, dict):
+                        risk_metrics = pred.risk_metrics_json
+                except Exception:
+                    pass
+            
+            # 嘗試取得 context_tags
+            context_tags = []
+            if hasattr(pred, 'tags') and pred.tags:
+                if isinstance(pred.tags, list):
+                    context_tags = pred.tags
+                elif isinstance(pred.tags, str):
+                    context_tags = [tag.strip() for tag in pred.tags.split(",")]
+            
             raw_items.append(RawScoreItem(
                 symbol=pred.symbol,
-                name=getattr(pred, 'name', None),
+                name=None,  # PredictionSnapshot 可能沒有 name，需從其他地方取得
                 date=trade_date,
-                raw_score=getattr(pred, 'score', 0.0) or getattr(pred, 'raw_score', 0.0),
-                strategy_scores=getattr(pred, 'strategy_scores', {}),
-                risk_metrics=getattr(pred, 'risk_metrics', {}),
-                context_tags=getattr(pred, 'tags', [])
+                raw_score=float(score_value),
+                strategy_scores=strategy_scores,
+                risk_metrics=risk_metrics,
+                context_tags=context_tags
             ))
         
         logger.info(f"Fetched {len(raw_items)} raw scores from database for date {trade_date}")
         return raw_items
     
-    except ImportError:
-        # 如果沒有 PredictionSnapshot 模型，使用 mock 資料
-        logger.warning("PredictionSnapshot model not found, using mock data")
-        # 返回空列表或 mock 資料（依需求）
+    except ImportError as e:
+        logger.warning(f"PredictionSnapshot model not found: {e}. Returning empty list.")
         return []
     except Exception as e:
         logger.error(f"Error fetching raw scores: {e}", exc_info=True)
@@ -280,7 +325,21 @@ async def get_top_n_short(
         
         # 4. 轉換為 TopShortItem
         top_items = []
-        name_map = {item.symbol: item.name for item in raw_items if item.name}
+        # 建立 symbol -> name 映射
+        name_map = {}
+        for item in raw_items:
+            if item.name:
+                name_map[item.symbol] = item.name
+        
+        # 如果 name_map 為空，嘗試從 universe 或 Stock 模型取得
+        if not name_map and db:
+            try:
+                from jgod.storage.models import Stock
+                stocks = db.query(Stock).filter(Stock.stock_id.in_([item.symbol for item in raw_items])).all()
+                for stock in stocks:
+                    name_map[stock.stock_id] = getattr(stock, 'name_zh', None) or getattr(stock, 'name', None) or ""
+            except Exception:
+                pass
         
         for output in decision_outputs:
             item = _convert_decision_output_to_top_short_item(output)
