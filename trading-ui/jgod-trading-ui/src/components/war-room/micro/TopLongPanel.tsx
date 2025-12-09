@@ -48,8 +48,8 @@ export function TopLongPanel() {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Top 30 多頭排行榜
         </h3>
-        <div className="text-gray-500 dark:text-gray-400 text-center py-8">
-          目前沒有多頭預測資料
+        <div className="text-gray-500 dark:text-gray-400 text-center py-8 text-sm">
+          目前尚無 Final Score 排名，可能尚未完成 Decision Layer 計算。
         </div>
       </div>
     );
@@ -80,9 +80,9 @@ export function TopLongPanel() {
                   <div className="font-mono font-semibold text-gray-900 dark:text-white">
                     {pred.symbol}
                   </div>
-                  {pred.name_zh && (
+                  {pred.name && (
                     <div className="text-xs text-gray-600 dark:text-gray-400">
-                      {pred.name_zh}
+                      {pred.name}
                     </div>
                   )}
                 </div>
@@ -93,7 +93,19 @@ export function TopLongPanel() {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-500">
                   Raw: {pred.raw_score.toFixed(2)}
+                  {pred.win_prob !== undefined && ` | Win: ${(pred.win_prob * 100).toFixed(0)}%`}
                 </div>
+                {pred.risk_level && (
+                  <div className={`text-xs mt-1 ${
+                    pred.risk_level === 'low'
+                      ? 'text-green-600 dark:text-green-400'
+                      : pred.risk_level === 'mid'
+                      ? 'text-yellow-600 dark:text-yellow-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    Risk: {pred.risk_level.toUpperCase()}
+                  </div>
+                )}
               </div>
             </div>
           </div>

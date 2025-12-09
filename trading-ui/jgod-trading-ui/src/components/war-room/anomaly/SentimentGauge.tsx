@@ -50,14 +50,13 @@ export function SentimentGauge() {
     );
   }
 
-  // Convert sentiment score (-1 to 1) to percentage (0 to 100)
-  const sentimentPercent = ((sentiment.sentiment_score + 1) / 2) * 100;
-  const sentimentAngle = (sentimentPercent / 100) * 180 - 90; // -90 to 90 degrees
+  // Convert index_value (0~100) to angle (-90 to 90 degrees)
+  const sentimentAngle = (sentiment.index_value / 100) * 180 - 90;
 
   const getSentimentColor = () => {
-    if (sentiment.sentiment_score >= 0.5) return 'text-green-600 dark:text-green-400';
-    if (sentiment.sentiment_score >= 0) return 'text-yellow-600 dark:text-yellow-400';
-    if (sentiment.sentiment_score >= -0.5) return 'text-orange-600 dark:text-orange-400';
+    if (sentiment.index_value >= 70) return 'text-green-600 dark:text-green-400';
+    if (sentiment.index_value >= 40) return 'text-yellow-600 dark:text-yellow-400';
+    if (sentiment.index_value >= 20) return 'text-orange-600 dark:text-orange-400';
     return 'text-red-600 dark:text-red-400';
   };
 
@@ -108,40 +107,22 @@ export function SentimentGauge() {
           </div>
         </div>
 
-        {/* Sentiment Score */}
-        <div className={`text-3xl font-bold mb-2 ${getSentimentColor()}`}>
-          {sentiment.sentiment_score >= 0 ? '+' : ''}
-          {sentiment.sentiment_score.toFixed(2)}
-        </div>
+          {/* Sentiment Index */}
+          <div className={`text-3xl font-bold mb-2 ${getSentimentColor()}`}>
+            {sentiment.index_value}
+          </div>
 
-        {/* Trend Direction */}
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          {sentiment.trend_direction === 'bullish' && '📈 看漲'}
-          {sentiment.trend_direction === 'bearish' && '📉 看跌'}
-          {sentiment.trend_direction === 'neutral' && '➡️ 中性'}
-        </div>
+          {/* Label */}
+          <div className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            {sentiment.label}
+          </div>
 
-        {/* Breakdown */}
-        <div className="grid grid-cols-3 gap-4 text-center text-xs">
-          <div>
-            <div className="text-green-600 dark:text-green-400 font-semibold">
-              {sentiment.bullish_count}
+          {/* Sources */}
+          {sentiment.sources && sentiment.sources.length > 0 && (
+            <div className="text-xs text-gray-500 dark:text-gray-500">
+              來源: {sentiment.sources.join(', ')}
             </div>
-            <div className="text-gray-500 dark:text-gray-500">看漲</div>
-          </div>
-          <div>
-            <div className="text-gray-600 dark:text-gray-400 font-semibold">
-              {sentiment.neutral_count}
-            </div>
-            <div className="text-gray-500 dark:text-gray-500">中性</div>
-          </div>
-          <div>
-            <div className="text-red-600 dark:text-red-400 font-semibold">
-              {sentiment.bearish_count}
-            </div>
-            <div className="text-gray-500 dark:text-gray-500">看跌</div>
-          </div>
-        </div>
+          )}
       </div>
     </div>
   );

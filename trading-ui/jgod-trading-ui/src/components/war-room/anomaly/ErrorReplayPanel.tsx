@@ -109,10 +109,7 @@ export function ErrorReplayPanel() {
           <div className="p-4 h-64 flex items-center justify-center">
             {!selectedError ? (
               <div className="text-gray-500 dark:text-gray-400 text-sm text-center">
-                請先選擇一筆錯誤
-                <div className="mt-2 text-xs">
-                  Replay Engine v1 開發中...
-                </div>
+                請先在錯誤列表中選擇一筆錯誤，才能啟動回放。
               </div>
             ) : (
               <div className="text-gray-500 dark:text-gray-400 text-sm text-center">

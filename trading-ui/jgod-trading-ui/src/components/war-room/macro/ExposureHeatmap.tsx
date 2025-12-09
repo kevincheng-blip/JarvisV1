@@ -10,15 +10,15 @@ import { useExposureHeatmap } from '../../../hooks/war-room/useRisk';
 import { useWarRoomStore } from '../../../store/warRoomStore';
 
 export function ExposureHeatmap() {
-  const { data: exposureData, isLoading, isError, error } = useExposureHeatmap();
+  const { data: exposureResponse, isLoading, isError, error } = useExposureHeatmap();
   const { selectedRunId } = useWarRoomStore();
 
-  // Color mapping based on weight
-  const getHeatColor = (weight: number) => {
-    const absWeight = Math.abs(weight);
-    if (absWeight >= 0.1) return 'bg-red-500';
-    if (absWeight >= 0.05) return 'bg-orange-500';
-    if (absWeight >= 0.02) return 'bg-yellow-500';
+  // Color mapping based on exposure
+  const getHeatColor = (exposure: number) => {
+    const absExposure = Math.abs(exposure);
+    if (absExposure >= 0.1) return 'bg-red-500';
+    if (absExposure >= 0.05) return 'bg-orange-500';
+    if (absExposure >= 0.02) return 'bg-yellow-500';
     return 'bg-green-500';
   };
 
@@ -43,14 +43,14 @@ export function ExposureHeatmap() {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           市場曝險熱圖
         </h3>
-        <div className="text-red-500">
+        <div className="text-red-500 dark:text-red-400">
           錯誤: {error instanceof Error ? error.message : '未知錯誤'}
         </div>
       </div>
     );
   }
 
-  if (!exposureData || exposureData.length === 0) {
+  if (!exposureResponse || !exposureResponse.buckets || exposureResponse.buckets.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -74,15 +74,15 @@ export function ExposureHeatmap() {
         )}
       </h3>
       <div className="grid grid-cols-5 gap-2">
-        {exposureData.slice(0, 30).map((item, idx) => (
+        {exposureResponse.buckets.slice(0, 30).map((bucket, idx) => (
           <div
             key={idx}
-            className={`${getHeatColor(item.weight)} rounded p-2 text-white text-center cursor-pointer hover:opacity-80 transition-opacity`}
-            title={`${item.symbol}: ${(item.weight * 100).toFixed(2)}% (${item.side})`}
+            className={`${getHeatColor(bucket.exposure)} rounded p-2 text-white text-center cursor-pointer hover:opacity-80 transition-opacity`}
+            title={`${bucket.bucket}: ${(bucket.exposure * 100).toFixed(2)}%`}
           >
-            <div className="text-xs font-mono">{item.symbol}</div>
+            <div className="text-xs font-semibold">{bucket.bucket}</div>
             <div className="text-xs">
-              {(item.weight * 100).toFixed(1)}%
+              {(bucket.exposure * 100).toFixed(1)}%
             </div>
           </div>
         ))}

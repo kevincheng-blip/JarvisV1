@@ -73,8 +73,9 @@ export function PolicyHealthV2() {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Policy Health (Sharpe vs MaxDD)
         </h3>
-        <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
-          目前沒有實驗資料
+        <div className="h-64 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+          <div className="text-lg font-semibold mb-2">尚未有任何實驗結果</div>
+          <div className="text-sm">請先執行 Policy Loop v2，再回到此畫面</div>
         </div>
       </div>
     );

@@ -69,7 +69,8 @@ export function usePolicyExperimentsHistory() {
       );
       return response.data;
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 300000, // 5 minutes (as per SPEC 13.1)
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -91,7 +92,8 @@ export function useBestPolicyExperiment() {
       );
       return response.data;
     },
-    staleTime: 60000,
+    staleTime: 300000, // 5 minutes (as per SPEC 13.1)
+    refetchOnWindowFocus: false,
   });
 }
 

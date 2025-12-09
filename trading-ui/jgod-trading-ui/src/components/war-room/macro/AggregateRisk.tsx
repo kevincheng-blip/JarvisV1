@@ -32,8 +32,8 @@ export function AggregateRisk() {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           總曝險概覽
         </h3>
-        <div className="text-red-500">
-          錯誤: {error instanceof Error ? error.message : '未知錯誤'}
+        <div className="text-red-500 dark:text-red-400">
+          無法載入風險資料，請稍後重試
         </div>
       </div>
     );
@@ -61,13 +61,17 @@ export function AggregateRisk() {
         <div>
           <div className="text-sm text-gray-600 dark:text-gray-400">總曝險</div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {(data.total_exposure * 100).toFixed(1)}%
+            {(data.gross_exposure * 100).toFixed(1)}%
           </div>
         </div>
         <div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">槓桿</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {data.leverage.toFixed(2)}x
+          <div className="text-sm text-gray-600 dark:text-gray-400">淨曝險</div>
+          <div className={`text-2xl font-bold ${
+            data.net_exposure >= 0
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'
+          }`}>
+            {(data.net_exposure * 100).toFixed(1)}%
           </div>
         </div>
         <div>
@@ -82,34 +86,22 @@ export function AggregateRisk() {
             {(data.short_exposure * 100).toFixed(1)}%
           </div>
         </div>
-        <div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">淨曝險</div>
-          <div className={`text-xl font-semibold ${
-            data.net_exposure >= 0
-              ? 'text-green-600 dark:text-green-400'
-              : 'text-red-600 dark:text-red-400'
-          }`}>
-            {(data.net_exposure * 100).toFixed(1)}%
+        {data.beta_exposure !== undefined && (
+          <div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Beta 曝險</div>
+            <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">
+              {data.beta_exposure.toFixed(2)}
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">VaR (95%)</div>
-          <div className="text-xl font-semibold text-yellow-600 dark:text-yellow-400">
-            {(data.var_95 * 100).toFixed(2)}%
+        )}
+        {data.var_95 !== undefined && (
+          <div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">VaR (95%)</div>
+            <div className="text-xl font-semibold text-yellow-600 dark:text-yellow-400">
+              {(data.var_95 * 100).toFixed(2)}%
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">最大回撤</div>
-          <div className="text-xl font-semibold text-orange-600 dark:text-orange-400">
-            {(data.max_drawdown * 100).toFixed(2)}%
-          </div>
-        </div>
-        <div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">集中度風險</div>
-          <div className="text-xl font-semibold text-purple-600 dark:text-purple-400">
-            {(data.concentration_risk * 100).toFixed(2)}%
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

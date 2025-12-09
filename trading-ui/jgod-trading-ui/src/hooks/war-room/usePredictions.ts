@@ -6,6 +6,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import type { TopLongItem, TopShortItem } from "../../types/warRoom";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -16,28 +17,16 @@ const apiClient = axios.create({
   },
 });
 
-export interface PredictionItem {
-  symbol: string;
-  name_zh?: string;
-  name_en?: string;
-  final_score: number;
-  raw_score: number;
-  strategy_score: number;
-  signal: string;
-  sector?: string;
-  date: string;
-}
-
 /**
  * Fetch top N long predictions
  */
 export function useTopLongPredictions(n: number = 30) {
   const today = new Date().toISOString().split('T')[0];
 
-  return useQuery<PredictionItem[]>({
+  return useQuery<TopLongItem[]>({
     queryKey: ["topLongPredictions", n, today],
     queryFn: async () => {
-      const response = await apiClient.get<PredictionItem[]>(
+      const response = await apiClient.get<TopLongItem[]>(
         `/api/v1/predictions/top-n/long`,
         {
           params: {
@@ -48,7 +37,8 @@ export function useTopLongPredictions(n: number = 30) {
       );
       return response.data;
     },
-    staleTime: 300000, // 5 minutes
+    staleTime: 30000, // 30 seconds (as per SPEC 13.1)
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -58,10 +48,10 @@ export function useTopLongPredictions(n: number = 30) {
 export function useTopShortPredictions(n: number = 30) {
   const today = new Date().toISOString().split('T')[0];
 
-  return useQuery<PredictionItem[]>({
+  return useQuery<TopShortItem[]>({
     queryKey: ["topShortPredictions", n, today],
     queryFn: async () => {
-      const response = await apiClient.get<PredictionItem[]>(
+      const response = await apiClient.get<TopShortItem[]>(
         `/api/v1/predictions/top-n/short`,
         {
           params: {
@@ -72,7 +62,8 @@ export function useTopShortPredictions(n: number = 30) {
       );
       return response.data;
     },
-    staleTime: 300000,
+    staleTime: 30000, // 30 seconds (as per SPEC 13.1)
+    refetchOnWindowFocus: false,
   });
 }
 

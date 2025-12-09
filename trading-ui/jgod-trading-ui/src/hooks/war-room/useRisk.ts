@@ -6,6 +6,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import type { PortfolioRisk, ExposureResponse } from "../../types/warRoom";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -16,38 +17,20 @@ const apiClient = axios.create({
   },
 });
 
-export interface AggregateRisk {
-  total_exposure: number;
-  long_exposure: number;
-  short_exposure: number;
-  net_exposure: number;
-  leverage: number;
-  var_95: number;
-  max_drawdown: number;
-  concentration_risk: number;
-}
-
-export interface ExposureHeatmapItem {
-  symbol: string;
-  weight: number;
-  side: "long" | "short";
-  sector?: string;
-}
-
 /**
  * Fetch aggregate risk overview
  */
 export function useAggregateRisk() {
-  return useQuery<AggregateRisk>({
+  return useQuery<PortfolioRisk>({
     queryKey: ["aggregateRisk"],
     queryFn: async () => {
-      const response = await apiClient.get<AggregateRisk>(
+      const response = await apiClient.get<PortfolioRisk>(
         `/api/v1/portfolio/risk`
       );
       return response.data;
     },
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 30000,
+    staleTime: 60000, // 60 seconds (as per SPEC 13.1)
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -55,16 +38,16 @@ export function useAggregateRisk() {
  * Fetch exposure heatmap data
  */
 export function useExposureHeatmap() {
-  return useQuery<ExposureHeatmapItem[]>({
+  return useQuery<ExposureResponse>({
     queryKey: ["exposureHeatmap"],
     queryFn: async () => {
-      const response = await apiClient.get<ExposureHeatmapItem[]>(
+      const response = await apiClient.get<ExposureResponse>(
         `/api/v1/portfolio/exposure`
       );
       return response.data;
     },
-    staleTime: 30000,
-    refetchInterval: 30000,
+    staleTime: 60000, // 60 seconds (as per SPEC 13.1)
+    refetchOnWindowFocus: false,
   });
 }
 
