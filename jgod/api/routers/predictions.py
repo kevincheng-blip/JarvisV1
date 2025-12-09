@@ -291,8 +291,15 @@ async def get_top_n_short(
     else:
         trade_date = date.today()
     
-    if db is None:
-        db = next(get_db())
+    # 取得資料庫連線（如果可用）
+    db = None
+    try:
+        db_gen = get_db()
+        if db_gen:
+            db = next(db_gen)
+    except Exception as e:
+        logger.debug(f"Could not get database session: {e}")
+        db = None
     
     try:
         # 1. 取得 Raw Scores

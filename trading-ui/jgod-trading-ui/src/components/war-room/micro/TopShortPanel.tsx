@@ -13,6 +13,7 @@ import { useWarRoomStore } from '../../../store/warRoomStore';
 export function TopShortPanel() {
   const { data: predictions, isLoading, isError, error } = useTopShortPredictions(30);
   const { selectedSymbol, setSelectedSymbol } = useWarRoomStore();
+  const { selectedSymbol, setSelectedSymbol } = useWarRoomStore();
 
   if (isLoading) {
     return (
