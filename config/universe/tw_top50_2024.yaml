@@ -109,6 +109,30 @@ universe:
     name_en: "Taiwan Cement"
     sector_zh: "水泥"
     sector_en: "Cement"
+  
+  - symbol: "3034"
+    name_zh: "聯詠"
+    name_en: "Novatek Microelectronics"
+    sector_zh: "IC 設計"
+    sector_en: "IC Design"
+  
+  - symbol: "6415"
+    name_zh: "矽力-KY"
+    name_en: "Silergy"
+    sector_zh: "電源管理"
+    sector_en: "Power Management"
+  
+  - symbol: "6669"
+    name_zh: "緯穎"
+    name_en: "Wiwynn"
+    sector_zh: "伺服器"
+    sector_en: "Server"
+  
+  - symbol: "3008"
+    name_zh: "大立光"
+    name_en: "Largan Precision"
+    sector_zh: "光學元件"
+    sector_en: "Optical Components"
 
-# TODO: 請自行補充其餘 32 檔，完成 50 檔清單
+# TODO: 請自行補充其餘 21 檔，完成 50 檔清單
 
