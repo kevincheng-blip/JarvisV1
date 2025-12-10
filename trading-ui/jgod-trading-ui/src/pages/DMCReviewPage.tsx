@@ -4,7 +4,10 @@
  * Review workbench for FixProposals with side-by-side diff.
  */
 
+import { useState } from "react";
 import { useDoctrineSection, useVersionContent, useVersionDiff, useApproveVersion, useRejectVersion } from "../hooks/useDoctrineV2";
+import { useRunRuleSimExperiment } from "../hooks/useRuleSim";
+import type { RuleSetRef } from "../types/ruleSim";
 
 interface DMCReviewPageProps {
   sectionId: string;
@@ -25,6 +28,44 @@ export function DMCReviewPage({ sectionId, versionId, onBack }: DMCReviewPagePro
   
   const approveMutation = useApproveVersion();
   const rejectMutation = useRejectVersion();
+  const runRuleSimMutation = useRunRuleSimExperiment();
+  const [ruleSimExperimentId, setRuleSimExperimentId] = useState<string | null>(null);
+  
+  const handleRunRuleSim = () => {
+    if (!sectionId || !versionId || !section) return;
+    
+    // Calculate default date range (last 6 months)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 6);
+    
+    const targetRuleset: RuleSetRef = {
+      id: sectionId,
+      type: "doctrine_section",
+      description: section.title,
+    };
+    
+    runRuleSimMutation.mutate(
+      {
+        target_ruleset: targetRuleset,
+        baseline_version_id: section.current_version_id,
+        variant_version_id: versionId,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        path_a_config_name: "path_a_tw_basic_v1",
+        note: `Rule simulation for Doctrine section ${sectionId}`,
+      },
+      {
+        onSuccess: (response) => {
+          setRuleSimExperimentId(response.experiment_id);
+          alert(`Rule Simulation 已啟動！\n實驗 ID: ${response.experiment_id}\n狀態: ${response.status.status}`);
+        },
+        onError: (error) => {
+          alert(`Rule Simulation 啟動失敗: ${error instanceof Error ? error.message : "未知錯誤"}`);
+        },
+      }
+    );
+  };
   
   const handleApprove = () => {
     if (!sectionId || !versionId) return;
@@ -110,8 +151,41 @@ export function DMCReviewPage({ sectionId, versionId, onBack }: DMCReviewPagePro
         </div>
       )}
       
+      {/* Rule Simulation Status */}
+      {ruleSimExperimentId && (
+        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="font-semibold text-blue-900 dark:text-blue-100">
+                Rule Simulation 已啟動
+              </div>
+              <div className="text-sm text-blue-700 dark:text-blue-300">
+                實驗 ID: {ruleSimExperimentId.substring(0, 8)}...
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('ruleSim:navigate', {
+                  detail: { page: 'detail', experimentId: ruleSimExperimentId }
+                }));
+              }}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+            >
+              前往報告
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Action Buttons */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
+        <button
+          onClick={handleRunRuleSim}
+          disabled={runRuleSimMutation.isPending}
+          className="px-6 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+        >
+          {runRuleSimMutation.isPending ? "啟動中..." : "在沙盒回測此修訂"}
+        </button>
         <button
           onClick={handleApprove}
           disabled={approveMutation.isPending}

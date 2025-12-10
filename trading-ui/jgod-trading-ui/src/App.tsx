@@ -9,8 +9,10 @@ import { WarRoomPage } from "./pages/WarRoomPage";
 import { DMCPage } from "./pages/DMCPage";
 import { DMCReviewPage } from "./pages/DMCReviewPage";
 import { DMCEditPage } from "./pages/DMCEditPage";
+import { RuleSimListPage } from "./pages/RuleSimListPage";
+import { RuleSimDetailPage } from "./pages/RuleSimDetailPage";
 
-type Page = "dashboard" | "war-room" | "dmc" | "dmc-review" | "dmc-edit";
+type Page = "dashboard" | "war-room" | "dmc" | "dmc-review" | "dmc-edit" | "rule-sim-list" | "rule-sim-detail";
 
 interface DMCRouteState {
   page: "review" | "edit";
@@ -18,9 +20,15 @@ interface DMCRouteState {
   versionId?: string;
 }
 
+interface RuleSimRouteState {
+  page: "detail";
+  experimentId: string;
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [dmcRouteState, setDmcRouteState] = useState<DMCRouteState | null>(null);
+  const [ruleSimRouteState, setRuleSimRouteState] = useState<RuleSimRouteState | null>(null);
   
   // Listen for DMC navigation events
   useEffect(() => {
@@ -39,9 +47,23 @@ function App() {
       }
     };
     
+    const handleRuleSimNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { page, experimentId } = customEvent.detail;
+      if (page === "detail") {
+        setCurrentPage("rule-sim-detail");
+        setRuleSimRouteState({ page: "detail", experimentId });
+      } else if (page === "list") {
+        setCurrentPage("rule-sim-list");
+        setRuleSimRouteState(null);
+      }
+    };
+    
     window.addEventListener("dmc:navigate", handleNavigate);
+    window.addEventListener("ruleSim:navigate", handleRuleSimNavigate);
     return () => {
       window.removeEventListener("dmc:navigate", handleNavigate);
+      window.removeEventListener("ruleSim:navigate", handleRuleSimNavigate);
     };
   }, []);
 
@@ -80,6 +102,16 @@ function App() {
           >
             DMC
           </button>
+          <button
+            onClick={() => setCurrentPage("rule-sim-list")}
+            className={`px-4 py-2 rounded ${
+              currentPage.startsWith("rule-sim")
+                ? "bg-blue-600 text-white"
+                : "text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            Rule Sim
+          </button>
         </div>
       </nav>
 
@@ -98,6 +130,13 @@ function App() {
         <DMCEditPage
           sectionId={dmcRouteState.sectionId}
           onBack={() => setCurrentPage("dmc")}
+        />
+      )}
+      {currentPage === "rule-sim-list" && <RuleSimListPage />}
+      {currentPage === "rule-sim-detail" && ruleSimRouteState && (
+        <RuleSimDetailPage
+          experimentId={ruleSimRouteState.experimentId}
+          onBack={() => setCurrentPage("rule-sim-list")}
         />
       )}
     </div>

@@ -5,15 +5,22 @@
  */
 
 import { useDoctrineSections } from "../../../hooks/useDoctrineV2";
+import { useRuleSimExperiments } from "../../../hooks/useRuleSim";
 import { useState } from "react";
 
 export function KnowledgeGovernancePanel() {
   const [showDetails, setShowDetails] = useState(false);
   
   const { data: pendingData } = useDoctrineSections("PENDING_REVIEW", 1, 5, true);
+  const { data: ruleSimData } = useRuleSimExperiments(10, true);
   
   const pendingCount = pendingData?.total || 0;
   const topPending = pendingData?.sections || [];
+  
+  // Count rule sim experiments
+  const ruleSimCount = ruleSimData?.length || 0;
+  const approveCount = ruleSimData?.filter((e) => e.recommendation === "APPROVE").length || 0;
+  const rejectCount = ruleSimData?.filter((e) => e.recommendation === "REJECT").length || 0;
   
   const criticalCount = topPending.filter(
     (s) => s.severity === "CRITICAL" || s.metadata?.confidence && s.metadata.confidence < 0.6
@@ -102,6 +109,28 @@ export function KnowledgeGovernancePanel() {
             </div>
           )}
         </>
+      )}
+      
+      {/* Rule Simulation Summary */}
+      {ruleSimCount > 0 && (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            最近規則沙盒實驗：{ruleSimCount} 次
+            {approveCount > 0 && <span className="text-green-600 ml-2">({approveCount} 次建議 APPROVE</span>}
+            {rejectCount > 0 && <span className="text-red-600">, {rejectCount} 次 REJECT)</span>}
+            {approveCount === 0 && rejectCount === 0 && <span>)</span>}
+          </div>
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('ruleSim:navigate', {
+                detail: { page: 'list' }
+              }));
+            }}
+            className="text-xs text-blue-500 hover:underline"
+          >
+            查看全部實驗 →
+          </button>
+        </div>
       )}
     </div>
   );
