@@ -133,6 +133,48 @@ universe:
     name_en: "Largan Precision"
     sector_zh: "光學元件"
     sector_en: "Optical Components"
+  
+  - symbol: "2301"   # 光寶科
+    name_zh: "光寶科"
+    name_en: "Lite-On Technology"
+    sector_zh: "電子零組件"
+    sector_en: "Electronic Components"
+  
+  - symbol: "2324"   # 仁寶
+    name_zh: "仁寶"
+    name_en: "Compal Electronics"
+    sector_zh: "筆電代工"
+    sector_en: "Notebook ODM"
+  
+  - symbol: "2356"   # 英業達
+    name_zh: "英業達"
+    name_en: "Inventec"
+    sector_zh: "筆電代工"
+    sector_en: "Notebook ODM"
+  
+  - symbol: "2880"   # 華南金
+    name_zh: "華南金"
+    name_en: "Hua Nan Financial"
+    sector_zh: "金融"
+    sector_en: "Financial"
+  
+  - symbol: "2884"   # 玉山金
+    name_zh: "玉山金"
+    name_en: "E.Sun Financial"
+    sector_zh: "金融"
+    sector_en: "Financial"
+  
+  - symbol: "2886"   # 兆豐金
+    name_zh: "兆豐金"
+    name_en: "Mega Financial"
+    sector_zh: "金融"
+    sector_en: "Financial"
+  
+  - symbol: "3231"   # 緯創
+    name_zh: "緯創"
+    name_en: "Wistron"
+    sector_zh: "電子製造"
+    sector_en: "Electronics Manufacturing"
 
-# TODO: 請自行補充其餘 21 檔，完成 50 檔清單
+# TODO: 請自行補充其餘 14 檔，完成 50 檔清單
 
