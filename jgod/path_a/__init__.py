@@ -37,6 +37,12 @@ from .path_a_engine_v1 import (
     BacktestResult,
 )
 
+# Path A v2 - Backtest Engine with Decision Layer v1/v2 Support
+from .path_a_engine_v2 import (
+    PathAEngineV2,
+    PathAConfig as PathAConfigV2,
+)
+
 __all__ = [
     "PathAConfig",
     "PathADailyInput",
@@ -58,5 +64,8 @@ __all__ = [
     "DailyPositionSnapshot",
     "PerformanceMetrics",
     "BacktestResult",
+    # Path A v2
+    "PathAEngineV2",
+    "PathAConfigV2",
 ]
 

@@ -20,6 +20,7 @@ from jgod.decision_ab.aggregator import create_ab_result
 from jgod.decision_ab.storage import AbResultStorage, DecisionAbStorageV1
 from jgod.decision.config import DecisionConfig
 from jgod.path_a.path_a_engine_v1 import PathAEngineV1, BacktestResult
+from jgod.path_a.path_a_engine_v2 import PathAEngineV2, PathAConfig
 
 logger = logging.getLogger(__name__)
 
@@ -336,24 +337,22 @@ class DecisionAbRunnerV1:
             "max_weight_per_symbol": 0.1,
         }
         
-        # For V1 vs V2 comparison, we need to integrate Decision Layer v1/v2
-        # Currently PathAEngineV1 uses Decision & Risk Engine v1 directly
-        # We'll need to create a wrapper or modify PathAEngineV1 to support decision_version
-        # For now, we'll use a simplified approach where we pass decision_version in config
-        # and PathAEngineV1 will need to be modified to respect this (future work)
-        
-        # TODO: Integrate Decision Layer v1/v2 selection into PathAEngineV1
-        # For now, we'll create engines with version flags in config
+        # Use PathAEngineV2 for both V1 and V2 comparisons
+        # PathAEngineV2 supports decision_version parameter to switch between v1/v2
         
         # Run baseline (V1)
-        logger.info(f"Running baseline (V1) backtest...")
-        baseline_config = {
-            **path_a_config,
-            "decision_version": "v1",  # Signal to use Decision Layer v1
-        }
-        baseline_engine = PathAEngineV1(
+        logger.info(f"Running baseline (V1) backtest using PathAEngineV2...")
+        baseline_patha_config = PathAConfig(
             initial_capital=capital,
-            **baseline_config
+            long_budget=path_a_config.get("long_budget", 0.8),
+            short_budget=path_a_config.get("short_budget", 0.2),
+            max_weight_per_symbol=path_a_config.get("max_weight_per_symbol", 0.10),
+            min_score=path_a_config.get("min_score", 0.0),
+            allow_short=path_a_config.get("allow_short", True),
+        )
+        baseline_engine = PathAEngineV2(
+            config=baseline_patha_config,
+            decision_version="v1",
         )
         baseline_backtest = baseline_engine.run_backtest(
             start_date=start_date,
@@ -365,14 +364,18 @@ class DecisionAbRunnerV1:
         )
         
         # Run variant (V2)
-        logger.info(f"Running variant (V2) backtest...")
-        variant_config = {
-            **path_a_config,
-            "decision_version": "v2",  # Signal to use Decision Layer v2
-        }
-        variant_engine = PathAEngineV1(
+        logger.info(f"Running variant (V2) backtest using PathAEngineV2...")
+        variant_patha_config = PathAConfig(
             initial_capital=capital,
-            **variant_config
+            long_budget=path_a_config.get("long_budget", 0.8),
+            short_budget=path_a_config.get("short_budget", 0.2),
+            max_weight_per_symbol=path_a_config.get("max_weight_per_symbol", 0.10),
+            min_score=path_a_config.get("min_score", 0.0),
+            allow_short=path_a_config.get("allow_short", True),
+        )
+        variant_engine = PathAEngineV2(
+            config=variant_patha_config,
+            decision_version="v2",
         )
         variant_backtest = variant_engine.run_backtest(
             start_date=start_date,
