@@ -19,15 +19,17 @@ const apiClient = axios.create({
 
 /**
  * Fetch top N long predictions
+ * Uses Decision Layer V2 by default
  */
-export function useTopLongPredictions(n: number = 30, targetDate?: string) {
+export function useTopLongPredictions(n: number = 30, targetDate?: string, version: "v1" | "v2" = "v2") {
   const today = targetDate || new Date().toISOString().split('T')[0];
 
   return useQuery<TopLongItem[]>({
-    queryKey: ["topLongPredictions", n, today],
+    queryKey: ["topLongPredictions", n, today, version],
     queryFn: async () => {
       const params = new URLSearchParams({
         limit: n.toString(),
+        version: version,
       });
       if (today) {
         params.append("date", today);
@@ -45,15 +47,17 @@ export function useTopLongPredictions(n: number = 30, targetDate?: string) {
 
 /**
  * Fetch top N short predictions
+ * Uses Decision Layer V2 by default
  */
-export function useTopShortPredictions(n: number = 30, targetDate?: string) {
+export function useTopShortPredictions(n: number = 30, targetDate?: string, version: "v1" | "v2" = "v2") {
   const today = targetDate || new Date().toISOString().split('T')[0];
 
   return useQuery<TopShortItem[]>({
-    queryKey: ["topShortPredictions", n, today],
+    queryKey: ["topShortPredictions", n, today, version],
     queryFn: async () => {
       const params = new URLSearchParams({
         limit: n.toString(),
+        version: version,
       });
       if (today) {
         params.append("date", today);
