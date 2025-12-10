@@ -177,4 +177,34 @@ class SRankFactorStorageV1:
         except Exception as e:
             logger.error(f"Failed to load historical factors: {e}", exc_info=True)
             return []
+    
+    def load_all(self) -> List[SRankFactor]:
+        """
+        Load all S-Rank factors from storage
+        
+        Returns:
+            List of all SRankFactor objects
+        """
+        if not self.path.exists():
+            return []
+        
+        factors: List[SRankFactor] = []
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            data = json.loads(line)
+                            factor = self._dict_to_factor(data)
+                            factors.append(factor)
+                        except (json.JSONDecodeError, KeyError, ValueError) as e:
+                            logger.warning(f"Skipping invalid JSON line: {e}")
+                            continue
+            
+            logger.debug(f"Loaded {len(factors)} total S-Rank factors")
+            return factors
+            
+        except Exception as e:
+            logger.error(f"Failed to load all factors: {e}", exc_info=True)
+            return []
 
