@@ -40,6 +40,7 @@ class SelfRepairEngineV1:
         self,
         llm_provider: Optional[LLMProvider] = None,
         storage: Optional[RepairReportStorage] = None,
+        doctrine_service_v2 = None,  # Optional DoctrineServiceV2 for auto-submission
     ):
         """
         Initialize self-repair engine
@@ -52,6 +53,7 @@ class SelfRepairEngineV1:
         self.proposer = RepairProposer(llm_provider=llm_provider)
         self.evaluator = ProposalEvaluator(llm_provider=llm_provider)
         self.storage = storage or RepairReportStorage()
+        self.doctrine_service_v2 = doctrine_service_v2  # Optional integration
         logger.info("SelfRepairEngineV1 initialized")
     
     def run_full_repair_analysis(
