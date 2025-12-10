@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, universe, strategy, decision, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, rule_sim
+from jgod.api.routers import indicators, predictions, universe, strategy, decision, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, rule_sim, s_rank_engine
 
 app = FastAPI(
     title="J-GOD Simulation API",
@@ -48,6 +48,7 @@ app.include_router(doctrine_alert.router, prefix="/api/v1/doctrine", tags=["doct
 app.include_router(self_repair.router, prefix="/api/v1/knowledge/self-repair", tags=["self-repair"])
 app.include_router(doctrine_v2.router, prefix="/api/v2/doctrine", tags=["doctrine-v2"])
 app.include_router(rule_sim.router, prefix="/api/v1/rule-sim", tags=["rule-sim"])
+app.include_router(s_rank_engine.router, prefix="/api/v1/s-rank", tags=["s-rank"])
 
 
 @app.get("/")

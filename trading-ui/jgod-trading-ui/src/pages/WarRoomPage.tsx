@@ -21,6 +21,7 @@ import { TopLongPanel } from '../components/war-room/micro/TopLongPanel';
 import { TopShortPanel } from '../components/war-room/micro/TopShortPanel';
 import { SignalConflictMap } from '../components/war-room/micro/SignalConflictMap';
 import { MicrostructureFactors } from '../components/war-room/micro/MicrostructureFactors';
+import { SRankRankingCard } from '../components/war-room/micro/SRankRankingCard';
 
 // Anomaly Layer Widgets
 import { ErrorReplayPanel } from '../components/war-room/anomaly/ErrorReplayPanel';
@@ -55,6 +56,7 @@ export function WarRoomPage() {
       }
       microLayer={
         <>
+          <SRankRankingCard />
           <TopLongPanel />
           <TopShortPanel />
           <SignalConflictMap />
