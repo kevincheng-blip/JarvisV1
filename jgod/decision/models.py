@@ -65,3 +65,15 @@ class DecisionContext:
     doctrine_hits: List[any] = field(default_factory=list)  # DoctrineHit 類型
     query_string: str = ""
 
+
+@dataclass
+class DecisionContextV2:
+    """Decision Layer V2 決策上下文"""
+    symbol: str
+    raw_scores: Dict[str, float]  # strategy_id -> raw_score
+    s_rank_factors: Optional[Dict[str, float]] = None  # strategy_id -> s_rank_score
+    conflict_summary: Optional[Dict[str, any]] = None  # Conflict scores and consensus
+    doctrine_alerts: List[DoctrineFlag] = field(default_factory=list)  # Doctrine alerts for this symbol
+    risk_metrics: Dict[str, float] = field(default_factory=dict)  # Risk metrics
+    context_tags: List[str] = field(default_factory=list)  # Context tags
+

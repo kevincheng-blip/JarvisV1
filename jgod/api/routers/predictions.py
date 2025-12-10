@@ -197,6 +197,7 @@ async def get_top_n_long(
     date: Optional[str] = Query(None, description="交易日期 (YYYY-MM-DD)，預設為今日"),
     limit: int = Query(30, ge=1, le=200, description="回傳筆數，預設 30，最大 200"),
     sort_by: str = Query("final_score", description="排序欄位: final_score 或 raw_score"),
+    version: str = Query("v2", description="Decision Layer 版本: 'v1' 或 'v2'"),
 ) -> List[TopLongItem]:
     """取得 Top N Long Predictions"""
     
@@ -231,14 +232,15 @@ async def get_top_n_long(
             return []
         
         # 3. 呼叫 Decision Layer
-        config = DecisionConfig()  # 可從設定檔或環境變數讀取
+        config = DecisionConfig() if version == "v1" else None  # v2 不需要 config
         knowledge_brain = get_knowledge_brain()
         
         decision_outputs = generate_final_predictions_for_date(
             trade_date=trade_date,
             raw_items=long_candidates,
             config=config,
-            knowledge_brain=knowledge_brain
+            knowledge_brain=knowledge_brain,
+            version=version,
         )
         
         # 4. 轉換為 TopLongItem
@@ -279,6 +281,7 @@ async def get_top_n_short(
     date: Optional[str] = Query(None, description="交易日期 (YYYY-MM-DD)，預設為今日"),
     limit: int = Query(30, ge=1, le=200, description="回傳筆數，預設 30，最大 200"),
     sort_by: str = Query("final_score", description="排序欄位: final_score 或 raw_score"),
+    version: str = Query("v2", description="Decision Layer 版本: 'v1' 或 'v2'"),
 ) -> List[TopShortItem]:
     """取得 Top N Short Predictions"""
     
@@ -320,14 +323,15 @@ async def get_top_n_short(
             return []
         
         # 3. 呼叫 Decision Layer
-        config = DecisionConfig()
+        config = DecisionConfig() if version == "v1" else None  # v2 不需要 config
         knowledge_brain = get_knowledge_brain()
         
         decision_outputs = generate_final_predictions_for_date(
             trade_date=trade_date,
             raw_items=short_candidates,
             config=config,
-            knowledge_brain=knowledge_brain
+            knowledge_brain=knowledge_brain,
+            version=version,
         )
         
         # 4. 轉換為 TopShortItem

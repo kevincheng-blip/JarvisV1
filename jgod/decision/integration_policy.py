@@ -10,6 +10,7 @@ from datetime import date
 
 from jgod.decision.models import RawScoreItem, DecisionOutput
 from jgod.decision.engine import DecisionEngineV1
+from jgod.decision.engine_unified import DecisionEngineUnified
 from jgod.decision.config import DecisionConfig
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,7 @@ def generate_final_predictions_for_date(
     raw_items: List[RawScoreItem],
     config: Optional[DecisionConfig] = None,
     knowledge_brain=None,
+    version: Literal["v1", "v2"] = "v2",
 ) -> List[DecisionOutput]:
     """為指定日期產生 Final Predictions（整合 Prediction Engine → Decision Layer）
     
@@ -112,8 +114,12 @@ def generate_final_predictions_for_date(
             logger.warning(f"Failed to load KnowledgeBrain: {e}. Continuing without Doctrine.")
             knowledge_brain = None
     
-    # 初始化 Decision Engine
-    engine = DecisionEngineV1(config=config, knowledge_brain=knowledge_brain)
+    # 初始化 Decision Engine (支援 v1/v2)
+    engine = DecisionEngineUnified(
+        version=version,
+        config=config,
+        knowledge_brain=knowledge_brain,
+    )
     
     # 批次處理 Raw Scores
     logger.info(f"Processing {len(raw_items)} raw items for date {trade_date}")

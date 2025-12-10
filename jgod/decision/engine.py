@@ -1,11 +1,12 @@
 """
-Decision Layer v1 - Decision Engine
+Decision Layer v1/v2 - Decision Engine
 
 核心決策引擎，負責 Raw Score → Final Score 轉換
+支援 v1 (LLM-based) 和 v2 (S-Rank weighted) 兩種模式
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from jgod.decision.models import (
     RawScoreItem,
