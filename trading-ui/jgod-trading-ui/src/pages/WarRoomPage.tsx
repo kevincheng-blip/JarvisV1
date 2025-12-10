@@ -28,19 +28,21 @@ import { DoctrineAlertPanel } from '../components/war-room/anomaly/DoctrineAlert
 import { PositionHealthPanel } from '../components/war-room/anomaly/PositionHealthPanel';
 import { SentimentGauge } from '../components/war-room/anomaly/SentimentGauge';
 import { SystemLogStream } from '../components/war-room/anomaly/SystemLogStream';
+import { KnowledgeGovernancePanel } from '../components/war-room/anomaly/KnowledgeGovernancePanel';
 
 export function WarRoomPage() {
   return (
     <WarRoomLayout
-      anomalyLayer={
-        <>
-          <ErrorReplayPanel />
-          <DoctrineAlertPanel />
-          <PositionHealthPanel />
-          <SentimentGauge />
-          <SystemLogStream />
-        </>
-      }
+            anomalyLayer={
+              <>
+                <KnowledgeGovernancePanel />
+                <ErrorReplayPanel />
+                <DoctrineAlertPanel />
+                <PositionHealthPanel />
+                <SentimentGauge />
+                <SystemLogStream />
+              </>
+            }
       macroLayer={
         <>
           <PolicyHealthV2 />
