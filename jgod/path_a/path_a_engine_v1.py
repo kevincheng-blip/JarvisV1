@@ -177,6 +177,13 @@ class PathAEngineV1:
         
         # 初始化 Decision Engine（如果 decision_config 有提供，會傳給 DecisionEngine）
         # DecisionEngineV1 現在支援從 risk_config_dict 載入參數
+        # TODO: 整合 Decision Layer v1/v2 支援
+        # 目前 PathAEngineV1 使用 Decision & Risk Engine v1，它直接從 StrategyEngine 取得信號
+        # 要支援 decision_version，需要：
+        # 1. 在 StrategyEngine 生成信號後，使用 Decision Layer v1/v2 處理 raw_score -> final_score
+        # 2. 然後將 final_score 傳給 Decision & Risk Engine 生成 PortfolioPlan
+        # 目前先保留現有架構，decision_version 參數會被儲存但尚未使用
+        self.decision_version = decision_config.pop("decision_version", "v1")  # Extract and store version
         self.decision_engine = DecisionEngineV1(risk_config_dict=decision_config)
         self.decision_config = decision_config
         

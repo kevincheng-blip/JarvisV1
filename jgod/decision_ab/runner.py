@@ -4,7 +4,8 @@ Core logic for running AB tests comparing RAW_ONLY vs DECISION_ON modes.
 """
 
 import logging
-from datetime import date
+import uuid
+from datetime import date, datetime
 from typing import Dict, Any, Optional
 
 from jgod.decision_ab.models import (
@@ -12,9 +13,11 @@ from jgod.decision_ab.models import (
     DecisionAbResult,
     ArmResult,
     ArmMetrics,
+    DecisionABTestReport,
+    ArmBacktestResult,
 )
 from jgod.decision_ab.aggregator import create_ab_result
-from jgod.decision_ab.storage import AbResultStorage
+from jgod.decision_ab.storage import AbResultStorage, DecisionAbStorageV1
 from jgod.decision.config import DecisionConfig
 from jgod.path_a.path_a_engine_v1 import PathAEngineV1, BacktestResult
 
@@ -224,4 +227,216 @@ class DecisionAbRunnerV1:
         )
         
         return ab_result
+    
+    def _backtest_result_to_arm_backtest_result(
+        self,
+        backtest_result: BacktestResult,
+        version: str,
+    ) -> ArmBacktestResult:
+        """Convert BacktestResult to ArmBacktestResult"""
+        metrics = backtest_result.metrics
+        
+        # Convert equity curve format
+        equity_curve = [
+            {
+                "date": point["date"],
+                "equity": point["equity_value"],
+            }
+            for point in backtest_result.daily_equity_curve
+        ]
+        
+        return ArmBacktestResult(
+            version=version,
+            sharpe_ratio=metrics.sharpe_ratio,
+            max_drawdown=metrics.max_drawdown,
+            total_return=metrics.total_return,
+            volatility=metrics.annualized_volatility,
+            win_rate=metrics.win_rate,
+            turnover=self._calculate_turnover(backtest_result),
+            equity_curve=equity_curve,
+        )
+    
+    def _calculate_turnover(self, backtest_result: BacktestResult) -> float:
+        """Calculate turnover from backtest result"""
+        if backtest_result.initial_capital <= 0:
+            return 0.0
+        
+        total_trade_value = sum(
+            abs(trade.price * trade.shares) for trade in backtest_result.trades
+        )
+        
+        # Annualized turnover
+        trading_days = len(backtest_result.daily_equity_curve)
+        if trading_days == 0:
+            return 0.0
+        
+        # Simple turnover: total trade value / initial capital
+        # Annualized by multiplying by (252 / trading_days)
+        annualization_factor = 252.0 / trading_days if trading_days > 0 else 1.0
+        turnover = (total_trade_value / backtest_result.initial_capital) * annualization_factor
+        
+        return turnover
+    
+    def _calculate_recommendation(
+        self,
+        baseline: ArmBacktestResult,
+        variant: ArmBacktestResult,
+    ) -> str:
+        """
+        計算推薦標籤
+        
+        Logic:
+        - V2_PREFERRED: variant.sharpe >= baseline.sharpe + 0.1 且 variant.max_drawdown <= baseline.max_drawdown
+        - V1_PREFERRED: variant.sharpe <= baseline.sharpe - 0.1
+        - NO_SIGNIFICANT_CHANGE: 其他情況
+        """
+        sharpe_diff = variant.sharpe_ratio - baseline.sharpe_ratio
+        maxdd_diff = variant.max_drawdown - baseline.max_drawdown  # max_drawdown is negative, so diff > 0 means variant is better
+        
+        # V2 明顯優於 V1
+        if sharpe_diff >= 0.1 and maxdd_diff >= 0:  # variant.max_drawdown <= baseline.max_drawdown (風險不惡化)
+            return "V2_PREFERRED"
+        
+        # V1 明顯優於 V2
+        if sharpe_diff <= -0.1:
+            return "V1_PREFERRED"
+        
+        # 無顯著差異
+        return "NO_SIGNIFICANT_CHANGE"
+    
+    def run_decision_v1_vs_v2(
+        self,
+        start_date: date,
+        end_date: date,
+        capital: float,
+        path_a_config_name: str,
+        note: Optional[str] = None,
+    ) -> DecisionABTestReport:
+        """
+        執行 V1 vs V2 的 AB Test 回測
+        
+        Args:
+            start_date: 回測開始日期
+            end_date: 回測結束日期
+            capital: 初始資金
+            path_a_config_name: Path A 配置名稱（用於記錄，實際配置從 decision_config 取得）
+            note: 備註
+        
+        Returns:
+            DecisionABTestReport
+        """
+        experiment_id = str(uuid.uuid4())
+        logger.info(f"Starting V1 vs V2 AB Test: {experiment_id}")
+        
+        # Parse path_a_config_name to extract config params
+        # For now, use default config if path_a_config_name is not a valid dict
+        path_a_config = {
+            "long_budget": 0.8,
+            "short_budget": 0.2,
+            "max_weight_per_symbol": 0.1,
+        }
+        
+        # For V1 vs V2 comparison, we need to integrate Decision Layer v1/v2
+        # Currently PathAEngineV1 uses Decision & Risk Engine v1 directly
+        # We'll need to create a wrapper or modify PathAEngineV1 to support decision_version
+        # For now, we'll use a simplified approach where we pass decision_version in config
+        # and PathAEngineV1 will need to be modified to respect this (future work)
+        
+        # TODO: Integrate Decision Layer v1/v2 selection into PathAEngineV1
+        # For now, we'll create engines with version flags in config
+        
+        # Run baseline (V1)
+        logger.info(f"Running baseline (V1) backtest...")
+        baseline_config = {
+            **path_a_config,
+            "decision_version": "v1",  # Signal to use Decision Layer v1
+        }
+        baseline_engine = PathAEngineV1(
+            initial_capital=capital,
+            **baseline_config
+        )
+        baseline_backtest = baseline_engine.run_backtest(
+            start_date=start_date,
+            end_date=end_date,
+        )
+        baseline_arm = self._backtest_result_to_arm_backtest_result(
+            baseline_backtest,
+            version="v1",
+        )
+        
+        # Run variant (V2)
+        logger.info(f"Running variant (V2) backtest...")
+        variant_config = {
+            **path_a_config,
+            "decision_version": "v2",  # Signal to use Decision Layer v2
+        }
+        variant_engine = PathAEngineV1(
+            initial_capital=capital,
+            **variant_config
+        )
+        variant_backtest = variant_engine.run_backtest(
+            start_date=start_date,
+            end_date=end_date,
+        )
+        variant_arm = self._backtest_result_to_arm_backtest_result(
+            variant_backtest,
+            version="v2",
+        )
+        
+        # Calculate deltas
+        sharpe_delta = variant_arm.sharpe_ratio - baseline_arm.sharpe_ratio
+        max_drawdown_delta = variant_arm.max_drawdown - baseline_arm.max_drawdown
+        return_delta = variant_arm.total_return - baseline_arm.total_return
+        volatility_delta = variant_arm.volatility - baseline_arm.volatility
+        win_rate_delta = variant_arm.win_rate - baseline_arm.win_rate
+        turnover_delta = variant_arm.turnover - baseline_arm.turnover
+        
+        # Calculate recommendation
+        recommendation = self._calculate_recommendation(baseline_arm, variant_arm)
+        
+        # Build config dict
+        config = {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "capital": capital,
+            "path_a_config_name": path_a_config_name,
+        }
+        
+        # Create report
+        report = DecisionABTestReport(
+            experiment_id=experiment_id,
+            created_at=datetime.now(),
+            config=config,
+            baseline=baseline_arm,
+            variant=variant_arm,
+            sharpe_delta=sharpe_delta,
+            max_drawdown_delta=max_drawdown_delta,
+            return_delta=return_delta,
+            volatility_delta=volatility_delta,
+            win_rate_delta=win_rate_delta,
+            turnover_delta=turnover_delta,
+            recommendation=recommendation,
+            notes=note,
+        )
+        
+        # Save to storage (if available)
+        if hasattr(self.storage, 'save_decision_report'):
+            self.storage.save_decision_report(report)
+        else:
+            # Try to save using new storage instance
+            try:
+                from jgod.decision_ab.storage import DecisionAbStorageV1
+                v2_storage = DecisionAbStorageV1()
+                v2_storage.save_decision_report(report)
+            except Exception as e:
+                logger.warning(f"Failed to save V1 vs V2 report: {e}")
+        
+        logger.info(
+            f"V1 vs V2 AB Test completed: {experiment_id} | "
+            f"Sharpe Delta: {sharpe_delta:+.4f}, "
+            f"Return Delta: {return_delta:+.2%}, "
+            f"Recommendation: {recommendation}"
+        )
+        
+        return report
 

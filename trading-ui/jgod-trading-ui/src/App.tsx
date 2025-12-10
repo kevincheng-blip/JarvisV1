@@ -11,8 +11,9 @@ import { DMCReviewPage } from "./pages/DMCReviewPage";
 import { DMCEditPage } from "./pages/DMCEditPage";
 import { RuleSimListPage } from "./pages/RuleSimListPage";
 import { RuleSimDetailPage } from "./pages/RuleSimDetailPage";
+import { DecisionABTestPage } from "./pages/DecisionABTestPage";
 
-type Page = "dashboard" | "war-room" | "dmc" | "dmc-review" | "dmc-edit" | "rule-sim-list" | "rule-sim-detail";
+type Page = "dashboard" | "war-room" | "dmc" | "dmc-review" | "dmc-edit" | "rule-sim-list" | "rule-sim-detail" | "decision-ab-test";
 
 interface DMCRouteState {
   page: "review" | "edit";
@@ -112,6 +113,16 @@ function App() {
           >
             Rule Sim
           </button>
+          <button
+            onClick={() => setCurrentPage("decision-ab-test")}
+            className={`px-4 py-2 rounded ${
+              currentPage === "decision-ab-test"
+                ? "bg-blue-600 text-white"
+                : "text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            Decision AB Test
+          </button>
         </div>
       </nav>
 
@@ -139,6 +150,7 @@ function App() {
           onBack={() => setCurrentPage("rule-sim-list")}
         />
       )}
+      {currentPage === "decision-ab-test" && <DecisionABTestPage />}
     </div>
   );
 }
