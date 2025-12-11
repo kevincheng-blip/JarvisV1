@@ -34,8 +34,8 @@ export function useGovernanceSummary(enabled: boolean = true) {
       return response.data;
     },
     staleTime: 60000, // 1 minute
-    refetchInterval: 60000, // Auto-refetch every minute
-    refetchOnWindowFocus: true,
+    refetchInterval: 60000, // Auto-refetch every 60 seconds
+    refetchOnWindowFocus: false,
     enabled,
   });
 }
@@ -78,6 +78,7 @@ export function useSRankDistributionHistory(
       return response.data;
     },
     staleTime: 300000, // 5 minutes
+    refetchInterval: 180000, // Auto-refetch every 3 minutes (S-Rank data changes less frequently)
     refetchOnWindowFocus: false,
     enabled,
   });

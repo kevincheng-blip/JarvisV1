@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, rule_sim, s_rank_engine, observer
+from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, observer
 
 app = FastAPI(
     title="J-GOD Simulation API",
@@ -47,6 +47,7 @@ app.include_router(signal_conflict.router, prefix="/api/v1/predictions", tags=["
 app.include_router(doctrine_alert.router, prefix="/api/v1/doctrine", tags=["doctrine-alert"])
 app.include_router(self_repair.router, prefix="/api/v1/knowledge/self-repair", tags=["self-repair"])
 app.include_router(doctrine_v2.router, prefix="/api/v2/doctrine", tags=["doctrine-v2"])
+app.include_router(doctrine_patch.router, prefix="/api/v1/doctrine", tags=["doctrine-patch"])
 app.include_router(rule_sim.router, prefix="/api/v1/rule-sim", tags=["rule-sim"])
 app.include_router(s_rank_engine.router, prefix="/api/v1/s-rank", tags=["s-rank"])
 app.include_router(observer.router, prefix="/api/v1/observer", tags=["observer"])
