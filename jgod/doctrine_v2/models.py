@@ -54,3 +54,48 @@ class DoctrineSectionV2:
     severity: Optional[str] = None  # Optional severity from Self-Repair Engine
     metadata: dict = field(default_factory=dict)  # Additional metadata
 
+
+# ============================================================================
+# Doctrine Patch Models
+# ============================================================================
+
+class PatchStatus(str, Enum):
+    """Patch status"""
+    PENDING_SIMULATION = "PENDING_SIMULATION"
+    REJECTED_BY_SIM = "REJECTED_BY_SIM"
+    PENDING_REVIEW = "PENDING_REVIEW"
+    APPROVED = "APPROVED"
+    DEPLOYED = "DEPLOYED"
+    REVERTED = "REVERTED"
+
+
+class RuleSimStatus(str, Enum):
+    """Rule Sim status for patches"""
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+@dataclass
+class DoctrineChangeItem:
+    """代表一個 Doctrine 條文的變更單元"""
+    change_type: str  # "add", "modify", "delete"
+    rule_id: str
+    old_text: Optional[str] = None
+    new_text: Optional[str] = None
+
+
+@dataclass
+class DoctrinePatch:
+    """Doctrine Patch with full lifecycle tracking"""
+    patch_id: str
+    created_at: datetime
+    author_id: str
+    description: str
+    changes: List[DoctrineChangeItem]
+    status: PatchStatus
+    rule_sim_report_id: Optional[str] = None
+    sim_result_status: RuleSimStatus = RuleSimStatus.PENDING
+    deployment_version: Optional[int] = None
+    deployed_at: Optional[datetime] = None
+

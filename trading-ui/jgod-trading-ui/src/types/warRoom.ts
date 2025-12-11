@@ -6,6 +6,17 @@
  */
 
 // ============================================================================
+// Doctrine Flag Types
+// ============================================================================
+
+export type DoctrineFlag = string | {
+  type: string;
+  severity?: 'info' | 'warning' | 'critical';
+  message?: string;
+  rule_id?: string;
+};
+
+// ============================================================================
 // 10.1 Top N Long Predictions
 // ============================================================================
 
@@ -16,7 +27,7 @@ export interface TopLongItem {
   raw_score: number;        // 純量化分數
   win_prob?: number;        // optional，勝率估計
   risk_level?: 'low' | 'mid' | 'high';
-  doctrine_flags: string[]; // ['over_concentration', 'chasing_high', ...]
+  doctrine_flags: string[] | DoctrineFlag[]; // ['over_concentration', 'chasing_high', ...] or DoctrineFlag[]
 }
 
 // ============================================================================
@@ -29,7 +40,7 @@ export interface TopShortItem {
   final_score: number;
   raw_score: number;
   risk_level?: 'low' | 'mid' | 'high';
-  doctrine_flags: DoctrineFlag[]; // Doctrine 風險標籤
+  doctrine_flags: string[] | DoctrineFlag[]; // Doctrine 風險標籤
 }
 
 // ============================================================================

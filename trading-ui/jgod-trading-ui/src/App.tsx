@@ -12,8 +12,9 @@ import { DMCEditPage } from "./pages/DMCEditPage";
 import { RuleSimListPage } from "./pages/RuleSimListPage";
 import { RuleSimDetailPage } from "./pages/RuleSimDetailPage";
 import { DecisionABTestPage } from "./pages/DecisionABTestPage";
+import { WarRoomV2Dashboard } from "./pages/WarRoomV2Dashboard";
 
-type Page = "dashboard" | "war-room" | "dmc" | "dmc-review" | "dmc-edit" | "rule-sim-list" | "rule-sim-detail" | "decision-ab-test";
+type Page = "dashboard" | "war-room" | "war-room-v2" | "dmc" | "dmc-review" | "dmc-edit" | "rule-sim-list" | "rule-sim-detail" | "decision-ab-test";
 
 interface DMCRouteState {
   page: "review" | "edit";
@@ -35,14 +36,14 @@ function App() {
   useEffect(() => {
     const handleNavigate = (e: Event) => {
       const customEvent = e as CustomEvent;
-      const { page, sectionId, versionId, status } = customEvent.detail;
+      const { page, sectionId, versionId, status, patchId } = customEvent.detail;
       if (page === "review") {
         setCurrentPage("dmc-review");
         setDmcRouteState({ page: "review", sectionId, versionId });
       } else if (page === "edit") {
         setCurrentPage("dmc-edit");
         setDmcRouteState({ page: "edit", sectionId });
-      } else if (page === "list") {
+      } else if (page === "list" || page === "patch-list") {
         setCurrentPage("dmc");
         setDmcRouteState(null);
       }
@@ -59,12 +60,33 @@ function App() {
         setRuleSimRouteState(null);
       }
     };
+
+    const handlePatchNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { patchId } = customEvent.detail;
+      if (patchId) {
+        setCurrentPage("dmc");
+        // Could navigate to patch detail page if available
+      }
+    };
+
+    const handleNavigation = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { page } = customEvent.detail;
+      if (page === "decision-ab-test") {
+        setCurrentPage("decision-ab-test");
+      }
+    };
     
     window.addEventListener("dmc:navigate", handleNavigate);
     window.addEventListener("ruleSim:navigate", handleRuleSimNavigate);
+    window.addEventListener("patch:navigate", handlePatchNavigate);
+    window.addEventListener("navigation", handleNavigation);
     return () => {
       window.removeEventListener("dmc:navigate", handleNavigate);
       window.removeEventListener("ruleSim:navigate", handleRuleSimNavigate);
+      window.removeEventListener("patch:navigate", handlePatchNavigate);
+      window.removeEventListener("navigation", handleNavigation);
     };
   }, []);
 
@@ -92,6 +114,16 @@ function App() {
             }`}
           >
             War Room
+          </button>
+          <button
+            onClick={() => setCurrentPage("war-room-v2")}
+            className={`px-4 py-2 rounded ${
+              currentPage === "war-room-v2"
+                ? "bg-blue-600 text-white"
+                : "text-gray-300 hover:bg-gray-700"
+            }`}
+          >
+            War Room V2
           </button>
           <button
             onClick={() => setCurrentPage("dmc")}
@@ -129,6 +161,7 @@ function App() {
       {/* Page Content */}
       {currentPage === "dashboard" && <DashboardPage />}
       {currentPage === "war-room" && <WarRoomPage />}
+      {currentPage === "war-room-v2" && <WarRoomV2Dashboard />}
       {currentPage === "dmc" && <DMCPage />}
       {currentPage === "dmc-review" && dmcRouteState && (
         <DMCReviewPage

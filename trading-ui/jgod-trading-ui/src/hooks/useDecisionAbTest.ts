@@ -57,6 +57,7 @@ export function useRecentDecisionAbReports(limit: number = 20) {
       return response.data;
     },
     staleTime: 60000, // 1 minute
+    refetchInterval: 90000, // Auto-refetch every 90 seconds
     refetchOnWindowFocus: false,
   });
 }
