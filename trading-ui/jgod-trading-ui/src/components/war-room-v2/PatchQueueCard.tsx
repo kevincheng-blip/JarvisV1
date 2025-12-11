@@ -148,8 +148,8 @@ export function PatchQueueCard() {
 
                 <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                   <span>作者: {patch.author_id}</span>
-                  <span className={`font-medium ${getSimStatusColor(patch.sim_status)}`}>
-                    RuleSim: {patch.sim_status}
+                  <span className={`font-medium ${getSimStatusColor(patch.sim_result_status)}`}>
+                    RuleSim: {patch.sim_result_status}
                   </span>
                 </div>
 

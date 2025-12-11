@@ -19,9 +19,9 @@ export type ChangeType = "ADD" | "UPDATE" | "DELETE";
 
 export type DoctrineChangeItem = {
   change_type: ChangeType;
-  section_id: string;
-  old_content?: string | null;
-  new_content?: string | null;
+  rule_id: string;
+  old_text?: string | null;
+  new_text?: string | null;
 };
 
 export type DoctrinePatch = {
@@ -32,7 +32,7 @@ export type DoctrinePatch = {
   changes: DoctrineChangeItem[];
   status: PatchStatus;
   rule_sim_report_id?: string | null;
-  sim_status: RuleSimStatus;
+  sim_result_status: RuleSimStatus;
   deployment_version?: number | null;
   deployed_at?: string | null;
   pre_deployment_version?: number | null;
@@ -48,7 +48,7 @@ export type DoctrinePatchSummary = {
   created_at: string;
   author_id: string;
   description: string;
-  sim_status: RuleSimStatus;
+  sim_result_status: RuleSimStatus;
   rule_sim_report_id?: string | null;
 };
 
