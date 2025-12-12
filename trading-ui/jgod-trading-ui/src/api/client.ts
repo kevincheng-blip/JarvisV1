@@ -185,5 +185,25 @@ export const api = {
       throw error;
     }
   },
+
+  /**
+   * Get prediction stability metrics for a symbol
+   * Returns stability metrics including grade, std, max_delta, trend_slope
+   */
+  getPredictionStability: async (symbol: string, limit: number = 60): Promise<{
+    symbol: string;
+    n_points: number;
+    score_std: number;
+    max_abs_delta: number;
+    trend_slope: number;
+    stability_grade: "NO_DATA" | "STABLE" | "WATCH" | "VOLATILE";
+    thresholds: Record<string, number>;
+  }> => {
+    const response = await client.get(
+      `/api/v1/observer/prediction-stability/${symbol}`,
+      { params: { limit } }
+    );
+    return response.data;
+  },
 };
 

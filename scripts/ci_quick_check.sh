@@ -58,6 +58,17 @@ else
 fi
 echo ""
 
+# Check 5: Prediction stability contract test
+echo "5️⃣  Running prediction stability contract test..."
+pytest tests/test_prediction_stability_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Prediction stability test passed"
+else
+    echo "   ❌ Prediction stability test failed"
+    exit 1
+fi
+echo ""
+
 echo "================================"
 echo "✅ All CI quick checks passed!"
 echo ""

@@ -20,14 +20,25 @@
 v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 ```
 
-### 1.2 目前階段：v0.2.0-war-room-v2
+### 1.2 目前階段：v0.3.0-war-room-v2 (2025-12-13)
 
 **核心功能：**
 - ✅ War Room V2 統一控制中心已實作
 - ✅ Decision Layer V1 和 V2 並存（V2 使用 S-Rank 加權）
 - ✅ Doctrine V2 版本控制系統已實作
 - ✅ War Room V2 Dashboard 前端已實作
+- ✅ 預測時間軸端點（timeline）已實作
+- ✅ 預測穩定性指標（prediction-stability）已實作
+- ✅ 前端 API 客戶端統一（client.ts 單一來源）
+- ✅ 後端編譯通過（agent-loop safe）
 - ⚠️ 部分股票資料不完整（需補齊）
+
+**v0.3.0 新增功能：**
+- 預測時間軸 API：`GET /api/v1/predictions/timeline/{symbol}`
+- 最新預測 API：`GET /api/v1/predictions/latest/{symbol}`
+- 預測穩定性 API：`GET /api/v1/observer/prediction-stability/{symbol}`
+- War Room V2 預測穩定性卡片
+- CI 快速檢查腳本（`scripts/ci_quick_check.sh`）
 
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）

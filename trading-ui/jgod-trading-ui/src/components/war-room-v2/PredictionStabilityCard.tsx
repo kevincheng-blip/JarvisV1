@@ -7,9 +7,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+import { api } from "../../api/client";
 
 interface PredictionStabilityData {
   symbol: string;
@@ -32,11 +30,7 @@ function usePredictionStability(symbol: string | null, enabled: boolean = true) 
     queryKey: ["predictionStability", symbol],
     queryFn: async () => {
       if (!symbol) throw new Error("Symbol is required");
-      const response = await axios.get<PredictionStabilityData>(
-        `${API_BASE_URL}/api/v1/observer/prediction-stability/${symbol}`,
-        { params: { limit: 60 } }
-      );
-      return response.data;
+      return await api.getPredictionStability(symbol, 60);
     },
     enabled: enabled && !!symbol,
     staleTime: 60000, // 1 minute

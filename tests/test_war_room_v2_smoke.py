@@ -41,6 +41,40 @@ def test_observer_s_rank_distribution_ok():
     assert data is not None
 
 
+def test_predictions_latest_ok():
+    """測試 Predictions Latest API 能正常回應（允許 404 或 200）"""
+    response = client.get("/api/v1/predictions/latest/2330")
+    # Should be 200 (even if no data, should return 200 with null/empty)
+    # Or 404 is acceptable if symbol doesn't exist, but prefer 200
+    assert response.status_code in [200, 404], f"Expected 200 or 404, got {response.status_code}: {response.text}"
+    if response.status_code == 200:
+        data = response.json()
+        assert isinstance(data, dict), "Response should be a dictionary"
+
+
+def test_predictions_timeline_ok():
+    """測試 Predictions Timeline API 能正常回應（允許空 items）"""
+    response = client.get("/api/v1/predictions/timeline/2330?limit=5")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "items" in data, "Response should have 'items' field"
+    assert isinstance(data["items"], list), "items should be a list"
+
+
+def test_observer_prediction_stability_ok():
+    """測試 Observer Prediction Stability API 能正常回應（允許 NO_DATA）"""
+    response = client.get("/api/v1/observer/prediction-stability/2330?limit=5")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "stability_grade" in data, "Response should have 'stability_grade' field"
+    assert data["stability_grade"] in ["NO_DATA", "STABLE", "WATCH", "VOLATILE"], \
+        f"stability_grade should be valid, got {data['stability_grade']}"
+
+
 def test_doctrine_patches_queue_ok():
     """測試 Doctrine Patches Queue API 能正常回應"""
     response = client.get("/api/v1/doctrine/patches/queue")
