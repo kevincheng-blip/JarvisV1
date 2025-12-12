@@ -8,10 +8,10 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-jgod.council_chamber.providers import ProviderManager
-jgod.council_chamber_v6.core.engine_v6 import WarRoomEngineV6
-jgod.council_chamber_backend_v6.websocket_manager import WebSocketManager
-jgod.council_chamber_backend_v6.routers.war_room_ws import (
+from jgod.council_chamber.providers import ProviderManager
+from jgod.council_chamber_v6.core.engine_v6 import WarRoomEngineV6
+from jgod.council_chamber_backend_v6.websocket_manager import WebSocketManager
+from jgod.council_chamber_backend_v6.routers.war_room_ws import (
     router,
     set_websocket_manager,
     set_engine,

@@ -5,7 +5,7 @@ Decision Layer v1 - Integration Functions
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import date
 
 from jgod.decision.models import RawScoreItem, DecisionOutput

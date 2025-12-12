@@ -9,14 +9,14 @@ from typing import Dict, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Query, Request
 from pydantic import BaseModel
 
-jgod.council_chamber_v6.core.engine_v6 import (
+from jgod.council_chamber_v6.core.engine_v6 import (
     WarRoomEngineV6,
     WarRoomRequest,
     WarRoomEvent,
 )
-jgod.council_chamber.providers import ProviderManager
-jgod.council_chamber_backend_v6.websocket_manager import WebSocketManager
-jgod.council_chamber_backend.auth import (
+from jgod.council_chamber.providers import ProviderManager
+from jgod.council_chamber_backend_v6.websocket_manager import WebSocketManager
+from jgod.council_chamber_backend.auth import (
     require_api_key_header,
     require_api_key_websocket,
     check_http_rate_limit,

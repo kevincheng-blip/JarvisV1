@@ -275,7 +275,8 @@ with tab1:
                     logger.error("role_results is empty! This should not happen.")
                     st.error("❌ 幕僚會議室執行失敗：沒有取得任何結果")
                     st.session_state["war_room_loading"] = False
-                    return
+                    # Early exit: stop execution here
+                    st.stop()
                 
                 # 執行 Strategist 總結
                 strategist_result = asyncio.run(

@@ -5,7 +5,7 @@ Manages Doctrine section versions in filesystem structure.
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 import json
 
 logger = logging.getLogger(__name__)

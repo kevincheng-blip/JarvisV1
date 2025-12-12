@@ -4,7 +4,7 @@ Implements Final Score v2 calculation with S-Rank weighting, conflict adjustment
 """
 
 import logging
-from typing import Optional, Dict
+from typing import List, Optional, Dict
 
 from jgod.decision.models import DecisionContextV2, DoctrineFlag
 

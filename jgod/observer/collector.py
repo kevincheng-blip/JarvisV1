@@ -252,7 +252,7 @@ class KnowledgeDataCollector:
                     all_alerts = self.alert_engine.scan_all()
                     summary.critical_alerts_active = sum(
                         1 for alert in all_alerts
-                        if alert.severity.value == "CRITICAL" if hasattr(alert.severity, "value") else str(alert.severity) == "CRITICAL"
+                        if (alert.severity.value == "CRITICAL" if hasattr(alert.severity, "value") else str(alert.severity) == "CRITICAL")
                     )
                 else:
                     logger.debug("scan_all not available, skipping critical_alerts_active")

@@ -6,8 +6,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-jgod.council_chamber_backend.config import API_HOST, API_PORT, LOG_LEVEL
-jgod.council_chamber_backend.routers import war_room
+from jgod.council_chamber_backend.config import API_HOST, API_PORT, LOG_LEVEL
+from jgod.council_chamber_backend.routers import war_room
 
 # 設定 logging
 logging.basicConfig(

@@ -120,35 +120,35 @@ class RolePanel:
                         # 顯示「正在輸入...」動畫
                         st.caption("💬 正在輸入...")
             elif result:
-            if result.success:
-                # 成功：顯示內容（優先顯示 streaming 內容）
-                content = streaming_content or result.content
-                
-                if result.execution_time > 0:
-                    st.caption(f"⏱️ 執行時間: {result.execution_time:.2f} 秒")
-                
-                # 使用 markdown 顯示內容，支援更好的格式
-                # 聊天室風格：使用訊息框
-                if content:
-                    # 使用 HTML 實現聊天室風格
-                    message_html = f"""
-                    <div style="
-                        background: #f8f9fa;
-                        border-left: 4px solid #007bff;
-                        padding: 12px 16px;
-                        margin: 8px 0;
-                        border-radius: 8px;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                        line-height: 1.6;
-                    ">
-                        <div style="color: #333;">
-                            {content.replace(chr(10), '<br>')}
+                if result.success:
+                    # 成功：顯示內容（優先顯示 streaming 內容）
+                    content = streaming_content or result.content
+                    
+                    if result.execution_time > 0:
+                        st.caption(f"⏱️ 執行時間: {result.execution_time:.2f} 秒")
+                    
+                    # 使用 markdown 顯示內容，支援更好的格式
+                    # 聊天室風格：使用訊息框
+                    if content:
+                        # 使用 HTML 實現聊天室風格
+                        message_html = f"""
+                        <div style="
+                            background: #f8f9fa;
+                            border-left: 4px solid #007bff;
+                            padding: 12px 16px;
+                            margin: 8px 0;
+                            border-radius: 8px;
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                            line-height: 1.6;
+                        ">
+                            <div style="color: #333;">
+                                {content.replace(chr(10), '<br>')}
+                            </div>
                         </div>
-                    </div>
-                    """
-                    st.markdown(message_html, unsafe_allow_html=True)
-                else:
-                    st.markdown(content)
+                        """
+                        st.markdown(message_html, unsafe_allow_html=True)
+                    else:
+                        st.markdown(content)
                 else:
                     # 失敗：使用 ErrorHandler 解析錯誤
                     error_info = self.error_handler.parse_error(result.error or "未知錯誤", provider_name)

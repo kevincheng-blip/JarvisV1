@@ -32,8 +32,8 @@ class PositionRow:
 class PredictionRow:
     """Prediction row data structure"""
     symbol: str
-    name: Optional[str] = None
     date: date
+    name: Optional[str] = None
     raw_score: Optional[float] = None
     final_score: Optional[float] = None
     signal: Optional[str] = None
