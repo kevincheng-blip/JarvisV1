@@ -113,22 +113,12 @@ export function PredictionTimelinePanel({
           endDate,
         });
         setData(result);
-        // If result is empty, don't treat it as an error
-        if (result && (!result.points || result.points.length === 0)) {
-          setError(null); // Clear any previous errors
-        }
+        setError(null); // Clear any previous errors
       } catch (err: any) {
-        // Only show error for real failures (4xx/5xx), not empty results
-        if (err.response?.status >= 400 && err.response?.status < 500) {
-          // 4xx errors: show friendly empty state message
-          setError(null);
-          setData({ symbol, startDate, endDate, points: [] });
-        } else {
-          // 5xx or network errors: show actual error
-          const errorMessage = err instanceof Error ? err.message : "載入預測資料失敗";
-          setError(errorMessage);
-          console.error("Error loading prediction timeline:", err);
-        }
+        // Only show error for 5xx or network errors (404 already handled in api.getPredictionTimeline)
+        const errorMessage = err instanceof Error ? err.message : "載入預測資料失敗";
+        setError(errorMessage);
+        console.error("Error loading prediction timeline:", err);
       } finally {
         setLoading(false);
       }

@@ -60,12 +60,17 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
       setError(null);
       try {
         const result = await api.getLatestPrediction(symbol);
-        setData(result);
+        if (result === null) {
+          // 404 handled gracefully - show empty state
+          setData(null);
+          setError(null);
+        } else {
+          setData(result);
+          setError(null);
+        }
       } catch (err: any) {
-        const errorMessage =
-          err.response?.status === 404
-            ? `No prediction found for ${symbol}`
-            : err.message || "載入最新預測失敗";
+        // Only show error for 5xx or network errors
+        const errorMessage = err.message || "載入最新預測失敗";
         setError(errorMessage);
         console.error("Error loading latest prediction:", err);
       } finally {
@@ -117,7 +122,7 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
       >
         <h3>J-GOD Signal – {symbol}</h3>
         <div style={{ marginTop: "8px", color: "#666" }}>
-          目前沒有預測資料
+          No latest prediction data
         </div>
       </div>
     );

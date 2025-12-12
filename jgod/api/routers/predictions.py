@@ -374,3 +374,191 @@ async def get_top_n_short(
     except Exception as e:
         logger.error(f"Error in get_top_n_short: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get(
+    "/v1/predictions/latest/{symbol}",
+    summary="Get Latest Prediction for Symbol",
+    description="取得指定股票代號的最新預測結果（包含 raw_score 和 final_score）"
+)
+async def get_latest_prediction(
+    symbol: str,
+    version: str = Query("v2", description="Decision Layer 版本: 'v1' 或 'v2'"),
+) -> dict:
+    """取得指定股票代號的最新預測結果"""
+    
+    # 取得資料庫連線
+    db = None
+    try:
+        db_gen = get_db()
+        if db_gen:
+            db = next(db_gen)
+    except Exception as e:
+        logger.debug(f"Could not get database session: {e}")
+        db = None
+    
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from jgod.storage.models import PredictionSnapshot, Stock
+        
+        # 查詢該 symbol 的最新預測（按 date desc, created_at desc）
+        latest_pred = db.query(PredictionSnapshot).filter(
+            PredictionSnapshot.symbol == symbol
+        ).order_by(
+            PredictionSnapshot.date.desc(),
+            PredictionSnapshot.created_at.desc()
+        ).first()
+        
+        if not latest_pred:
+            raise HTTPException(status_code=404, detail=f"No prediction found for symbol {symbol}")
+        
+        # 取得股票名稱
+        stock = db.query(Stock).filter(Stock.symbol == symbol).first()
+        stock_name = ""
+        if stock:
+            stock_name = getattr(stock, 'name_zh', None) or getattr(stock, 'name_en', None) or stock.symbol
+        
+        # 取得 raw_score
+        raw_score = latest_pred.score if hasattr(latest_pred, 'score') and latest_pred.score is not None else (latest_pred.total_score or 0.0)
+        
+        # 如果需要 final_score，呼叫 Decision Layer
+        final_score = raw_score
+        doctrine_flags = []
+        adjustment_reason = None
+        
+        try:
+            # 建立 RawScoreItem
+            raw_item = RawScoreItem(
+                symbol=symbol,
+                name=stock_name,
+                date=latest_pred.date,
+                raw_score=float(raw_score),
+                strategy_scores={},
+                risk_metrics={},
+                context_tags=[]
+            )
+            
+            # 呼叫 Decision Layer
+            config = DecisionConfig() if version == "v1" else None
+            knowledge_brain = get_knowledge_brain()
+            
+            decision_outputs = generate_final_predictions_for_date(
+                trade_date=latest_pred.date,
+                raw_items=[raw_item],
+                config=config,
+                knowledge_brain=knowledge_brain,
+                version=version,
+            )
+            
+            if decision_outputs:
+                output = decision_outputs[0]
+                final_score = output.final_score
+                doctrine_flags = [
+                    {
+                        "code": flag.code,
+                        "severity": flag.severity,
+                        "message": flag.message,
+                        "doctrine_refs": flag.doctrine_refs
+                    }
+                    for flag in output.doctrine_flags
+                ]
+                adjustment_reason = output.adjustment_reason
+        except Exception as e:
+            logger.warning(f"Error calling Decision Layer for {symbol}: {e}. Using raw_score as final_score.")
+        
+        # 判斷 risk_level
+        risk_level = None
+        if doctrine_flags:
+            severities = [f.get("severity", "") for f in doctrine_flags]
+            if "critical" in severities:
+                risk_level = "high"
+            elif "warning" in severities:
+                risk_level = "mid"
+            else:
+                risk_level = "low"
+        
+        return {
+            "symbol": symbol,
+            "name": stock_name,
+            "date": latest_pred.date.isoformat(),
+            "raw_score": raw_score,
+            "final_score": final_score,
+            "signal": latest_pred.signal or latest_pred.verdict or None,
+            "risk_level": risk_level,
+            "doctrine_flags": doctrine_flags,
+            "adjustment_reason": adjustment_reason,
+            "version": version
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_latest_prediction: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get(
+    "/v1/predictions/timeline/{symbol}",
+    summary="Get Prediction Timeline for Symbol",
+    description="取得指定股票代號的預測時間軸（歷史預測記錄）"
+)
+async def get_prediction_timeline(
+    symbol: str,
+    limit: int = Query(60, ge=1, le=200, description="Maximum number of items to return"),
+) -> dict:
+    """取得指定股票代號的預測時間軸"""
+    
+    # 取得資料庫連線
+    db = None
+    try:
+        db_gen = get_db()
+        if db_gen:
+            db = next(db_gen)
+    except Exception as e:
+        logger.debug(f"Could not get database session: {e}")
+        db = None
+    
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        from jgod.storage.models import PredictionSnapshot
+        
+        # 查詢該 symbol 的預測記錄（按 date desc）
+        predictions = db.query(PredictionSnapshot).filter(
+            PredictionSnapshot.symbol == symbol
+        ).order_by(
+            PredictionSnapshot.date.desc()
+        ).limit(limit).all()
+        
+        # 轉換為 timeline items
+        items = []
+        for pred in predictions:
+            raw_score = pred.score if hasattr(pred, 'score') and pred.score is not None else (pred.total_score or 0.0)
+            signal = pred.signal or pred.verdict or "UNKNOWN"
+            
+            items.append({
+                "date": pred.date.isoformat(),
+                "raw_score": float(raw_score),
+                "final_score": float(raw_score),  # Default to raw_score, can be enhanced with Decision Layer later
+                "signal": signal,
+            })
+        
+        # 計算日期範圍
+        start_date = items[-1]["date"] if items else ""
+        end_date = items[0]["date"] if items else ""
+        
+        return {
+            "symbol": symbol,
+            "start_date": start_date,
+            "end_date": end_date,
+            "items": items,
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_prediction_timeline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

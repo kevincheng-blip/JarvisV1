@@ -5,27 +5,9 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import type { TopLongItem, TopShortItem } from "../../types/warRoom";
 import type { DecisionContextV2 } from "../../types/warRoomV2";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Dev-only: Log request URLs
-if (import.meta.env.DEV) {
-  apiClient.interceptors.request.use((config) => {
-    const fullUrl = `${config.baseURL}${config.url}`;
-    console.debug(`[API] ${config.method?.toUpperCase()} ${fullUrl}`, config.params || {});
-    return config;
-  });
-}
+import { apiClient } from "../../api/client";
 
 /**
  * Fetch top N long predictions

@@ -107,8 +107,8 @@ export const api = {
   },
 
   /**
-   * Get prediction timeline for a specific symbol within a date range
-   * Note: Endpoint doesn't exist yet, returns empty timeline gracefully
+   * Get prediction timeline for a specific symbol
+   * Returns empty timeline on 404 (no data), throws on 5xx/network errors
    */
   getPredictionTimeline: async (params: {
     symbol: string;
@@ -116,38 +116,74 @@ export const api = {
     endDate: string;   // YYYY-MM-DD
   }): Promise<PredictionTimelineResponse> => {
     try {
-      // TODO: Implement timeline endpoint in backend
-      // For now, return empty timeline to prevent 404 errors
+      const response = await client.get<{
+        symbol: string;
+        start_date: string;
+        end_date: string;
+        items: Array<{
+          date: string;
+          raw_score: number;
+          final_score: number;
+          signal: string;
+        }>;
+      }>(
+        `/api/v1/predictions/timeline/${params.symbol}`,
+        {
+          params: {
+            limit: 60, // Default limit
+          },
+        }
+      );
+      
+      // Transform backend response to frontend format
       return {
-        symbol: params.symbol,
-        startDate: params.startDate,
-        endDate: params.endDate,
-        points: [],
+        symbol: response.data.symbol,
+        start_date: response.data.start_date || params.startDate,
+        end_date: response.data.end_date || params.endDate,
+        points: response.data.items.map((item) => ({
+          date: item.date,
+          score: item.final_score || item.raw_score,
+          signal: item.signal,
+        })),
       };
     } catch (error: any) {
-      // Return empty timeline for any error (empty state, not error)
-      return {
-        symbol: params.symbol,
-        startDate: params.startDate,
-        endDate: params.endDate,
-        points: [],
-      };
+      // 404: return empty timeline (empty state, not error)
+      if (error.response?.status === 404) {
+        return {
+          symbol: params.symbol,
+          start_date: params.startDate,
+          end_date: params.endDate,
+          points: [],
+        };
+      }
+      // 5xx or network errors: throw (show error state)
+      throw error;
     }
   },
 
   /**
    * Get latest prediction for a specific symbol
+   * Returns null on 404 (no data), throws on 5xx/network errors
    */
-  getLatestPrediction: async (symbol: string, date?: string): Promise<LatestPrediction> => {
-    const params: any = {};
-    if (date) {
-      params.date = date;
+  getLatestPrediction: async (symbol: string, date?: string): Promise<LatestPrediction | null> => {
+    try {
+      const params: any = {};
+      if (date) {
+        params.date = date;
+      }
+      const response = await client.get<LatestPrediction>(
+        `/api/v1/predictions/latest/${symbol}`,
+        { params }
+      );
+      return response.data;
+    } catch (error: any) {
+      // 404: return null (empty state, not error)
+      if (error.response?.status === 404) {
+        return null;
+      }
+      // 5xx or network errors: throw (show error state)
+      throw error;
     }
-    const response = await client.get<LatestPrediction>(
-      `/api/v1/predictions/latest/${symbol}`,
-      { params }
-    );
-    return response.data;
   },
 };
 
