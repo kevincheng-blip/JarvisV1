@@ -115,3 +115,74 @@ async def get_s_rank_distribution_history(
         logger.error(f"Error getting S-Rank distribution history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+
+@router.get(
+    "/prediction-stability/{symbol}",
+    summary="Get prediction stability metrics for symbol",
+    description="取得指定股票代號的預測穩定性指標，包含標準差、最大日間變化、趨勢斜率與穩定性等級。",
+)
+async def get_prediction_stability(
+    symbol: str,
+    limit: int = Query(60, ge=1, le=200, description="Maximum number of timeline points to analyze"),
+) -> dict:
+    """Get prediction stability metrics for a symbol"""
+    try:
+        from jgod.storage.models import PredictionSnapshot
+        from jgod.observer.prediction_stability import compute_stability_metrics
+        
+        # Get database connection (same pattern as predictions router)
+        try:
+            from jgod.api.dependencies import get_db
+        except ImportError:
+            try:
+                from jgod.storage.db import get_session as get_db
+            except ImportError:
+                raise HTTPException(status_code=503, detail="Database not available")
+        
+        db = None
+        try:
+            db_gen = get_db()
+            if db_gen:
+                db = next(db_gen)
+        except Exception as e:
+            logger.debug(f"Could not get database session: {e}")
+            db = None
+        
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database not available")
+        
+        # Query prediction timeline (same as /api/v1/predictions/timeline/{symbol})
+        predictions = db.query(PredictionSnapshot).filter(
+            PredictionSnapshot.symbol == symbol
+        ).order_by(
+            PredictionSnapshot.date.desc()
+        ).limit(limit).all()
+        
+        # Convert to timeline items format
+        items = []
+        for pred in predictions:
+            raw_score = pred.score if hasattr(pred, 'score') and pred.score is not None else (pred.total_score or 0.0)
+            items.append({
+                "date": pred.date.isoformat(),
+                "final_score": float(raw_score),  # Using raw_score as final_score for now
+            })
+        
+        # Compute stability metrics
+        metrics = compute_stability_metrics(items)
+        
+        return {
+            "symbol": symbol,
+            "n_points": metrics["n_points"],
+            "score_std": metrics["score_std"],
+            "max_abs_delta": metrics["max_abs_delta"],
+            "trend_slope": metrics["trend_slope"],
+            "stability_grade": metrics["stability_grade"],
+            "thresholds": metrics["thresholds"],
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error computing prediction stability for {symbol}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
