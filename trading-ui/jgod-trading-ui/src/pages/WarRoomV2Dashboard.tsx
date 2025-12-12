@@ -17,6 +17,8 @@ import { SRankTrendCard } from "../components/war-room-v2/SRankTrendCard";
 import { PatchQueueCard } from "../components/war-room-v2/PatchQueueCard";
 import { AbTestSummaryCard } from "../components/war-room-v2/AbTestSummaryCard";
 import { PredictionStabilityCard } from "../components/war-room-v2/PredictionStabilityCard";
+import { SRankRecommendationCard } from "../components/war-room-v2/SRankRecommendationCard";
+import { DecisionV3Card } from "../components/war-room-v2/DecisionV3Card";
 import { useFinalScoreV2 } from "../hooks/war-room/usePredictions";
 import type { TopLongItem, TopShortItem } from "../types/warRoom";
 
@@ -251,6 +253,8 @@ export function WarRoomV2Dashboard() {
           <div className="space-y-6">
             <SRankTrendCard />
             <PredictionStabilityCard symbol={selectedSymbol || "2330"} />
+            <SRankRecommendationCard symbol={selectedSymbol || "2330"} />
+            <DecisionV3Card symbol={selectedSymbol || "2330"} />
             <PatchQueueCard />
             <AbTestSummaryCard />
           </div>

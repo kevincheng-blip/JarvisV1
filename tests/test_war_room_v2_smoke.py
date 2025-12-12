@@ -75,6 +75,85 @@ def test_observer_prediction_stability_ok():
         f"stability_grade should be valid, got {data['stability_grade']}"
 
 
+def test_doctrine_patch_queue_health_check():
+    """測試 Doctrine Patch Queue API 健康檢查（允許空陣列）"""
+    response = client.get("/api/v1/doctrine/patches/queue")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, list), "Response should be a list"
+
+
+def test_s_rank_v2_recommendation_health_check():
+    """測試 S-Rank V2 Recommendation API 健康檢查（允許 items empty）"""
+    response = client.get("/api/v1/s-rank-v2/recommendation/2330?limit=60&k=5")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "metrics" in data, "Response should have 'metrics' field"
+    assert "items" in data, "Response should have 'items' field"
+    assert isinstance(data["items"], list), "items should be a list"
+
+
+def test_strategy_perf_latest_health_check():
+    """測試 Strategy Performance Latest API 健康檢查（允許 items empty）"""
+    response = client.get("/api/v1/strategy-perf/latest/2330")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "items" in data, "Response should have 'items' field"
+    assert isinstance(data["items"], list), "items should be a list"
+
+
+def test_s_rank_v2_recommendation_performance_mode_health_check():
+    """測試 S-Rank V2 Recommendation API (mode=performance) 健康檢查"""
+    response = client.get("/api/v1/s-rank-v2/recommendation/2330?mode=performance&limit=60&k=5")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "items" in data, "Response should have 'items' field"
+    assert isinstance(data["items"], list), "items should be a list"
+
+
+def test_decision_v3_health_check():
+    """測試 Decision V3 API 健康檢查（允許 NO_DATA）"""
+    response = client.get("/api/v1/decision-v3/decide/2330?mode=performance&limit=60&k=5")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "risk_plan" in data, "Response should have 'risk_plan' field"
+    assert "confidence" in data, "Response should have 'confidence' field"
+    assert "explain" in data, "Response should have 'explain' field"
+    assert isinstance(data["risk_plan"], dict), "risk_plan should be a dictionary"
+    assert "risk_state" in data["risk_plan"], "risk_plan should have 'risk_state' field"
+    assert "position_scale" in data["risk_plan"], "risk_plan should have 'position_scale' field"
+
+
+def test_decision_v3_latest_health_check():
+    """測試 Decision V3 Latest API 健康檢查（允許 NO_DATA）"""
+    response = client.get("/api/v1/decision-v3/latest/2330")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "result" in data, "Response should have 'result' field"
+    assert isinstance(data["result"], dict), "result should be a dictionary"
+
+
+def test_decision_v3_recompute_health_check():
+    """測試 Decision V3 Recompute API 健康檢查"""
+    response = client.post("/api/v1/decision-v3/recompute/2330?mode=performance&limit=60&k=5")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "snapshot_id" in data, "Response should have 'snapshot_id' field"
+    assert "result" in data, "Response should have 'result' field"
+    assert isinstance(data["result"], dict), "result should be a dictionary"
+
+
 def test_doctrine_patches_queue_ok():
     """測試 Doctrine Patches Queue API 能正常回應"""
     response = client.get("/api/v1/doctrine/patches/queue")

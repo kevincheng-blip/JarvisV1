@@ -88,6 +88,28 @@ class RevertPatchResponse(BaseModel):
     message: Optional[str] = None
 
 
+class ApprovePatchRequest(BaseModel):
+    """Request body for approve endpoint"""
+    reviewer_id: str
+    comment: Optional[str] = None
+
+
+class RejectPatchRequest(BaseModel):
+    """Request body for reject endpoint"""
+    reviewer_id: str
+    comment: Optional[str] = None
+
+
+class DeployPatchRequest(BaseModel):
+    """Request body for deploy endpoint"""
+    operator_id: str
+
+
+class RevertPatchRequest(BaseModel):
+    """Request body for revert endpoint"""
+    operator_id: str
+
+
 # Mapping functions from DoctrinePatch → Schema
 
 def patch_to_schema(patch: DoctrinePatch) -> DoctrinePatchSchema:

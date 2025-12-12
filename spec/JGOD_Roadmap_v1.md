@@ -20,7 +20,7 @@
 v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 ```
 
-### 1.2 目前階段：v0.3.0-war-room-v2 (2025-12-13)
+### 1.2 目前階段：v0.4.0 (2025-12-13)
 
 **核心功能：**
 - ✅ War Room V2 統一控制中心已實作
@@ -29,8 +29,10 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - ✅ War Room V2 Dashboard 前端已實作
 - ✅ 預測時間軸端點（timeline）已實作
 - ✅ 預測穩定性指標（prediction-stability）已實作
-- ✅ 前端 API 客戶端統一（client.ts 單一來源）
+- ✅ 前端 API 客戶端 100% 統一（所有 hooks 使用 client.ts）
 - ✅ 後端編譯通過（agent-loop safe）
+- ✅ Patch lifecycle E2E 完整支援（create → run-sim → approve → deploy → revert）
+- ✅ War Room V2 Patch 快速處置 UI（Run Sim / Approve / Reject / Deploy / Revert）
 - ⚠️ 部分股票資料不完整（需補齊）
 
 **v0.3.0 新增功能：**
@@ -40,10 +42,39 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - War Room V2 預測穩定性卡片
 - CI 快速檢查腳本（`scripts/ci_quick_check.sh`）
 
+**v0.4.0 新增功能：**
+- Patch lifecycle API 完整支援（Body 參數統一）
+- Patch E2E 合約測試（`tests/test_doctrine_patch_lifecycle_e2e.py`）
+- War Room V2 Patch 快速處置按鈕（狀態感知）
+- 治理瓶頸計算更新（pending_review + pending_simulation）
+- 前端 hooks 100% 遷移至統一 API 客戶端
+
+**v0.5.0-B1 新增功能：**
+- S-Rank Engine V2 推薦系統（rule-based，可擴充）
+- 策略推薦 API：`GET /api/v1/s-rank-v2/recommendation/{symbol}`
+- JSONL 儲存快照（`data/s_rank_v2/recommendations.jsonl`）
+- War Room V2 S-Rank Recommendation Card
+
+**v0.5.1-B2 新增功能：**
+- Strategy Performance Feed（deterministic evaluator，純 Python）
+- 績效驅動推薦模式（mode=performance，預設）
+- 績效指標：sharpe_proxy, max_drawdown_proxy, turnover_proxy, decay_slope
+- 績效 API：`GET /api/v1/strategy-perf/latest/{symbol}`, `POST /api/v1/strategy-perf/recompute/{symbol}`
+- War Room V2 S-Rank Recommendation Card 升級（顯示績效指標 + Recompute Perf 按鈕）
+
+**v0.6.0-A1 新增功能：**
+- Decision Engine V3（Rule-based × S-Rank V2 × Performance Feed）
+- 決策 API：`GET /api/v1/decision-v3/decide/{symbol}?mode=performance`
+- 風險管理：自動計算 position_scale 與 risk_state（RISK_ON / CAUTION / RISK_OFF）
+- 決策信心度：基於穩定性與策略權重計算 confidence（0.0 ~ 1.0）
+- 決策說明：自動生成繁中決策摘要
+- War Room V2 DecisionV3Card（顯示主要策略、風險狀態、信心度、決策理由）
+
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）
 - 資料完整性待補齊
 - 部分 Path 引擎未完成
+- Patch 操作者 ID 目前硬編碼（未來需整合認證）
 
 ---
 

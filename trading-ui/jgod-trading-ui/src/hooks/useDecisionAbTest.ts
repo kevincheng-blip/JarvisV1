@@ -5,21 +5,12 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import { apiClient } from "../api/client";
 import type {
   DecisionABTestReport,
   DecisionABTestReportSummary,
   DecisionComparisonRequest,
 } from "../types/decisionAb";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
 
 /**
  * Mutation: Run Decision V1 vs V2 AB Test

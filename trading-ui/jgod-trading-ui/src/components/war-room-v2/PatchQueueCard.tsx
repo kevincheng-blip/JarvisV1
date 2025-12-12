@@ -6,7 +6,15 @@
  * 顯示待審核的 Patches
  */
 
-import { usePatchQueue } from "../../hooks/useDoctrinePatches";
+import { useState } from "react";
+import {
+  usePatchQueue,
+  useRunRuleSim,
+  useApprovePatch,
+  useRejectPatch,
+  useDeployPatch,
+  useRevertPatch,
+} from "../../hooks/useDoctrinePatches";
 import type { PatchStatus } from "../../types/doctrinePatch";
 
 // Helper function to format relative time
@@ -30,7 +38,14 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export function PatchQueueCard() {
-  const { data: patches, isLoading, isError, error } = usePatchQueue();
+  const { data: patches, isLoading, isError, error, refetch } = usePatchQueue();
+  const runSim = useRunRuleSim();
+  const approvePatch = useApprovePatch();
+  const rejectPatch = useRejectPatch();
+  const deployPatch = useDeployPatch();
+  const revertPatch = useRevertPatch();
+  
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Filter for pending/active patches
   const activeStatuses: PatchStatus[] = ["PENDING_SIMULATION", "PENDING_REVIEW", "APPROVED"];
@@ -80,6 +95,86 @@ export function PatchQueueCard() {
     }));
   };
 
+  const handleAction = async (
+    action: "run-sim" | "approve" | "reject" | "deploy" | "revert",
+    patchId: string,
+    patchStatus: PatchStatus,
+    simResultStatus: string
+  ) => {
+    setActionMessage(null);
+    
+    try {
+      const operatorId = "war-room-user"; // In real app, get from auth context
+      
+      if (action === "run-sim") {
+        if (patchStatus !== "PENDING_SIMULATION") {
+          setActionMessage({ type: "error", text: "只能對 PENDING_SIMULATION 狀態執行 Run Sim" });
+          return;
+        }
+        await runSim.mutateAsync(patchId);
+        setActionMessage({ type: "success", text: "Rule Sim 執行成功" });
+      } else if (action === "approve") {
+        if (patchStatus !== "PENDING_REVIEW" || simResultStatus !== "APPROVED") {
+          setActionMessage({ type: "error", text: "只能審核 PENDING_REVIEW 且 Sim APPROVED 的 Patch" });
+          return;
+        }
+        await approvePatch.mutateAsync({
+          patchId,
+          request: { reviewer_id: operatorId },
+        });
+        setActionMessage({ type: "success", text: "Patch 審核通過" });
+      } else if (action === "reject") {
+        if (patchStatus === "DEPLOYED" || patchStatus === "REVERTED") {
+          setActionMessage({ type: "error", text: "無法拒絕已部署或已回滾的 Patch" });
+          return;
+        }
+        await rejectPatch.mutateAsync({
+          patchId,
+          request: { reviewer_id: operatorId },
+        });
+        setActionMessage({ type: "success", text: "Patch 已拒絕" });
+      } else if (action === "deploy") {
+        if (patchStatus !== "APPROVED") {
+          setActionMessage({ type: "error", text: "只能部署 APPROVED 狀態的 Patch" });
+          return;
+        }
+        await deployPatch.mutateAsync({
+          patchId,
+          request: { operator_id: operatorId },
+        });
+        setActionMessage({ type: "success", text: "Patch 部署成功" });
+      } else if (action === "revert") {
+        if (patchStatus !== "DEPLOYED") {
+          setActionMessage({ type: "error", text: "只能回滾 DEPLOYED 狀態的 Patch" });
+          return;
+        }
+        await revertPatch.mutateAsync({
+          patchId,
+          request: { operator_id: operatorId },
+        });
+        setActionMessage({ type: "success", text: "Patch 回滾成功" });
+      }
+      
+      // Auto-refresh queue after action
+      setTimeout(() => {
+        refetch();
+        setActionMessage(null);
+      }, 2000);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "操作失敗";
+      setActionMessage({ type: "error", text: errorMsg });
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  const canRunSim = (status: PatchStatus) => status === "PENDING_SIMULATION";
+  const canApprove = (status: PatchStatus, simStatus: string) => 
+    status === "PENDING_REVIEW" && simStatus === "APPROVED";
+  const canReject = (status: PatchStatus) => 
+    status !== "DEPLOYED" && status !== "REVERTED";
+  const canDeploy = (status: PatchStatus) => status === "APPROVED";
+  const canRevert = (status: PatchStatus) => status === "DEPLOYED";
+
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -119,6 +214,17 @@ export function PatchQueueCard() {
         </span>
       </div>
 
+      {/* Action Message */}
+      {actionMessage && (
+        <div className={`mb-4 p-3 rounded text-sm ${
+          actionMessage.type === "success"
+            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+        }`}>
+          {actionMessage.text}
+        </div>
+      )}
+
       {pendingPatches.length === 0 ? (
         <div className="text-gray-500 dark:text-gray-400 text-center py-8">
           目前沒有待審核的 Patches
@@ -155,6 +261,70 @@ export function PatchQueueCard() {
 
                 <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   {formatRelativeTime(patch.created_at)}
+                </div>
+
+                {/* Quick Actions */}
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 flex-wrap">
+                  {canRunSim(patch.status) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("run-sim", patch.patch_id, patch.status, patch.sim_result_status);
+                      }}
+                      disabled={runSim.isPending}
+                      className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-50"
+                    >
+                      {runSim.isPending ? "執行中..." : "Run Sim"}
+                    </button>
+                  )}
+                  {canApprove(patch.status, patch.sim_result_status) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("approve", patch.patch_id, patch.status, patch.sim_result_status);
+                      }}
+                      disabled={approvePatch.isPending}
+                      className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded hover:bg-green-200 dark:hover:bg-green-800 disabled:opacity-50"
+                    >
+                      {approvePatch.isPending ? "處理中..." : "Approve"}
+                    </button>
+                  )}
+                  {canReject(patch.status) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("reject", patch.patch_id, patch.status, patch.sim_result_status);
+                      }}
+                      disabled={rejectPatch.isPending}
+                      className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50"
+                    >
+                      {rejectPatch.isPending ? "處理中..." : "Reject"}
+                    </button>
+                  )}
+                  {canDeploy(patch.status) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("deploy", patch.patch_id, patch.status, patch.sim_result_status);
+                      }}
+                      disabled={deployPatch.isPending}
+                      className="px-2 py-1 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded hover:bg-purple-200 dark:hover:bg-purple-800 disabled:opacity-50"
+                    >
+                      {deployPatch.isPending ? "部署中..." : "Deploy"}
+                    </button>
+                  )}
+                  {canRevert(patch.status) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction("revert", patch.patch_id, patch.status, patch.sim_result_status);
+                      }}
+                      disabled={revertPatch.isPending}
+                      className="px-2 py-1 text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 rounded hover:bg-orange-200 dark:hover:bg-orange-800 disabled:opacity-50"
+                    >
+                      {revertPatch.isPending ? "回滾中..." : "Revert"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import { api } from "../api/client";
 import type {
   DoctrinePatch,
   DoctrinePatchSummary,
@@ -15,15 +15,6 @@ import type {
   DeployPatchRequest,
   RevertPatchRequest,
 } from "../types/doctrinePatch";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
 
 /**
  * Fetch patch queue (default: PENDING_REVIEW + APPROVED)
@@ -37,16 +28,7 @@ export function usePatchQueue(
   return useQuery<DoctrinePatchSummary[]>({
     queryKey: ["patchQueue", { status, limit }],
     queryFn: async () => {
-      const response = await apiClient.get<DoctrinePatchSummary[]>(
-        `/api/v1/doctrine/patches/queue`,
-        {
-          params: {
-            status: status || undefined,
-            limit,
-          },
-        }
-      );
-      return response.data;
+      return await api.getDoctrinePatchQueue(status);
     },
     staleTime: 30000, // 30 seconds
     refetchInterval: 60000, // Auto-refetch every 60 seconds
@@ -63,10 +45,7 @@ export function usePatch(patchId: string | null, enabled: boolean = true) {
     queryKey: ["patch", patchId],
     queryFn: async () => {
       if (!patchId) throw new Error("Patch ID is required");
-      const response = await apiClient.get<DoctrinePatch>(
-        `/api/v1/doctrine/patches/${patchId}`
-      );
-      return response.data;
+      return await api.getDoctrinePatch(patchId);
     },
     staleTime: 30000,
     refetchOnWindowFocus: false,
@@ -82,11 +61,7 @@ export function useCreatePatch() {
   
   return useMutation({
     mutationFn: async (request: CreateDoctrinePatchRequest) => {
-      const response = await apiClient.post<DoctrinePatch>(
-        `/api/v1/doctrine/patches`,
-        request
-      );
-      return response.data;
+      return await api.createDoctrinePatch(request);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patchQueue"] });
@@ -102,10 +77,8 @@ export function useRunRuleSim() {
   
   return useMutation({
     mutationFn: async (patchId: string) => {
-      const response = await apiClient.post<DoctrinePatch>(
-        `/api/v1/doctrine/patches/${patchId}/run-sim`
-      );
-      return response.data;
+      const result = await api.runDoctrinePatchSim(patchId);
+      return result.patch || result;
     },
     onSuccess: (_, patchId) => {
       queryClient.invalidateQueries({ queryKey: ["patchQueue"] });
@@ -122,11 +95,8 @@ export function useApprovePatch() {
   
   return useMutation({
     mutationFn: async ({ patchId, request }: { patchId: string; request: ApprovePatchRequest }) => {
-      const response = await apiClient.post<DoctrinePatch>(
-        `/api/v1/doctrine/patches/${patchId}/approve`,
-        request
-      );
-      return response.data;
+      const result = await api.approveDoctrinePatch(patchId, request);
+      return result.patch || result;
     },
     onSuccess: (_, { patchId }) => {
       queryClient.invalidateQueries({ queryKey: ["patchQueue"] });
@@ -143,11 +113,7 @@ export function useRejectPatch() {
   
   return useMutation({
     mutationFn: async ({ patchId, request }: { patchId: string; request: RejectPatchRequest }) => {
-      const response = await apiClient.post<DoctrinePatch>(
-        `/api/v1/doctrine/patches/${patchId}/reject`,
-        request
-      );
-      return response.data;
+      return await api.rejectDoctrinePatch(patchId, request);
     },
     onSuccess: (_, { patchId }) => {
       queryClient.invalidateQueries({ queryKey: ["patchQueue"] });
@@ -164,11 +130,8 @@ export function useDeployPatch() {
   
   return useMutation({
     mutationFn: async ({ patchId, request }: { patchId: string; request: DeployPatchRequest }) => {
-      const response = await apiClient.post<DoctrinePatch>(
-        `/api/v1/doctrine/patches/${patchId}/deploy`,
-        request
-      );
-      return response.data;
+      const result = await api.deployDoctrinePatch(patchId, request);
+      return result.patch || result;
     },
     onSuccess: (_, { patchId }) => {
       queryClient.invalidateQueries({ queryKey: ["patchQueue"] });
@@ -185,11 +148,8 @@ export function useRevertPatch() {
   
   return useMutation({
     mutationFn: async ({ patchId, request }: { patchId: string; request: RevertPatchRequest }) => {
-      const response = await apiClient.post<DoctrinePatch>(
-        `/api/v1/doctrine/patches/${patchId}/revert`,
-        request
-      );
-      return response.data;
+      const result = await api.revertDoctrinePatch(patchId, request);
+      return result.patch || result;
     },
     onSuccess: (_, { patchId }) => {
       queryClient.invalidateQueries({ queryKey: ["patchQueue"] });

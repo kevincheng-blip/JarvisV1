@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, observer
+from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, decision_v3, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, s_rank_v2, strategy_perf, observer
 
 app = FastAPI(
     title="J-GOD Simulation API",
@@ -37,6 +37,7 @@ app.include_router(indicators.router, prefix="/api", tags=["indicators"])
 app.include_router(universe.router, prefix="/api", tags=["universe"])
 app.include_router(strategy.router, prefix="/api", tags=["strategy"])
 app.include_router(decision.router, prefix="/api", tags=["decision"])
+app.include_router(decision_v3.router, prefix="/api/v1/decision-v3", tags=["decision-v3"])
 app.include_router(policy.router, prefix="/api/v1/policy", tags=["policy"])
 app.include_router(backtest.router)
 app.include_router(error_review.router, prefix="/api/v1/error-review", tags=["error-review"])
@@ -50,6 +51,8 @@ app.include_router(doctrine_v2.router, prefix="/api/v2/doctrine", tags=["doctrin
 app.include_router(doctrine_patch.router, prefix="/api/v1/doctrine", tags=["doctrine-patch"])
 app.include_router(rule_sim.router, prefix="/api/v1/rule-sim", tags=["rule-sim"])
 app.include_router(s_rank_engine.router, prefix="/api/v1/s-rank", tags=["s-rank"])
+app.include_router(s_rank_v2.router, prefix="/api/v1/s-rank-v2", tags=["s-rank-v2"])
+app.include_router(strategy_perf.router, prefix="/api/v1/strategy-perf", tags=["strategy-perf"])
 app.include_router(observer.router, prefix="/api/v1/observer", tags=["observer"])
 
 

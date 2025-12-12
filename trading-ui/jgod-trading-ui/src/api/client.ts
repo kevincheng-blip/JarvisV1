@@ -205,5 +205,378 @@ export const api = {
     );
     return response.data;
   },
+
+  // Doctrine Patch API wrappers
+  /**
+   * Get doctrine patch queue
+   * Returns empty array on 404 (no patches), throws on 5xx/network errors
+   */
+  getDoctrinePatchQueue: async (status?: string | null): Promise<any[]> => {
+    try {
+      const response = await client.get("/api/v1/doctrine/patches/queue", {
+        params: status ? { status } : {},
+      });
+      return response.data || [];
+    } catch (error: any) {
+      // 404: return empty array (empty state, not error)
+      if (error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Get doctrine patch by ID
+   * Throws on 404 (patch not found is an error)
+   */
+  getDoctrinePatch: async (patchId: string): Promise<any> => {
+    const response = await client.get(`/api/v1/doctrine/patches/${patchId}`);
+    return response.data;
+  },
+
+  /**
+   * Create a new doctrine patch
+   */
+  createDoctrinePatch: async (request: {
+    author_id: string;
+    description: string;
+    changes: Array<{
+      change_type: string;
+      rule_id: string;
+      old_text?: string | null;
+      new_text?: string | null;
+    }>;
+  }): Promise<any> => {
+    const response = await client.post("/api/v1/doctrine/patches", request);
+    return response.data;
+  },
+
+  /**
+   * Run Rule Sim for a patch
+   */
+  runDoctrinePatchSim: async (patchId: string): Promise<any> => {
+    const response = await client.post(`/api/v1/doctrine/patches/${patchId}/run-sim`);
+    return response.data;
+  },
+
+  /**
+   * Approve a patch
+   */
+  approveDoctrinePatch: async (patchId: string, request: {
+    reviewer_id: string;
+    comment?: string | null;
+  }): Promise<any> => {
+    const response = await client.post(
+      `/api/v1/doctrine/patches/${patchId}/approve`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Reject a patch
+   */
+  rejectDoctrinePatch: async (patchId: string, request: {
+    reviewer_id: string;
+    comment?: string | null;
+  }): Promise<any> => {
+    const response = await client.post(
+      `/api/v1/doctrine/patches/${patchId}/reject`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Deploy a patch
+   */
+  deployDoctrinePatch: async (patchId: string, request: {
+    operator_id: string;
+  }): Promise<any> => {
+    const response = await client.post(
+      `/api/v1/doctrine/patches/${patchId}/deploy`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Revert a patch
+   */
+  revertDoctrinePatch: async (patchId: string, request: {
+    operator_id: string;
+  }): Promise<any> => {
+    const response = await client.post(
+      `/api/v1/doctrine/patches/${patchId}/revert`,
+      request
+    );
+    return response.data;
+  },
+
+  // S-Rank V2 API wrappers
+  /**
+   * Get S-Rank V2 strategy recommendation for a symbol
+   * Returns recommendation with top K strategies, weights, and rationale
+   */
+  getSRankV2Recommendation: async (
+    symbol: string,
+    limit: number = 60,
+    k: number = 5,
+    mode: "signals" | "performance" = "performance"
+  ): Promise<{
+    symbol: string;
+    start_date: string | null;
+    end_date: string | null;
+    metrics: {
+      n_points: number;
+      score_std: number;
+      max_abs_delta: number;
+      trend_slope: number;
+      stability_grade: "NO_DATA" | "STABLE" | "WATCH" | "VOLATILE";
+    };
+    items: Array<{
+      strategy: string;
+      weight: number;
+      score: number;
+    }>;
+    weights: Record<string, number>;
+    rationale: Record<string, string>;
+  }> => {
+    const response = await client.get(
+      `/api/v1/s-rank-v2/recommendation/${symbol}`,
+      { params: { limit, k, mode } }
+    );
+    return response.data;
+  },
+
+  // Strategy Performance API wrappers
+  /**
+   * Get latest strategy performance snapshot for a symbol
+   */
+  getStrategyPerfLatest: async (symbol: string): Promise<{
+    snapshot_id: string;
+    created_at: string;
+    symbol: string;
+    limit: number;
+    window: number;
+    items: Array<{
+      strategy_id: string;
+      n_points: number;
+      avg_return_proxy: number;
+      sharpe_proxy: number;
+      max_drawdown_proxy: number;
+      turnover_proxy: number;
+      decay_slope: number;
+      grade: "NO_DATA" | "GOOD" | "WATCH" | "BAD";
+    }>;
+  }> => {
+    const response = await client.get(`/api/v1/strategy-perf/latest/${symbol}`);
+    return response.data;
+  },
+
+  /**
+   * Recompute and save strategy performance snapshot
+   */
+  recomputeStrategyPerf: async (
+    symbol: string,
+    limit: number = 60,
+    window: number = 20
+  ): Promise<{
+    snapshot_id: string;
+    created_at: string;
+    symbol: string;
+    limit: number;
+    window: number;
+    items: Array<{
+      strategy_id: string;
+      n_points: number;
+      avg_return_proxy: number;
+      sharpe_proxy: number;
+      max_drawdown_proxy: number;
+      turnover_proxy: number;
+      decay_slope: number;
+      grade: "NO_DATA" | "GOOD" | "WATCH" | "BAD";
+    }>;
+  }> => {
+    const response = await client.post(
+      `/api/v1/strategy-perf/recompute/${symbol}`,
+      null,
+      { params: { limit, window } }
+    );
+    return response.data;
+  },
+
+  // Decision V3 API wrappers
+  /**
+   * Get Decision V3 for a symbol
+   * Returns decision result with primary/secondary strategies, risk plan, confidence, and explanation
+   */
+  getDecisionV3: async (
+    symbol: string,
+    options: {
+      mode?: "signals" | "performance";
+      limit?: number;
+      k?: number;
+    } = {}
+  ): Promise<{
+    symbol: string;
+    as_of_date: string | null;
+    selected_primary_strategy: string | null;
+    selected_secondary_strategies: string[];
+    weights: Array<{
+      strategy_id: string;
+      weight: number;
+      grade?: string | null;
+      metrics?: Record<string, number> | null;
+      rationale?: string | null;
+    }>;
+    risk_plan: {
+      position_scale: number;
+      risk_state: "RISK_ON" | "RISK_OFF" | "CAUTION";
+      reasons: string[];
+    };
+    confidence: number;
+    explain: string;
+  }> => {
+    try {
+      const response = await client.get(
+        `/api/v1/decision-v3/decide/${symbol}`,
+        {
+          params: {
+            mode: options.mode || "performance",
+            limit: options.limit || 60,
+            k: options.k || 5,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      // Backend guarantees 200, but if 404 occurs, return null for empty state
+      if (error.response?.status === 404) {
+        throw new Error("Decision V3 not found");
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Get latest Decision V3 snapshot for a symbol
+   */
+  getDecisionV3Latest: async (symbol: string): Promise<{
+    snapshot_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    limit: number;
+    k: number;
+    result: {
+      symbol: string;
+      as_of_date: string | null;
+      selected_primary_strategy: string | null;
+      selected_secondary_strategies: string[];
+      weights: Array<{
+        strategy_id: string;
+        weight: number;
+        grade?: string | null;
+        metrics?: Record<string, number> | null;
+        rationale?: string | null;
+      }>;
+      risk_plan: {
+        position_scale: number;
+        risk_state: "RISK_ON" | "RISK_OFF" | "CAUTION";
+        reasons: string[];
+      };
+      confidence: number;
+      explain: string;
+    };
+  }> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/latest/${symbol}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error("Decision V3 snapshot not found");
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Recompute and save Decision V3 snapshot
+   */
+  recomputeDecisionV3: async (
+    symbol: string,
+    options: {
+      mode?: "signals" | "performance";
+      limit?: number;
+      k?: number;
+    } = {}
+  ): Promise<{
+    snapshot_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    limit: number;
+    k: number;
+    result: {
+      symbol: string;
+      as_of_date: string | null;
+      selected_primary_strategy: string | null;
+      selected_secondary_strategies: string[];
+      weights: Array<{
+        strategy_id: string;
+        weight: number;
+        grade?: string | null;
+        metrics?: Record<string, number> | null;
+        rationale?: string | null;
+      }>;
+      risk_plan: {
+        position_scale: number;
+        risk_state: "RISK_ON" | "RISK_OFF" | "CAUTION";
+        reasons: string[];
+      };
+      confidence: number;
+      explain: string;
+    };
+  }> => {
+    const response = await client.post(
+      `/api/v1/decision-v3/recompute/${symbol}`,
+      null,
+      {
+        params: {
+          mode: options.mode || "performance",
+          limit: options.limit || 60,
+          k: options.k || 5,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * List Decision V3 snapshots for a symbol
+   */
+  listDecisionV3Snapshots: async (
+    symbol: string,
+    n: number = 20
+  ): Promise<{
+    symbol: string;
+    items: Array<{
+      snapshot_id: string;
+      created_at: string;
+      symbol: string;
+      mode: string;
+      primary_strategy: string | null;
+      confidence: number;
+      risk_state: string;
+    }>;
+    total: number;
+  }> => {
+    const response = await client.get(`/api/v1/decision-v3/list/${symbol}`, {
+      params: { n },
+    });
+    return response.data;
+  },
 };
 

@@ -109,6 +109,7 @@
 
 本目錄還包含其他模組的詳細規格文件：
 
+- `SRank_Engine_V2_Spec.md` - S-Rank Engine V2 推薦系統規格
 - `JGOD_System_Architecture_v1.md` - 系統架構詳細說明
 - `JGOD_Backfill_and_Simulation_Data_Spec_v1.md` - 資料回填與模擬規格
 - `JGOD_Trading_Command_Center_UI_Spec_v1.md` - 交易指揮中心 UI 規格

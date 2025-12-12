@@ -69,6 +69,61 @@ else
 fi
 echo ""
 
+# Check 6: Doctrine patch lifecycle E2E test
+echo "6️⃣  Running doctrine patch lifecycle E2E test..."
+pytest tests/test_doctrine_patch_lifecycle_e2e.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Patch lifecycle E2E test passed"
+else
+    echo "   ❌ Patch lifecycle E2E test failed"
+    exit 1
+fi
+echo ""
+
+# Check 7: S-Rank V2 contract test
+echo "7️⃣  Running S-Rank V2 contract test..."
+pytest tests/test_s_rank_v2_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ S-Rank V2 contract test passed"
+else
+    echo "   ❌ S-Rank V2 contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 8: Strategy Performance contract test
+echo "8️⃣  Running Strategy Performance contract test..."
+pytest tests/test_strategy_perf_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Strategy Performance contract test passed"
+else
+    echo "   ❌ Strategy Performance contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 9: Decision V3 contract test
+echo "9️⃣  Running Decision V3 contract test..."
+pytest tests/test_decision_v3_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Decision V3 contract test passed"
+else
+    echo "   ❌ Decision V3 contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 10: Decision V3 Snapshot contract test
+echo "🔟 Running Decision V3 Snapshot contract test..."
+pytest tests/test_decision_v3_snapshot_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Decision V3 Snapshot contract test passed"
+else
+    echo "   ❌ Decision V3 Snapshot contract test failed"
+    exit 1
+fi
+echo ""
+
 echo "================================"
 echo "✅ All CI quick checks passed!"
 echo ""

@@ -91,6 +91,51 @@ Test with a symbol that has no data:
    - Timeline shows empty state (not error)
    - Latest prediction shows "No latest prediction data" (not error)
 
+### 7. Patch Quick Actions (v0.4.0)
+
+Test Patch lifecycle quick actions:
+1. **Create Patch** (via API or /docs):
+   ```bash
+   curl -X POST "http://127.0.0.1:8000/api/v1/doctrine/patches" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "author_id": "test-user",
+       "description": "Test patch",
+       "changes": [
+         {"change_type": "add", "rule_id": "rule-1", "new_text": "Content 1"},
+         {"change_type": "modify", "rule_id": "rule-2", "old_text": "Old", "new_text": "New"}
+       ]
+     }'
+   ```
+
+2. **Verify in UI**:
+   - PatchQueueCard should show the new patch with status "PENDING_SIMULATION"
+   - "Run Sim" button should be visible and enabled
+
+3. **Run Sim**:
+   - Click "Run Sim" button
+   - Verify: Success message appears, queue refreshes, status changes to "PENDING_REVIEW"
+   - "Approve" button should now be visible
+
+4. **Approve**:
+   - Click "Approve" button
+   - Verify: Success message, status changes to "APPROVED"
+   - "Deploy" button should now be visible
+
+5. **Deploy**:
+   - Click "Deploy" button
+   - Verify: Success message, status changes to "DEPLOYED"
+   - "Revert" button should now be visible
+
+6. **Revert**:
+   - Click "Revert" button
+   - Verify: Success message, status changes to "REVERTED"
+   - Patch should disappear from active queue
+
+7. **State Guards**:
+   - Try clicking invalid actions (e.g., Deploy on PENDING_SIMULATION)
+   - Verify: Error message appears, action is blocked
+
 ## Expected Behavior
 
 ✅ **Success Indicators:**

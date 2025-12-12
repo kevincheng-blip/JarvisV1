@@ -6,7 +6,7 @@ Provides endpoints for Doctrine Patch workflow.
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 
 from jgod.api.schemas.doctrine_patch import (
     CreatePatchRequest,
@@ -16,6 +16,10 @@ from jgod.api.schemas.doctrine_patch import (
     ApprovePatchResponse,
     DeployPatchResponse,
     RevertPatchResponse,
+    ApprovePatchRequest,
+    RejectPatchRequest,
+    DeployPatchRequest,
+    RevertPatchRequest,
     patch_to_schema,
     patch_to_summary_schema,
 )
@@ -139,10 +143,13 @@ async def run_sim(patch_id: str) -> RunSimResponse:
     response_model=ApprovePatchResponse,
     summary="Approve a patch",
 )
-async def approve_patch(patch_id: str, reviewer_id: str = "system") -> ApprovePatchResponse:
+async def approve_patch(
+    patch_id: str,
+    request: ApprovePatchRequest = Body(...),
+) -> ApprovePatchResponse:
     """Approve a patch"""
     try:
-        patch = _service.approve_patch(patch_id, reviewer_id)
+        patch = _service.approve_patch(patch_id, request.reviewer_id)
         return ApprovePatchResponse(
             success=True,
             patch=patch_to_schema(patch),
@@ -160,10 +167,13 @@ async def approve_patch(patch_id: str, reviewer_id: str = "system") -> ApprovePa
     response_model=DoctrinePatchSchema,
     summary="Reject a patch",
 )
-async def reject_patch(patch_id: str, reviewer_id: str = "system") -> DoctrinePatchSchema:
+async def reject_patch(
+    patch_id: str,
+    request: RejectPatchRequest = Body(...),
+) -> DoctrinePatchSchema:
     """Reject a patch"""
     try:
-        patch = _service.reject_patch(patch_id, reviewer_id)
+        patch = _service.reject_patch(patch_id, request.reviewer_id)
         return patch_to_schema(patch)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -177,7 +187,10 @@ async def reject_patch(patch_id: str, reviewer_id: str = "system") -> DoctrinePa
     response_model=DeployPatchResponse,
     summary="Deploy a patch to production",
 )
-async def deploy_patch(patch_id: str) -> DeployPatchResponse:
+async def deploy_patch(
+    patch_id: str,
+    request: DeployPatchRequest = Body(...),
+) -> DeployPatchResponse:
     """Deploy a patch to production"""
     try:
         patch = _service.deploy_patch(patch_id)
@@ -199,7 +212,10 @@ async def deploy_patch(patch_id: str) -> DeployPatchResponse:
     response_model=RevertPatchResponse,
     summary="Revert a deployed patch",
 )
-async def revert_patch(patch_id: str) -> RevertPatchResponse:
+async def revert_patch(
+    patch_id: str,
+    request: RevertPatchRequest = Body(...),
+) -> RevertPatchResponse:
     """Revert a deployed patch"""
     try:
         patch = _service.revert_patch(patch_id)

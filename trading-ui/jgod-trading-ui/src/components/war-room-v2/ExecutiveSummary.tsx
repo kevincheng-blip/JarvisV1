@@ -35,15 +35,15 @@ export function ExecutiveSummary() {
   // Calculate critical alerts count
   const criticalAlertsCount = governanceSummary?.critical_alerts_active ?? 0;
 
-  // Calculate pending review patches
+  // Calculate pending review patches (PENDING_REVIEW + PENDING_SIMULATION)
   const pendingReviewPatches = patches?.filter(
-    p => p.status === "PENDING_REVIEW" || p.status === "APPROVED" || p.status === "PENDING_SIMULATION"
+    p => p.status === "PENDING_REVIEW" || p.status === "PENDING_SIMULATION"
   ).length ?? 0;
   
   // Get pending review count from governance summary
   const pendingReviewDoctrine = governanceSummary?.pending_review_count ?? 0;
   
-  // Total governance bottleneck (doctrine + patches)
+  // Total governance bottleneck (doctrine pending_review + patches pending_review + patches pending_simulation)
   const totalBottleneck = pendingReviewDoctrine + pendingReviewPatches;
 
   // Get latest AB test report
@@ -124,7 +124,8 @@ export function ExecutiveSummary() {
             {totalBottleneck}
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-            待審核：{pendingReviewDoctrine} 條 Doctrine / {pendingReviewPatches} 個 Patch
+            等待審核：{pendingReviewDoctrine} 條 Doctrine<br />
+            等待模擬/審核：{pendingReviewPatches} 個 Patch
           </p>
         </div>
       )}
