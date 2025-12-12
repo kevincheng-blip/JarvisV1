@@ -5,7 +5,7 @@
 import axios from "axios";
 import type { CoverageResponse, IndicatorSnapshot, LatestPrediction, Prediction, PredictionTimelineResponse } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -14,26 +14,54 @@ const client = axios.create({
   },
 });
 
+// Dev-only: Log request URLs
+if (import.meta.env.DEV) {
+  client.interceptors.request.use((config) => {
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.debug(`[API] ${config.method?.toUpperCase()} ${fullUrl}`, config.params || {});
+    return config;
+  });
+}
+
 // Export client for use in hooks
 export const apiClient = client;
 
 export const api = {
   /**
    * Get predictions for all symbols on a specific date
+   * Note: Uses top-n/long endpoint as fallback since /api/predictions/{date} doesn't exist
    */
   getPredictions: async (date: string, universe: string = "tw_top50_2024"): Promise<Prediction[]> => {
-    const response = await client.get<Prediction[]>(`/api/predictions/${date}`, {
-      params: { universe },
-    });
-    return response.data;
+    try {
+      const response = await client.get<Prediction[]>(`/api/top-n/long`, {
+        params: { date, limit: 200 },
+      });
+      return response.data || [];
+    } catch (error: any) {
+      // Return empty array for 404 or other errors (empty state, not error)
+      if (error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 
   /**
    * Get prediction for a specific symbol on a date
+   * Note: Uses latest endpoint since /api/predictions/{date}/{symbol} doesn't exist
    */
   getPrediction: async (date: string, symbol: string): Promise<any> => {
-    const response = await client.get(`/api/predictions/${date}/${symbol}`);
-    return response.data;
+    try {
+      const response = await client.get(`/api/v1/predictions/latest/${symbol}`, {
+        params: { date },
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`No prediction found for ${symbol} on ${date}`);
+      }
+      throw error;
+    }
   },
 
   /**
@@ -80,22 +108,31 @@ export const api = {
 
   /**
    * Get prediction timeline for a specific symbol within a date range
+   * Note: Endpoint doesn't exist yet, returns empty timeline gracefully
    */
   getPredictionTimeline: async (params: {
     symbol: string;
     startDate: string; // YYYY-MM-DD
     endDate: string;   // YYYY-MM-DD
   }): Promise<PredictionTimelineResponse> => {
-    const response = await client.get<PredictionTimelineResponse>(
-      `/api/predictions/timeline/${params.symbol}`,
-      {
-        params: {
-          start_date: params.startDate,
-          end_date: params.endDate,
-        },
-      }
-    );
-    return response.data;
+    try {
+      // TODO: Implement timeline endpoint in backend
+      // For now, return empty timeline to prevent 404 errors
+      return {
+        symbol: params.symbol,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        points: [],
+      };
+    } catch (error: any) {
+      // Return empty timeline for any error (empty state, not error)
+      return {
+        symbol: params.symbol,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        points: [],
+      };
+    }
   },
 
   /**
@@ -107,7 +144,7 @@ export const api = {
       params.date = date;
     }
     const response = await client.get<LatestPrediction>(
-      `/api/predictions/latest/${symbol}`,
+      `/api/v1/predictions/latest/${symbol}`,
       { params }
     );
     return response.data;

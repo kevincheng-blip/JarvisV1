@@ -9,7 +9,7 @@ import axios from "axios";
 import type { TopLongItem, TopShortItem } from "../../types/warRoom";
 import type { DecisionContextV2 } from "../../types/warRoomV2";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -17,6 +17,15 @@ const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// Dev-only: Log request URLs
+if (import.meta.env.DEV) {
+  apiClient.interceptors.request.use((config) => {
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.debug(`[API] ${config.method?.toUpperCase()} ${fullUrl}`, config.params || {});
+    return config;
+  });
+}
 
 /**
  * Fetch top N long predictions
@@ -43,10 +52,8 @@ export function useTopLongPredictions(
         params.append("date", today);
       }
       
-      // Support both V1 and V2 API endpoints
-      const endpoint = version === "v2" 
-        ? `/api/v2/predictions/top-n/long?${params.toString()}`
-        : `/api/v1/predictions/top-n/long?${params.toString()}`;
+      // Backend endpoint is /api/top-n/long (no version prefix)
+      const endpoint = `/api/top-n/long?${params.toString()}`;
       const response = await apiClient.get<TopLongItem[]>(endpoint);
       return response.data;
     },
@@ -81,10 +88,8 @@ export function useTopShortPredictions(
         params.append("date", today);
       }
       
-      // Support both V1 and V2 API endpoints
-      const endpoint = version === "v2"
-        ? `/api/v2/predictions/top-n/short?${params.toString()}`
-        : `/api/v1/predictions/top-n/short?${params.toString()}`;
+      // Backend endpoint is /api/top-n/short (no version prefix)
+      const endpoint = `/api/top-n/short?${params.toString()}`;
       const response = await apiClient.get<TopShortItem[]>(endpoint);
       return response.data;
     },
@@ -110,8 +115,10 @@ export function useFinalScoreV2(symbol: string | null, date: string | null, enab
         params.append("date", date);
       }
       
+      // Note: /api/v2/predictions/final-score doesn't exist in backend
+      // Using latest endpoint as fallback
       const response = await apiClient.get<DecisionContextV2>(
-        `/api/v2/predictions/final-score?${params.toString()}`
+        `/api/v1/predictions/latest/${symbol}?${params.toString()}`
       );
       return response.data;
     },
