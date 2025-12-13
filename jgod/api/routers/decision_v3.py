@@ -32,6 +32,13 @@ from jgod.api.schemas.decision_v3_compare import (
     compare_snapshot_to_response_schema,
     compare_list_to_response_schema,
 )
+from jgod.api.schemas.decision_v3_arena import (
+    ArenaResponseSchema,
+    ArenaSnapshotResponseSchema,
+    ArenaListResponseSchema,
+    arena_snapshot_to_response,
+    arena_result_to_schema,
+)
 from jgod.decision_v3.engine import DecisionEngineV3
 from jgod.decision_v3.service import (
     compute_decision,
@@ -44,6 +51,9 @@ from jgod.decision_v3.service import (
     recompute_compare_and_save,
     get_latest_compare,
     list_compare_snapshots,
+    recompute_arena_and_save,
+    get_latest_arena,
+    list_arena_snapshots,
 )
 
 logger = logging.getLogger(__name__)
@@ -587,6 +597,173 @@ async def list_decision_v3_compares(
         logger.error(f"Error listing Decision V3 compares for {symbol}: {e}", exc_info=True)
         # Even on error, return empty list - still 200
         return CompareListResponseSchema(
+            symbol=symbol,
+            items=[],
+            total=0,
+        )
+
+
+# Arena endpoints
+
+@router.post(
+    "/arena/recompute/{symbol}",
+    response_model=ArenaResponseSchema,
+    summary="Recompute Decision V3 Arena",
+    description="Recompute arena comparison (multi-challenger + auto-tuning) for a symbol",
+)
+async def recompute_arena(
+    symbol: str,
+    mode: str = Query("performance", description="Decision mode: 'performance' or 'signals'"),
+    limit: int = Query(60, ge=10, le=200, description="Number of timeline items to fetch"),
+    k: int = Query(5, ge=1, le=10, description="Number of top strategies to consider"),
+    window: int = Query(20, ge=5, le=60, description="Evaluation window size"),
+) -> ArenaResponseSchema:
+    """Recompute arena comparison and save snapshot (always returns 200)"""
+    try:
+        snapshot = recompute_arena_and_save(symbol, mode, limit, k, window)
+        
+        # Wrap for response
+        arena_data = snapshot.copy()
+        arena_data.pop("arena_id", None)
+        arena_data.pop("created_at", None)
+        
+        return ArenaResponseSchema(
+            arena_id=snapshot.get("arena_id", ""),
+            created_at=snapshot.get("created_at", ""),
+            symbol=snapshot.get("symbol", symbol),
+            mode=snapshot.get("mode", mode),
+            window=snapshot.get("window", window),
+            limit=snapshot.get("limit", limit),
+            k=snapshot.get("k", k),
+            arena=arena_result_to_schema(arena_data),
+        )
+    except Exception as e:
+        logger.error(f"Error recomputing Decision V3 arena for {symbol}: {e}", exc_info=True)
+        # Return empty state on error - still 200
+        return ArenaResponseSchema(
+            arena_id="",
+            created_at=datetime.now().isoformat(),
+            symbol=symbol,
+            mode=mode,
+            window=window,
+            limit=limit,
+            k=k,
+            arena=arena_result_to_schema({
+                "symbol": symbol,
+                "mode": mode,
+                "window": window,
+                "limit": limit,
+                "k": k,
+                "scoreboard": [],
+                "winner_id": "NO_DATA",
+                "is_regression": False,
+                "summary": f"計算失敗：{str(e)}",
+                "recommendation_next_step": "請檢查資料或稍後重試",
+            }),
+        )
+
+
+@router.get(
+    "/arena/latest/{symbol}",
+    response_model=ArenaSnapshotResponseSchema,
+    summary="Get Latest Decision V3 Arena",
+    description="Get the latest arena snapshot for a symbol (always returns 200, empty state if no data)",
+)
+async def get_arena_latest(
+    symbol: str,
+) -> ArenaSnapshotResponseSchema:
+    """Get latest arena snapshot (always returns 200, empty state if no data)"""
+    try:
+        snapshot = get_latest_arena(symbol)
+        if not snapshot:
+            # Return empty state - still 200
+            return ArenaSnapshotResponseSchema(
+                arena_id="",
+                created_at=datetime.now().isoformat(),
+                symbol=symbol,
+                mode="performance",
+                window=20,
+                limit=60,
+                k=5,
+                arena=arena_result_to_schema({
+                    "symbol": symbol,
+                    "mode": "performance",
+                    "window": 20,
+                    "limit": 60,
+                    "k": 5,
+                    "scoreboard": [],
+                    "winner_id": "NO_DATA",
+                    "is_regression": False,
+                    "summary": "暫無競技場資料",
+                    "recommendation_next_step": "請先執行 recompute 產生競技場對照",
+                }),
+            )
+        
+        return arena_snapshot_to_response(snapshot)
+    except Exception as e:
+        logger.error(f"Error getting latest Decision V3 arena for {symbol}: {e}", exc_info=True)
+        # Return empty state on error - still 200
+        return ArenaSnapshotResponseSchema(
+            arena_id="",
+            created_at=datetime.now().isoformat(),
+            symbol=symbol,
+            mode="performance",
+            window=20,
+            limit=60,
+            k=5,
+            arena=arena_result_to_schema({
+                "symbol": symbol,
+                "mode": "performance",
+                "window": 20,
+                "limit": 60,
+                "k": 5,
+                "scoreboard": [],
+                "winner_id": "NO_DATA",
+                "is_regression": False,
+                "summary": f"讀取失敗：{str(e)}",
+                "recommendation_next_step": "請稍後重試",
+            }),
+        )
+
+
+@router.get(
+    "/arena/list/{symbol}",
+    response_model=ArenaListResponseSchema,
+    summary="List Decision V3 Arena Snapshots",
+    description="List arena snapshots for a symbol (always returns 200, empty list if no data)",
+)
+async def list_arena_snapshots(
+    symbol: str,
+    n: int = Query(20, ge=1, le=100, description="Maximum number of arena snapshots to return"),
+) -> ArenaListResponseSchema:
+    """List arena snapshots for a symbol (always returns 200, empty list if no snapshots)"""
+    try:
+        snapshots = list_arena_snapshots(symbol, n)
+        
+        items = []
+        for snapshot in snapshots:
+            created_at = snapshot.get("created_at", "")
+            if isinstance(created_at, datetime):
+                created_at = created_at.isoformat()
+            elif not isinstance(created_at, str):
+                created_at = datetime.now().isoformat()
+            
+            items.append({
+                "arena_id": snapshot.get("arena_id", ""),
+                "created_at": created_at,
+                "winner_id": snapshot.get("winner_id", "NO_DATA"),
+                "is_regression": snapshot.get("is_regression", False),
+            })
+        
+        return ArenaListResponseSchema(
+            symbol=symbol,
+            total=len(items),
+            items=items,
+        )
+    except Exception as e:
+        logger.error(f"Error listing Decision V3 arena for {symbol}: {e}", exc_info=True)
+        # Even on error, return empty list - still 200
+        return ArenaListResponseSchema(
             symbol=symbol,
             items=[],
             total=0,

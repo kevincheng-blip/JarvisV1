@@ -23,6 +23,11 @@ import {
   useRecomputeDecisionV3Compare,
   useDecisionV3CompareList,
 } from "../../hooks/useDecisionV3Compare";
+import {
+  useDecisionV3ArenaLatest,
+  useRecomputeDecisionV3Arena,
+  useDecisionV3ArenaList,
+} from "../../hooks/useDecisionV3Arena";
 
 interface DecisionV3CardProps {
   symbol: string | null;
@@ -46,6 +51,12 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
   const { data: compareList } = useDecisionV3CompareList(symbol || "", 5);
   const recomputeCompare = useRecomputeDecisionV3Compare(symbol || "");
   const [compareActionMessage, setCompareActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
+  // Arena hooks
+  const { data: arenaLatest } = useDecisionV3ArenaLatest(symbol, !!symbol);
+  const { data: arenaList } = useDecisionV3ArenaList(symbol, 5, !!symbol);
+  const recomputeArena = useRecomputeDecisionV3Arena(symbol);
+  const [arenaActionMessage, setArenaActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const getRiskStateColor = (state: string) => {
     switch (state) {
@@ -156,6 +167,21 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
       const errorMsg = err.response?.data?.detail || err.message || "操作失敗";
       setCompareActionMessage({ type: "error", text: errorMsg });
       setTimeout(() => setCompareActionMessage(null), 5000);
+    }
+  };
+
+  const handleRecomputeArena = async () => {
+    if (!symbol) return;
+    
+    setArenaActionMessage(null);
+    try {
+      await recomputeArena.mutateAsync({ mode: "performance", limit: 60, k: 5, window: 20 });
+      setArenaActionMessage({ type: "success", text: "競技場重新計算成功" });
+      setTimeout(() => setArenaActionMessage(null), 3000);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "操作失敗";
+      setArenaActionMessage({ type: "error", text: errorMsg });
+      setTimeout(() => setArenaActionMessage(null), 5000);
     }
   };
 
@@ -620,6 +646,175 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
                   <span className={`px-1.5 py-0.5 rounded text-xs ${getWinnerColor(item.winner)}`}>
                     {getWinnerLabel(item.winner)}
                   </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Arena Section */}
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">競技場 (Arena)</h4>
+          <button
+            onClick={handleRecomputeArena}
+            disabled={recomputeArena.isPending || !symbol}
+            className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {recomputeArena.isPending ? "計算中..." : "Run Arena"}
+          </button>
+        </div>
+
+        {/* Arena Action Message */}
+        {arenaActionMessage && (
+          <div className={`mb-3 p-2 rounded text-xs ${
+            arenaActionMessage.type === "success"
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+          }`}>
+            {arenaActionMessage.text}
+          </div>
+        )}
+
+        {/* Latest Arena */}
+        {arenaLatest && arenaLatest.arena && arenaLatest.arena.winner_id !== "NO_DATA" ? (
+          <>
+            {/* Winner Badge + Regression Alert */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className={`px-2 py-1 text-xs rounded ${getWinnerColor(arenaLatest.arena.winner_id)}`}>
+                {getWinnerLabel(arenaLatest.arena.winner_id)}
+              </span>
+              {arenaLatest.arena.is_regression && (
+                <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                  ⚠️ 回歸警報
+                </span>
+              )}
+              {arenaLatest.created_at && (
+                <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                  {new Date(arenaLatest.created_at).toLocaleString("zh-TW")}
+                </span>
+              )}
+            </div>
+
+            {/* Scoreboard Table */}
+            {arenaLatest.arena.scoreboard && arenaLatest.arena.scoreboard.length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">分數板 (Scoreboard)</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="text-left p-1">挑戰者</th>
+                        <th className="text-right p-1">分數</th>
+                        <th className="text-right p-1">報酬</th>
+                        <th className="text-right p-1">回撤</th>
+                        <th className="text-right p-1">支配</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {arenaLatest.arena.scoreboard.map((item, idx) => (
+                        <tr key={idx} className={`border-b border-gray-100 dark:border-gray-800 ${
+                          item.challenger_id === arenaLatest.arena.winner_id ? "bg-yellow-50 dark:bg-yellow-900/20" : ""
+                        }`}>
+                          <td className="p-1 font-medium">{item.challenger_id}</td>
+                          <td className="text-right p-1">{item.composite_score.toFixed(4)}</td>
+                          <td className="text-right p-1">{(item.metrics.avg_return_proxy * 100).toFixed(2)}%</td>
+                          <td className="text-right p-1">{(item.metrics.max_drawdown_proxy * 100).toFixed(1)}%</td>
+                          <td className="text-right p-1">
+                            {item.pareto_dominated ? "是" : "否"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Auto-Tuning Results */}
+            {arenaLatest.arena.auto_tuning && (
+              <div className="mb-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">自動調參 (Auto-Tuning)</div>
+                {arenaLatest.arena.auto_tuning.best_config && (
+                  <div className="mb-2 text-xs">
+                    <div className="font-medium mb-1">最佳配置：</div>
+                    <div className="text-gray-700 dark:text-gray-300">
+                      {arenaLatest.arena.auto_tuning.best_config.risk_mapping && (
+                        <div>風險映射: STABLE={arenaLatest.arena.auto_tuning.best_config.risk_mapping.STABLE?.toFixed(2)}, WATCH={arenaLatest.arena.auto_tuning.best_config.risk_mapping.WATCH?.toFixed(2)}, VOLATILE={arenaLatest.arena.auto_tuning.best_config.risk_mapping.VOLATILE?.toFixed(2)}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {arenaLatest.arena.auto_tuning.top_variants && arenaLatest.arena.auto_tuning.top_variants.length > 0 && (
+                  <div className="text-xs">
+                    <div className="font-medium mb-1">Top 5 變體：</div>
+                    <div className="space-y-1">
+                      {arenaLatest.arena.auto_tuning.top_variants.slice(0, 5).map((variant, idx) => (
+                        <div key={idx} className="text-gray-600 dark:text-gray-400">
+                          #{idx + 1}: 分數 {variant.score.toFixed(4)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {arenaLatest.arena.auto_tuning.notes && (
+                  <div className="mt-2 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                    {arenaLatest.arena.auto_tuning.notes}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Summary */}
+            {arenaLatest.arena.summary && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">競技場摘要</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {arenaLatest.arena.summary}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendation */}
+            {arenaLatest.arena.recommendation_next_step && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">建議</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {arenaLatest.arena.recommendation_next_step}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+            暫無競技場資料
+          </div>
+        )}
+
+        {/* Recent Arena History */}
+        {arenaList && arenaList.items && arenaList.items.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">最近競技場 ({arenaList.total})</div>
+            <div className="space-y-1">
+              {arenaList.items.slice(0, 5).map((item) => (
+                <div key={item.arena_id} className="flex justify-between text-xs">
+                  <div className="text-gray-600 dark:text-gray-400">
+                    {new Date(item.created_at).toLocaleString("zh-TW", {
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-1.5 py-0.5 rounded text-xs ${getWinnerColor(item.winner_id)}`}>
+                      {getWinnerLabel(item.winner_id)}
+                    </span>
+                    {item.is_regression && (
+                      <span className="px-1 py-0.5 text-xs text-red-600 dark:text-red-400">⚠️</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

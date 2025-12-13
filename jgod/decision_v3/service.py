@@ -14,9 +14,11 @@ from jgod.decision_v3.storage import (
     save_snapshot, load_latest, list_latest,
     save_evaluation, load_latest_evaluation, list_evaluations,
     save_compare, load_latest_compare, list_compares,
+    save_arena_snapshot, load_latest_arena, list_arena,
 )
 from jgod.decision_v3.evaluation import evaluate_decision_v3, EvaluationVerdict
 from jgod.decision_v3.compare import compute_compare, CompareWinner
+from jgod.decision_v3.arena import compute_arena, ArenaResult
 from jgod.observer.prediction_stability import TimelineItem
 
 logger = logging.getLogger(__name__)
@@ -440,4 +442,110 @@ def list_compare_snapshots(symbol: str, n: int = 20) -> List[Dict]:
         List of compare snapshot dicts (newest first)
     """
     return list_compares(symbol, n)
+
+
+# Arena functions
+
+def recompute_arena_and_save(
+    symbol: str,
+    mode: str = "performance",
+    limit: int = 60,
+    k: int = 5,
+    window: int = 20
+) -> Dict:
+    """
+    Recompute arena comparison and save snapshot.
+    
+    Args:
+        symbol: Stock symbol
+        mode: Decision mode ("performance" or "signals")
+        limit: Number of timeline items to fetch
+        k: Number of top strategies to consider
+        window: Evaluation window size
+        
+    Returns:
+        Arena snapshot dict with arena_id
+    """
+    logger.info(f"Recomputing arena for {symbol} (mode={mode}, limit={limit}, k={k}, window={window})")
+    
+    # Compute arena result
+    arena_result = compute_arena(symbol, mode, limit, k, window)
+    
+    # Convert ArenaResult to dict
+    arena_dict = {
+        "symbol": arena_result.symbol,
+        "created_at": arena_result.created_at,
+        "mode": arena_result.mode,
+        "window": arena_result.window,
+        "limit": arena_result.limit,
+        "k": arena_result.k,
+        "scoreboard": [
+            {
+                "challenger_id": score.challenger_id,
+                "composite_score": score.composite_score,
+                "metrics": score.metrics,
+                "pareto_dominated": score.pareto_dominated,
+            }
+            for score in arena_result.scoreboard
+        ],
+        "winner_id": arena_result.winner_id,
+        "is_regression": arena_result.is_regression,
+        "auto_tuning": {
+            "best_config": {
+                "risk_mapping": arena_result.auto_tuning.best_config.risk_mapping if arena_result.auto_tuning and arena_result.auto_tuning.best_config else None,
+                "composite_weights": arena_result.auto_tuning.best_config.composite_weights if arena_result.auto_tuning and arena_result.auto_tuning.best_config else None,
+            } if arena_result.auto_tuning and arena_result.auto_tuning.best_config else None,
+            "top_variants": [
+                {
+                    "config": {
+                        "risk_mapping": variant[0].risk_mapping,
+                        "composite_weights": variant[0].composite_weights,
+                    },
+                    "score": variant[1],
+                }
+                for variant in (arena_result.auto_tuning.top_variants if arena_result.auto_tuning else [])
+            ],
+            "notes": arena_result.auto_tuning.notes if arena_result.auto_tuning else "",
+        } if arena_result.auto_tuning else None,
+        "summary": arena_result.summary,
+        "recommendation_next_step": arena_result.recommendation_next_step,
+    }
+    
+    # Save to storage
+    arena_id = save_arena_snapshot(arena_dict)
+    arena_dict["arena_id"] = arena_id
+    
+    logger.info(f"Saved arena snapshot {arena_id} for {symbol}")
+    return arena_dict
+
+
+def get_latest_arena(symbol: str) -> Optional[Dict]:
+    """
+    Get the latest arena snapshot for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        
+    Returns:
+        Arena snapshot dict if found, None otherwise
+    """
+    snapshot = load_latest_arena(symbol)
+    if not snapshot:
+        return None
+    
+    return snapshot
+
+
+def list_arena_snapshots(symbol: str, n: int = 20) -> List[Dict]:
+    """
+    List the latest N arena snapshots for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        n: Maximum number of snapshots to return
+        
+    Returns:
+        List of arena snapshot dicts (newest first)
+    """
+    return list_arena(symbol, n)
 

@@ -90,6 +90,16 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - 對照 API：`POST /api/v1/decision-v3/compare/recompute/{symbol}`, `GET /api/v1/decision-v3/compare/latest/{symbol}`, `GET /api/v1/decision-v3/compare/list/{symbol}`
 - War Room V2 DecisionV3Card 升級（Compare 區塊：winner badge + delta metrics grid + summary + next step）
 
+**v0.6.4-A5 新增功能：**
+- Decision V3 Arena（多挑戰者競技場）
+- Champion：Decision V3；Challengers：RISK_OFF, MOMENTUM, EQUAL_WEIGHT baselines
+- Scoreboard：每個挑戰者的 composite score + metrics
+- Winner 判定：最高 composite score（Pareto 支配檢查 + 降權）
+- Regression 警報：若 winner != V3 且差距 >= 0.03 → 觸發回歸警報
+- Auto-Tuning：風險映射 + composite weights grid search（9 個組合）
+- 競技場 API：`POST /api/v1/decision-v3/arena/recompute/{symbol}`, `GET /api/v1/decision-v3/arena/latest/{symbol}`, `GET /api/v1/decision-v3/arena/list/{symbol}`
+- War Room V2 DecisionV3Card 升級（Arena 區塊：winner badge + regression alert + scoreboard table + auto-tuning results）
+
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）
 - 資料完整性待補齊

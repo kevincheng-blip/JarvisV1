@@ -230,3 +230,34 @@ def test_decision_v3_compare_list_health_check():
     assert "symbol" in data, "Response should have 'symbol' field"
     assert "items" in data, "Response should have 'items' field"
     assert isinstance(data["items"], list), "items should be a list"
+
+
+def test_decision_v3_arena_recompute_health_check():
+    """測試 Decision V3 Arena Recompute API 健康檢查"""
+    response = client.post("/api/v1/decision-v3/arena/recompute/2330?mode=performance&window=20")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "arena_id" in data or "symbol" in data, "Response should have 'arena_id' or 'symbol' field"
+    assert "arena" in data, "Response should have 'arena' field"
+
+
+def test_decision_v3_arena_latest_health_check():
+    """測試 Decision V3 Arena Latest API 健康檢查（允許 NO_DATA）"""
+    response = client.get("/api/v1/decision-v3/arena/latest/2330")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "arena" in data, "Response should have 'arena' field"
+
+
+def test_decision_v3_arena_list_health_check():
+    """測試 Decision V3 Arena List API 健康檢查（允許空列表）"""
+    response = client.get("/api/v1/decision-v3/arena/list/2330?n=20")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "items" in data, "Response should have 'items' field"
+    assert isinstance(data["items"], list), "items should be a list"

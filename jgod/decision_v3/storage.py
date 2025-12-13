@@ -446,3 +446,148 @@ def list_compares(symbol: str, n: int = 20) -> List[Dict]:
     compares.sort(key=get_sort_key, reverse=True)
     return compares[:n]
 
+
+# Arena storage functions
+
+def _get_arena_storage_path() -> Path:
+    """Get the storage path for arena.jsonl"""
+    project_root = Path(__file__).parent.parent.parent
+    path = project_root / "data" / "decision_v3" / "arena.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_arena_snapshot(arena: Dict) -> str:
+    """
+    Save an arena snapshot to JSONL file.
+    
+    Args:
+        arena: Arena dict (must contain arena_id or will generate one)
+        
+    Returns:
+        arena_id (str)
+    """
+    path = _get_arena_storage_path()
+    
+    # Generate arena_id if not present
+    if "arena_id" not in arena:
+        arena["arena_id"] = str(uuid.uuid4())
+    
+    # Ensure created_at is ISO format string
+    if "created_at" in arena and isinstance(arena["created_at"], datetime):
+        arena["created_at"] = arena["created_at"].isoformat()
+    elif "created_at" not in arena:
+        arena["created_at"] = datetime.now().isoformat()
+    
+    # Append to file (JSONL format)
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(arena, ensure_ascii=False, default=str) + '\n')
+    
+    logger.info(f"Saved Decision V3 arena {arena['arena_id']} for {arena.get('symbol', 'unknown')}")
+    return arena["arena_id"]
+
+
+def load_latest_arena(symbol: str) -> Optional[Dict]:
+    """
+    Load the latest arena snapshot for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        
+    Returns:
+        Arena dict if found, None otherwise
+    """
+    path = _get_arena_storage_path()
+    
+    if not path.exists():
+        return None
+    
+    latest_arena = None
+    latest_time = None
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("symbol") == symbol:
+                        # Parse created_at if it's a string
+                        if "created_at" in data and isinstance(data["created_at"], str):
+                            try:
+                                data["created_at"] = datetime.fromisoformat(data["created_at"])
+                            except (ValueError, AttributeError):
+                                pass
+                        
+                        if latest_time is None or (
+                            isinstance(data.get("created_at"), datetime) and
+                            (latest_time is None or data["created_at"] > latest_time)
+                        ) or (
+                            isinstance(data.get("created_at"), str) and
+                            (latest_time is None or data["created_at"] > latest_time)
+                        ):
+                            latest_arena = data
+                            if isinstance(data.get("created_at"), datetime):
+                                latest_time = data["created_at"]
+                            elif isinstance(data.get("created_at"), str):
+                                latest_time = data["created_at"]
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse arena line: {e}")
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to load arena: {e}", exc_info=True)
+    
+    return latest_arena
+
+
+def list_arena(symbol: str, n: int = 20) -> List[Dict]:
+    """
+    List the latest N arena snapshots for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        n: Maximum number of arena snapshots to return
+        
+    Returns:
+        List of arena dicts (newest first)
+    """
+    path = _get_arena_storage_path()
+    arenas = []
+    
+    if not path.exists():
+        return arenas
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("symbol") == symbol:
+                        # Parse created_at if it's a string
+                        if "created_at" in data and isinstance(data["created_at"], str):
+                            try:
+                                data["created_at"] = datetime.fromisoformat(data["created_at"])
+                            except (ValueError, AttributeError):
+                                pass
+                        arenas.append(data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse arena line: {e}")
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to load arena: {e}", exc_info=True)
+    
+    # Sort by created_at (newest first) and take top N
+    def get_sort_key(a: Dict) -> str:
+        created_at = a.get("created_at")
+        if isinstance(created_at, datetime):
+            return created_at.isoformat()
+        elif isinstance(created_at, str):
+            return created_at
+        return ""
+    
+    arenas.sort(key=get_sort_key, reverse=True)
+    return arenas[:n]
+

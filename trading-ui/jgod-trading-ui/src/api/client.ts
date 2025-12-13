@@ -854,5 +854,164 @@ export const api = {
       throw error;
     }
   },
+
+  recomputeDecisionV3Arena: async (
+    symbol: string,
+    options: {
+      mode?: string;
+      limit?: number;
+      k?: number;
+      window?: number;
+    } = {}
+  ): Promise<{
+    arena_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    window: number;
+    limit: number;
+    k: number;
+    arena: {
+      symbol: string;
+      mode: string;
+      window: number;
+      limit: number;
+      k: number;
+      scoreboard: Array<{
+        challenger_id: string;
+        composite_score: number;
+        metrics: {
+          hit_rate_proxy: number;
+          avg_return_proxy: number;
+          max_drawdown_proxy: number;
+          turnover_proxy: number;
+          decision_consistency: number;
+        };
+        pareto_dominated: boolean;
+      }>;
+      winner_id: string;
+      is_regression: boolean;
+      auto_tuning: {
+        best_config: {
+          risk_mapping: Record<string, number>;
+          composite_weights: Record<string, number>;
+        } | null;
+        top_variants: Array<{
+          config: {
+            risk_mapping: Record<string, number>;
+            composite_weights: Record<string, number>;
+          };
+          score: number;
+        }>;
+        notes: string;
+      } | null;
+      summary: string;
+      recommendation_next_step: string;
+    };
+  }> => {
+    try {
+      const response = await client.post(
+        `/api/v1/decision-v3/arena/recompute/${symbol}`,
+        {},
+        {
+          params: {
+            mode: options.mode || "performance",
+            limit: options.limit || 60,
+            k: options.k || 5,
+            window: options.window || 20,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`Arena not found for ${symbol}`);
+      }
+      throw error;
+    }
+  },
+
+  getDecisionV3ArenaLatest: async (symbol: string): Promise<{
+    arena_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    window: number;
+    limit: number;
+    k: number;
+    arena: {
+      symbol: string;
+      mode: string;
+      window: number;
+      limit: number;
+      k: number;
+      scoreboard: Array<{
+        challenger_id: string;
+        composite_score: number;
+        metrics: {
+          hit_rate_proxy: number;
+          avg_return_proxy: number;
+          max_drawdown_proxy: number;
+          turnover_proxy: number;
+          decision_consistency: number;
+        };
+        pareto_dominated: boolean;
+      }>;
+      winner_id: string;
+      is_regression: boolean;
+      auto_tuning: {
+        best_config: {
+          risk_mapping: Record<string, number>;
+          composite_weights: Record<string, number>;
+        } | null;
+        top_variants: Array<{
+          config: {
+            risk_mapping: Record<string, number>;
+            composite_weights: Record<string, number>;
+          };
+          score: number;
+        }>;
+        notes: string;
+      } | null;
+      summary: string;
+      recommendation_next_step: string;
+    };
+  } | null> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/arena/latest/${symbol}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  listDecisionV3Arena: async (
+    symbol: string,
+    n: number = 20
+  ): Promise<{
+    symbol: string;
+    items: Array<{
+      arena_id: string;
+      created_at: string;
+      winner_id: string;
+      is_regression: boolean;
+    }>;
+    total: number;
+  }> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/arena/list/${symbol}`, {
+        params: { n },
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return { symbol, items: [], total: 0 };
+      }
+      throw error;
+    }
+  },
 };
 
