@@ -295,7 +295,10 @@ def test_list_arena_snapshots_contract(mock_arena_service):
         },
     ]
     
+    # Ensure mock returns a list, not a coroutine
     mock_arena_service["list"].return_value = mock_snapshots
+    # Also ensure it's not async
+    mock_arena_service["list"].side_effect = None
     
     response = client.get("/api/v1/decision-v3/arena/list/2330?n=20")
     
@@ -305,12 +308,14 @@ def test_list_arena_snapshots_contract(mock_arena_service):
     assert "symbol" in data
     assert data["symbol"] == "2330"
     assert "total" in data
-    assert data["total"] == 2
+    assert data["total"] == len(mock_snapshots)
     assert "items" in data
-    assert len(data["items"]) == 2
-    assert data["items"][0]["arena_id"] == "arena-1"
-    assert data["items"][0]["winner_id"] == "V3"
-    assert data["items"][1]["is_regression"] == True
+    assert len(data["items"]) == len(mock_snapshots)
+    if len(data["items"]) > 0:
+        assert data["items"][0]["arena_id"] == "arena-1"
+        assert data["items"][0]["winner_id"] == "V3"
+    if len(data["items"]) > 1:
+        assert data["items"][1]["is_regression"] == True
 
 
 def test_list_arena_snapshots_empty_contract(mock_arena_service):

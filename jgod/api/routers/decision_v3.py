@@ -53,7 +53,7 @@ from jgod.decision_v3.service import (
     list_compare_snapshots,
     recompute_arena_and_save,
     get_latest_arena,
-    list_arena_snapshots,
+    list_arena_snapshots as service_list_arena_snapshots,
 )
 
 logger = logging.getLogger(__name__)
@@ -732,13 +732,13 @@ async def get_arena_latest(
     summary="List Decision V3 Arena Snapshots",
     description="List arena snapshots for a symbol (always returns 200, empty list if no data)",
 )
-async def list_arena_snapshots(
+def list_arena_snapshots(
     symbol: str,
     n: int = Query(20, ge=1, le=100, description="Maximum number of arena snapshots to return"),
 ) -> ArenaListResponseSchema:
     """List arena snapshots for a symbol (always returns 200, empty list if no snapshots)"""
     try:
-        snapshots = list_arena_snapshots(symbol, n)
+        snapshots = service_list_arena_snapshots(symbol, n)
         
         items = []
         for snapshot in snapshots:
