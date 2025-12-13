@@ -13,8 +13,10 @@ from jgod.decision_v3.models import DecisionV3Result
 from jgod.decision_v3.storage import (
     save_snapshot, load_latest, list_latest,
     save_evaluation, load_latest_evaluation, list_evaluations,
+    save_compare, load_latest_compare, list_compares,
 )
 from jgod.decision_v3.evaluation import evaluate_decision_v3, EvaluationVerdict
+from jgod.decision_v3.compare import compute_compare, CompareWinner
 from jgod.observer.prediction_stability import TimelineItem
 
 logger = logging.getLogger(__name__)
@@ -299,4 +301,143 @@ def list_evaluation_snapshots(symbol: str, n: int = 20) -> List[Dict]:
         List of evaluation snapshot dicts (newest first)
     """
     return list_evaluations(symbol, n)
+
+
+# Compare service functions
+
+def compute_compare_result(
+    symbol: str,
+    mode: str = "performance",
+    limit: int = 60,
+    k: int = 5,
+    window: int = 20,
+) -> Dict:
+    """
+    Compute comparison between Decision V3 and Baseline (no storage).
+    
+    Args:
+        symbol: Stock symbol
+        mode: "performance" (default) or "signals"
+        limit: Number of timeline items to use
+        k: Number of top strategies to recommend
+        window: Evaluation window size
+        
+    Returns:
+        Compare result dict with winner, delta_metrics, summary, recommendation_next_step
+    """
+    return compute_compare(symbol, mode, limit, k, window)
+
+
+def recompute_compare_and_save(
+    symbol: str,
+    mode: str = "performance",
+    limit: int = 60,
+    k: int = 5,
+    window: int = 20,
+) -> Dict:
+    """
+    Recompute compare and save as snapshot.
+    
+    Args:
+        symbol: Stock symbol
+        mode: "performance" (default) or "signals"
+        limit: Number of timeline items to use
+        k: Number of top strategies to recommend
+        window: Evaluation window size
+        
+    Returns:
+        Compare snapshot dict with compare_id, created_at, and full compare result
+    """
+    # Compute compare
+    compare_result = compute_compare(symbol, mode, limit, k, window)
+    
+    # Build snapshot dict (compare_result already has winner, delta_metrics, summary, recommendation_next_step)
+    # We need to wrap it with symbol, mode, limit, k, window for the response schema
+    snapshot = {
+        "created_at": datetime.now(),
+        "symbol": symbol,
+        "mode": mode,
+        "limit": limit,
+        "k": k,
+        "window": window,
+        "compare": {
+            "symbol": symbol,
+            "mode": mode,
+            "limit": limit,
+            "k": k,
+            "window": window,
+            "winner": compare_result["winner"],
+            "delta_metrics": compare_result["delta_metrics"],
+            "summary": compare_result["summary"],
+            "recommendation_next_step": compare_result["recommendation_next_step"],
+        },
+    }
+    
+    # Save to storage (save the compare_result directly, not the wrapped version)
+    storage_snapshot = {
+        "created_at": datetime.now(),
+        "symbol": symbol,
+        "mode": mode,
+        "limit": limit,
+        "k": k,
+        "window": window,
+        "compare": compare_result,
+    }
+    compare_id = save_compare(storage_snapshot)
+    snapshot["compare_id"] = compare_id
+    
+    logger.info(f"Recomputed and saved Decision V3 compare {compare_id} for {symbol}")
+    return snapshot
+
+
+def get_latest_compare(symbol: str) -> Optional[Dict]:
+    """
+    Get the latest saved compare snapshot for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        
+    Returns:
+        Compare snapshot dict if found, None otherwise (wrapped for response schema)
+    """
+    snapshot = load_latest_compare(symbol)
+    if not snapshot:
+        return None
+    
+    # Wrap the compare result for response schema
+    compare_result = snapshot.get("compare", {})
+    return {
+        "compare_id": snapshot.get("compare_id", ""),
+        "created_at": snapshot.get("created_at"),
+        "symbol": snapshot.get("symbol", symbol),
+        "mode": snapshot.get("mode", "performance"),
+        "limit": snapshot.get("limit", 60),
+        "k": snapshot.get("k", 5),
+        "window": snapshot.get("window", 20),
+        "compare": {
+            "symbol": snapshot.get("symbol", symbol),
+            "mode": snapshot.get("mode", "performance"),
+            "limit": snapshot.get("limit", 60),
+            "k": snapshot.get("k", 5),
+            "window": snapshot.get("window", 20),
+            "winner": compare_result.get("winner", "NO_DATA"),
+            "delta_metrics": compare_result.get("delta_metrics", {}),
+            "summary": compare_result.get("summary", ""),
+            "recommendation_next_step": compare_result.get("recommendation_next_step", ""),
+        },
+    }
+
+
+def list_compare_snapshots(symbol: str, n: int = 20) -> List[Dict]:
+    """
+    List the latest N compare snapshots for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        n: Maximum number of snapshots to return
+        
+    Returns:
+        List of compare snapshot dicts (newest first)
+    """
+    return list_compares(symbol, n)
 

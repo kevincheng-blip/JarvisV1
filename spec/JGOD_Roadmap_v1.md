@@ -82,6 +82,14 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - 評估 API：`POST /api/v1/decision-v3/eval/recompute/{symbol}`, `GET /api/v1/decision-v3/eval/latest/{symbol}`, `GET /api/v1/decision-v3/eval/list/{symbol}`
 - War Room V2 DecisionV3Card 升級（Evaluation 區塊：verdict badge + metrics grid + recommendation）
 
+**v0.6.3-A4 新增功能：**
+- Decision V3 Compare vs Baseline（對照評估）
+- Baseline 定義：固定 risk_state="CAUTION", position_scale=0.50, primary_strategy="momentum", confidence=0.50
+- Winner 判定：V3 / BASELINE / TIE / NO_DATA（使用 composite score）
+- Delta metrics：每個指標的差值（v3 - baseline）
+- 對照 API：`POST /api/v1/decision-v3/compare/recompute/{symbol}`, `GET /api/v1/decision-v3/compare/latest/{symbol}`, `GET /api/v1/decision-v3/compare/list/{symbol}`
+- War Room V2 DecisionV3Card 升級（Compare 區塊：winner badge + delta metrics grid + summary + next step）
+
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）
 - 資料完整性待補齊

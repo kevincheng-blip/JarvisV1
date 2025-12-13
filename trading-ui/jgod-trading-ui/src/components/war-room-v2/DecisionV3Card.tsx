@@ -18,6 +18,11 @@ import {
   useRecomputeDecisionV3Eval,
   useDecisionV3EvalList,
 } from "../../hooks/useDecisionV3Eval";
+import {
+  useDecisionV3CompareLatest,
+  useRecomputeDecisionV3Compare,
+  useDecisionV3CompareList,
+} from "../../hooks/useDecisionV3Compare";
 
 interface DecisionV3CardProps {
   symbol: string | null;
@@ -35,6 +40,12 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
   const { data: evalList } = useDecisionV3EvalList(symbol || "", 5);
   const recomputeEval = useRecomputeDecisionV3Eval(symbol || "");
   const [evalActionMessage, setEvalActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
+  // Compare hooks
+  const { data: compareLatest } = useDecisionV3CompareLatest(symbol || "");
+  const { data: compareList } = useDecisionV3CompareList(symbol || "", 5);
+  const recomputeCompare = useRecomputeDecisionV3Compare(symbol || "");
+  const [compareActionMessage, setCompareActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const getRiskStateColor = (state: string) => {
     switch (state) {
@@ -100,6 +111,51 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
         return "無資料";
       default:
         return verdict;
+    }
+  };
+
+  const getWinnerColor = (winner: string) => {
+    switch (winner) {
+      case "V3":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "BASELINE":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      case "TIE":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      case "NO_DATA":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+    }
+  };
+
+  const getWinnerLabel = (winner: string) => {
+    switch (winner) {
+      case "V3":
+        return "V3 勝出";
+      case "BASELINE":
+        return "Baseline 勝出";
+      case "TIE":
+        return "平手";
+      case "NO_DATA":
+        return "無資料";
+      default:
+        return winner;
+    }
+  };
+
+  const handleRecomputeCompare = async () => {
+    if (!symbol) return;
+    
+    setCompareActionMessage(null);
+    try {
+      await recomputeCompare.mutateAsync({ mode: "performance", limit: 60, k: 5, window: 20 });
+      setCompareActionMessage({ type: "success", text: "對照評估重新計算成功" });
+      setTimeout(() => setCompareActionMessage(null), 3000);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "操作失敗";
+      setCompareActionMessage({ type: "error", text: errorMsg });
+      setTimeout(() => setCompareActionMessage(null), 5000);
     }
   };
 
@@ -421,6 +477,148 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
                   </div>
                   <span className={`px-1.5 py-0.5 rounded text-xs ${getVerdictColor(item.verdict)}`}>
                     {getVerdictLabel(item.verdict)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Compare Section */}
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">對照 (Compare)</h4>
+          <button
+            onClick={handleRecomputeCompare}
+            disabled={recomputeCompare.isPending || !symbol}
+            className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {recomputeCompare.isPending ? "計算中..." : "Run Compare"}
+          </button>
+        </div>
+
+        {/* Compare Action Message */}
+        {compareActionMessage && (
+          <div className={`mb-3 p-2 rounded text-xs ${
+            compareActionMessage.type === "success"
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+          }`}>
+            {compareActionMessage.text}
+          </div>
+        )}
+
+        {/* Latest Compare */}
+        {compareLatest && compareLatest.compare && compareLatest.compare.compare && compareLatest.compare.compare.winner !== "NO_DATA" ? (
+          <>
+            {/* Winner Badge */}
+            <div className="mb-3">
+              <span className={`px-2 py-1 text-xs rounded ${getWinnerColor(compareLatest.compare.compare.winner)}`}>
+                {getWinnerLabel(compareLatest.compare.compare.winner)}
+              </span>
+              {compareLatest.created_at && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  {new Date(compareLatest.created_at).toLocaleString("zh-TW")}
+                </span>
+              )}
+            </div>
+
+            {/* Delta Metrics Grid */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">命中率差異</div>
+                <div className={`text-sm font-semibold ${
+                  compareLatest.compare.compare.delta_metrics.hit_rate_proxy > 0
+                    ? "text-green-600 dark:text-green-400"
+                    : compareLatest.compare.compare.delta_metrics.hit_rate_proxy < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-900 dark:text-white"
+                }`}>
+                  {(compareLatest.compare.compare.delta_metrics.hit_rate_proxy * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">報酬差異</div>
+                <div className={`text-sm font-semibold ${
+                  compareLatest.compare.compare.delta_metrics.avg_return_proxy > 0
+                    ? "text-green-600 dark:text-green-400"
+                    : compareLatest.compare.compare.delta_metrics.avg_return_proxy < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-900 dark:text-white"
+                }`}>
+                  {(compareLatest.compare.compare.delta_metrics.avg_return_proxy * 100).toFixed(2)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">回撤差異</div>
+                <div className={`text-sm font-semibold ${
+                  compareLatest.compare.compare.delta_metrics.max_drawdown_proxy < 0
+                    ? "text-green-600 dark:text-green-400"
+                    : compareLatest.compare.compare.delta_metrics.max_drawdown_proxy > 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-900 dark:text-white"
+                }`}>
+                  {(compareLatest.compare.compare.delta_metrics.max_drawdown_proxy * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">一致性差異</div>
+                <div className={`text-sm font-semibold ${
+                  compareLatest.compare.compare.delta_metrics.decision_consistency > 0
+                    ? "text-green-600 dark:text-green-400"
+                    : compareLatest.compare.compare.delta_metrics.decision_consistency < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-900 dark:text-white"
+                }`}>
+                  {(compareLatest.compare.compare.delta_metrics.decision_consistency * 100).toFixed(0)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Summary */}
+            {compareLatest.compare.compare.summary && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">對照摘要</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {compareLatest.compare.compare.summary}
+                </div>
+              </div>
+            )}
+
+            {/* Recommendation */}
+            {compareLatest.compare.compare.recommendation_next_step && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">建議</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {compareLatest.compare.compare.recommendation_next_step}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+            暫無對照評估資料
+          </div>
+        )}
+
+        {/* Recent Compares */}
+        {compareList && compareList.items.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">最近對照 ({compareList.total})</div>
+            <div className="space-y-1">
+              {compareList.items.slice(0, 5).map((item) => (
+                <div key={item.compare_id} className="flex justify-between text-xs">
+                  <div className="text-gray-600 dark:text-gray-400">
+                    {new Date(item.created_at).toLocaleString("zh-TW", {
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-xs ${getWinnerColor(item.winner)}`}>
+                    {getWinnerLabel(item.winner)}
                   </span>
                 </div>
               ))}

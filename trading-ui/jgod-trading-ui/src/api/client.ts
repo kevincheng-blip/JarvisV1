@@ -733,5 +733,126 @@ export const api = {
       throw error;
     }
   },
+
+  // Decision V3 Compare APIs
+  recomputeDecisionV3Compare: async (
+    symbol: string,
+    options: {
+      mode?: string;
+      limit?: number;
+      k?: number;
+      window?: number;
+    } = {}
+  ): Promise<{
+    compare_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    limit: number;
+    k: number;
+    window: number;
+    compare: {
+      symbol: string;
+      mode: string;
+      limit: number;
+      k: number;
+      window: number;
+      winner: string;
+      delta_metrics: {
+        hit_rate_proxy: number;
+        avg_return_proxy: number;
+        max_drawdown_proxy: number;
+        turnover_proxy: number;
+        decision_consistency: number;
+      };
+      summary: string;
+      recommendation_next_step: string;
+    };
+  }> => {
+    try {
+      const response = await client.post(
+        `/api/v1/decision-v3/compare/recompute/${symbol}`,
+        {},
+        {
+          params: {
+            mode: options.mode || "performance",
+            limit: options.limit || 60,
+            k: options.k || 5,
+            window: options.window || 20,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`Compare not found for ${symbol}`);
+      }
+      throw error;
+    }
+  },
+
+  getDecisionV3CompareLatest: async (symbol: string): Promise<{
+    compare_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    limit: number;
+    k: number;
+    window: number;
+    compare: {
+      symbol: string;
+      mode: string;
+      limit: number;
+      k: number;
+      window: number;
+      winner: string;
+      delta_metrics: {
+        hit_rate_proxy: number;
+        avg_return_proxy: number;
+        max_drawdown_proxy: number;
+        turnover_proxy: number;
+        decision_consistency: number;
+      };
+      summary: string;
+      recommendation_next_step: string;
+    };
+  } | null> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/compare/latest/${symbol}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  listDecisionV3Compares: async (
+    symbol: string,
+    n: number = 20
+  ): Promise<{
+    symbol: string;
+    items: Array<{
+      compare_id: string;
+      created_at: string;
+      symbol: string;
+      winner: string;
+      summary_short: string;
+    }>;
+    total: number;
+  }> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/compare/list/${symbol}`, {
+        params: { n },
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return { symbol, items: [], total: 0 };
+      }
+      throw error;
+    }
+  },
 };
 

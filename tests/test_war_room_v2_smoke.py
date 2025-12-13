@@ -200,3 +200,33 @@ def test_decision_ab_reports_recent_ok():
     # 驗證可以正常解析 JSON
     data = response.json()
     assert isinstance(data, list), "Recent AB test reports should return a list"
+
+
+def test_decision_v3_compare_recompute_health_check():
+    """測試 Decision V3 Compare Recompute API 健康檢查"""
+    response = client.post("/api/v1/decision-v3/compare/recompute/2330?mode=performance&window=20")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "compare_id" in data or "symbol" in data, "Response should have 'compare_id' or 'symbol' field"
+
+
+def test_decision_v3_compare_latest_health_check():
+    """測試 Decision V3 Compare Latest API 健康檢查（允許 NO_DATA）"""
+    response = client.get("/api/v1/decision-v3/compare/latest/2330")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "compare" in data, "Response should have 'compare' field"
+
+
+def test_decision_v3_compare_list_health_check():
+    """測試 Decision V3 Compare List API 健康檢查（允許空列表）"""
+    response = client.get("/api/v1/decision-v3/compare/list/2330?n=20")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "items" in data, "Response should have 'items' field"
+    assert isinstance(data["items"], list), "items should be a list"

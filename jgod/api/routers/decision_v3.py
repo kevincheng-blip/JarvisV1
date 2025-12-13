@@ -26,6 +26,12 @@ from jgod.api.schemas.decision_v3_eval import (
     eval_snapshot_to_response_schema,
     eval_list_to_response_schema,
 )
+from jgod.api.schemas.decision_v3_compare import (
+    CompareSnapshotResponseSchema,
+    CompareListResponseSchema,
+    compare_snapshot_to_response_schema,
+    compare_list_to_response_schema,
+)
 from jgod.decision_v3.engine import DecisionEngineV3
 from jgod.decision_v3.service import (
     compute_decision,
@@ -35,6 +41,9 @@ from jgod.decision_v3.service import (
     recompute_evaluation_and_save,
     get_latest_evaluation,
     list_evaluation_snapshots,
+    recompute_compare_and_save,
+    get_latest_compare,
+    list_compare_snapshots,
 )
 
 logger = logging.getLogger(__name__)
@@ -424,6 +433,160 @@ async def list_decision_v3_evaluations(
         logger.error(f"Error listing Decision V3 evaluations for {symbol}: {e}", exc_info=True)
         # Even on error, return empty list - still 200
         return DecisionV3EvalListResponseSchema(
+            symbol=symbol,
+            items=[],
+            total=0,
+        )
+
+
+# Compare endpoints
+
+@router.post(
+    "/compare/recompute/{symbol}",
+    response_model=CompareSnapshotResponseSchema,
+    summary="Recompute and save Decision V3 compare snapshot",
+    description="重新計算並存檔 Decision V3 對照評估快照（V3 vs Baseline）",
+)
+async def recompute_decision_v3_compare(
+    symbol: str,
+    mode: str = Query("performance", description="Decision mode: 'performance' or 'signals'"),
+    limit: int = Query(60, ge=1, le=200, description="Number of timeline items to use"),
+    k: int = Query(5, ge=1, le=10, description="Number of top strategies to recommend"),
+    window: int = Query(20, ge=5, le=100, description="Evaluation window size"),
+) -> CompareSnapshotResponseSchema:
+    """Recompute compare and save as snapshot (always returns 200)"""
+    try:
+        snapshot = recompute_compare_and_save(symbol, mode, limit, k, window)
+        return compare_snapshot_to_response_schema(snapshot)
+    except Exception as e:
+        logger.error(f"Error recomputing Decision V3 compare for {symbol}: {e}", exc_info=True)
+        # Even on error, return a valid response (NO_DATA)
+        from jgod.decision_v3.compare import CompareWinner
+        error_snapshot = {
+            "compare_id": "",
+            "created_at": datetime.now(),
+            "symbol": symbol,
+            "mode": mode,
+            "limit": limit,
+            "k": k,
+            "window": window,
+            "compare": {
+                "symbol": symbol,
+                "mode": mode,
+                "limit": limit,
+                "k": k,
+                "window": window,
+                "winner": CompareWinner.NO_DATA,
+                "delta_metrics": {
+                    "hit_rate_proxy": 0.0,
+                    "avg_return_proxy": 0.0,
+                    "max_drawdown_proxy": 0.0,
+                    "turnover_proxy": 0.0,
+                    "decision_consistency": 0.0,
+                },
+                "summary": f"無法為 {symbol} 產生對照評估：系統發生錯誤。請稍後再試。",
+                "recommendation_next_step": "請檢查系統狀態後重試。",
+            },
+        }
+        return compare_snapshot_to_response_schema(error_snapshot)
+
+
+@router.get(
+    "/compare/latest/{symbol}",
+    response_model=CompareSnapshotResponseSchema,
+    summary="Get latest Decision V3 compare for symbol",
+    description="讀取最新存檔的 Decision V3 對照評估快照",
+)
+async def get_latest_decision_v3_compare(
+    symbol: str,
+) -> CompareSnapshotResponseSchema:
+    """Get latest saved compare for a symbol (always returns 200, never 404)"""
+    try:
+        snapshot = get_latest_compare(symbol)
+        
+        if not snapshot:
+            # Return empty snapshot (NO_DATA) - still 200
+            from jgod.decision_v3.compare import CompareWinner
+            empty_snapshot = {
+                "compare_id": "",
+                "created_at": datetime.now(),
+                "symbol": symbol,
+                "mode": "performance",
+                "limit": 60,
+                "k": 5,
+                "window": 20,
+                "compare": {
+                    "symbol": symbol,
+                    "mode": "performance",
+                    "limit": 60,
+                    "k": 5,
+                    "window": 20,
+                    "winner": CompareWinner.NO_DATA,
+                    "delta_metrics": {
+                        "hit_rate_proxy": 0.0,
+                        "avg_return_proxy": 0.0,
+                        "max_drawdown_proxy": 0.0,
+                        "turnover_proxy": 0.0,
+                        "decision_consistency": 0.0,
+                    },
+                    "summary": f"目前 {symbol} 暫無存檔的對照評估快照。請使用 recompute 端點產生快照。",
+                    "recommendation_next_step": "請使用 recompute 端點產生對照評估。",
+                },
+            }
+            return compare_snapshot_to_response_schema(empty_snapshot)
+        
+        return compare_snapshot_to_response_schema(snapshot)
+    except Exception as e:
+        logger.error(f"Error getting latest Decision V3 compare for {symbol}: {e}", exc_info=True)
+        # Even on error, return a valid response
+        from jgod.decision_v3.compare import CompareWinner
+        empty_snapshot = {
+            "compare_id": "",
+            "created_at": datetime.now(),
+            "symbol": symbol,
+            "mode": "performance",
+            "limit": 60,
+            "k": 5,
+            "window": 20,
+            "compare": {
+                "symbol": symbol,
+                "mode": "performance",
+                "limit": 60,
+                "k": 5,
+                "window": 20,
+                "winner": CompareWinner.NO_DATA,
+                "delta_metrics": {
+                    "hit_rate_proxy": 0.0,
+                    "avg_return_proxy": 0.0,
+                    "max_drawdown_proxy": 0.0,
+                    "turnover_proxy": 0.0,
+                    "decision_consistency": 0.0,
+                },
+                "summary": f"無法讀取 {symbol} 的對照評估快照：系統發生錯誤。",
+                "recommendation_next_step": "請檢查系統狀態後重試。",
+            },
+        }
+        return compare_snapshot_to_response_schema(empty_snapshot)
+
+
+@router.get(
+    "/compare/list/{symbol}",
+    response_model=CompareListResponseSchema,
+    summary="List Decision V3 compares for symbol",
+    description="列出指定股票的 Decision V3 對照評估快照列表",
+)
+async def list_decision_v3_compares(
+    symbol: str,
+    n: int = Query(20, ge=1, le=100, description="Maximum number of compares to return"),
+) -> CompareListResponseSchema:
+    """List compares for a symbol (always returns 200, empty list if no compares)"""
+    try:
+        snapshots = list_compare_snapshots(symbol, n)
+        return compare_list_to_response_schema(snapshots, symbol)
+    except Exception as e:
+        logger.error(f"Error listing Decision V3 compares for {symbol}: {e}", exc_info=True)
+        # Even on error, return empty list - still 200
+        return CompareListResponseSchema(
             symbol=symbol,
             items=[],
             total=0,
