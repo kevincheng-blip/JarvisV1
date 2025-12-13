@@ -1,17 +1,18 @@
 # J-GOD Latest Release Notes
 
 **Last Updated:** 2025-12-13  
-**Current Version:** v0.6.1-A2
+**Current Version:** v0.6.2-A3
 
 ---
 
 ## Highlights
 
-This release includes three major feature packages:
+This release includes four major feature packages:
 
 1. **v0.4.0**: Patch lifecycle E2E + War Room Quick Actions + Frontend API consistency
 2. **v0.5.0-B1 + v0.5.1-B2**: S-Rank Engine V2 recommendation system (rule-based → performance-driven)
 3. **v0.6.0-A1 + v0.6.1-A2**: Decision Engine V3 (rule-based × S-Rank V2 × Performance Feed) with snapshot management
+4. **v0.6.2-A3**: Decision V3 Evaluation Loop (Self-Compare / Self-Evolve)
 
 ---
 
@@ -32,6 +33,11 @@ This release includes three major feature packages:
 - `GET /api/v1/decision-v3/latest/{symbol}` - Get latest decision snapshot
 - `GET /api/v1/decision-v3/list/{symbol}?n=20` - List decision snapshots
 
+### Decision V3 Evaluation (v0.6.2-A3)
+- `POST /api/v1/decision-v3/eval/recompute/{symbol}?mode=performance&limit=60&k=5&window=20` - Recompute and save evaluation snapshot
+- `GET /api/v1/decision-v3/eval/latest/{symbol}` - Get latest evaluation snapshot
+- `GET /api/v1/decision-v3/eval/list/{symbol}?n=20` - List evaluation snapshots
+
 ### Doctrine Patch (Enhanced)
 - `POST /api/v1/doctrine/patches/{patchId}/approve` - Approve patch (with request body)
 - `POST /api/v1/doctrine/patches/{patchId}/reject` - Reject patch (with request body)
@@ -48,6 +54,7 @@ This release includes three major feature packages:
 - `tests/test_strategy_perf_contract.py` - Strategy Performance contract tests
 - `tests/test_decision_v3_contract.py` - Decision V3 contract tests
 - `tests/test_decision_v3_snapshot_contract.py` - Decision V3 snapshot contract tests
+- `tests/test_decision_v3_eval_contract.py` - Decision V3 evaluation contract tests (v0.6.2-A3)
 
 ### Updated Smoke Tests
 - `tests/test_war_room_v2_smoke.py` - Added health checks for:
@@ -56,7 +63,7 @@ This release includes three major feature packages:
   - Decision V3 decide/latest/recompute
 
 ### CI Quick Check
-- `scripts/ci_quick_check.sh` - Now includes 10 checks:
+- `scripts/ci_quick_check.sh` - Now includes 11 checks:
   1. Compileall syntax check
   2. War Room V2 smoke test
   3. Predictions timeline contract test
@@ -67,6 +74,7 @@ This release includes three major feature packages:
   8. Strategy Performance contract test
   9. Decision V3 contract test
   10. Decision V3 Snapshot contract test
+  11. Decision V3 Evaluation contract test
 
 ---
 
@@ -129,6 +137,7 @@ curl "http://127.0.0.1:8000/api/v1/decision-v3/latest/2330"
 - S-Rank V2 Snapshots: `data/s_rank_v2/recommendations.jsonl`
 - Strategy Performance Snapshots: `data/strategy_perf/perf_snapshots.jsonl`
 - Decision V3 Snapshots: `data/decision_v3/snapshots.jsonl`
+- Decision V3 Evaluations: `data/decision_v3/evaluations.jsonl` (v0.6.2-A3)
 
 ---
 
@@ -136,4 +145,5 @@ curl "http://127.0.0.1:8000/api/v1/decision-v3/latest/2330"
 - `docs/release_notes_v0.4.0.md`
 - `docs/release_notes_v0.6.0-a1.md`
 - `docs/release_notes_v0.6.1-a2.md`
+- `docs/release_notes_v0.6.2-a3.md`
 

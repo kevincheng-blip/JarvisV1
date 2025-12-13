@@ -124,6 +124,17 @@ else
 fi
 echo ""
 
+# Check 11: Decision V3 Evaluation contract test
+echo "1️⃣1️⃣  Running Decision V3 Evaluation contract test..."
+pytest tests/test_decision_v3_eval_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Decision V3 Evaluation contract test passed"
+else
+    echo "   ❌ Decision V3 Evaluation contract test failed"
+    exit 1
+fi
+echo ""
+
 echo "================================"
 echo "✅ All CI quick checks passed!"
 echo ""

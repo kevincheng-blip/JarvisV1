@@ -13,6 +13,11 @@ import {
   useRecomputeDecisionV3,
   useDecisionV3SnapshotList,
 } from "../../hooks/useDecisionV3Snapshots";
+import {
+  useDecisionV3EvalLatest,
+  useRecomputeDecisionV3Eval,
+  useDecisionV3EvalList,
+} from "../../hooks/useDecisionV3Eval";
 
 interface DecisionV3CardProps {
   symbol: string | null;
@@ -24,6 +29,12 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
   const { data: snapshotList } = useDecisionV3SnapshotList(symbol, 5, !!symbol);
   const recomputeDecision = useRecomputeDecisionV3();
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
+  // Evaluation hooks
+  const { data: evalLatest } = useDecisionV3EvalLatest(symbol || "");
+  const { data: evalList } = useDecisionV3EvalList(symbol || "", 5);
+  const recomputeEval = useRecomputeDecisionV3Eval(symbol || "");
+  const [evalActionMessage, setEvalActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const getRiskStateColor = (state: string) => {
     switch (state) {
@@ -60,6 +71,51 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
       momentum: "動量",
     };
     return names[strategy] || strategy;
+  };
+
+  const getVerdictColor = (verdict: string) => {
+    switch (verdict) {
+      case "IMPROVED":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "NEUTRAL":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      case "REGRESSED":
+        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      case "NO_DATA":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+    }
+  };
+
+  const getVerdictLabel = (verdict: string) => {
+    switch (verdict) {
+      case "IMPROVED":
+        return "改善";
+      case "NEUTRAL":
+        return "中性";
+      case "REGRESSED":
+        return "衰退";
+      case "NO_DATA":
+        return "無資料";
+      default:
+        return verdict;
+    }
+  };
+
+  const handleRecomputeEval = async () => {
+    if (!symbol) return;
+    
+    setEvalActionMessage(null);
+    try {
+      await recomputeEval.mutateAsync({ mode: "performance", limit: 60, k: 5, window: 20 });
+      setEvalActionMessage({ type: "success", text: "評估重新計算成功" });
+      setTimeout(() => setEvalActionMessage(null), 3000);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || "操作失敗";
+      setEvalActionMessage({ type: "error", text: errorMsg });
+      setTimeout(() => setEvalActionMessage(null), 5000);
+    }
   };
 
   if (isLoading) {
@@ -260,6 +316,118 @@ export function DecisionV3Card({ symbol }: DecisionV3CardProps) {
           </div>
         </div>
       )}
+
+      {/* Evaluation Section */}
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center mb-3">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">評估 (Evaluation)</h4>
+          <button
+            onClick={handleRecomputeEval}
+            disabled={recomputeEval.isPending || !symbol}
+            className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {recomputeEval.isPending ? "計算中..." : "Run Evaluation"}
+          </button>
+        </div>
+
+        {/* Eval Action Message */}
+        {evalActionMessage && (
+          <div className={`mb-3 p-2 rounded text-xs ${
+            evalActionMessage.type === "success"
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+          }`}>
+            {evalActionMessage.text}
+          </div>
+        )}
+
+        {/* Latest Evaluation */}
+        {evalLatest && evalLatest.evaluation && evalLatest.evaluation.metrics.verdict !== "NO_DATA" ? (
+          <>
+            {/* Verdict Badge */}
+            <div className="mb-3">
+              <span className={`px-2 py-1 text-xs rounded ${getVerdictColor(evalLatest.evaluation.metrics.verdict)}`}>
+                {getVerdictLabel(evalLatest.evaluation.metrics.verdict)}
+              </span>
+              {evalLatest.created_at && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  {new Date(evalLatest.created_at).toLocaleString("zh-TW")}
+                </span>
+              )}
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">命中率</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {(evalLatest.evaluation.metrics.hit_rate_proxy * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">平均報酬</div>
+                <div className={`text-sm font-semibold ${
+                  evalLatest.evaluation.metrics.avg_return_proxy > 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}>
+                  {(evalLatest.evaluation.metrics.avg_return_proxy * 100).toFixed(2)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">最大回撤</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {(evalLatest.evaluation.metrics.max_drawdown_proxy * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">一致性</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {(evalLatest.evaluation.metrics.decision_consistency * 100).toFixed(0)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Recommendation */}
+            {evalLatest.evaluation.metrics.recommendation_next_step && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">建議</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {evalLatest.evaluation.metrics.recommendation_next_step}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+            暫無評估資料
+          </div>
+        )}
+
+        {/* Recent Evaluations */}
+        {evalList && evalList.items.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">最近評估 ({evalList.total})</div>
+            <div className="space-y-1">
+              {evalList.items.slice(0, 3).map((item) => (
+                <div key={item.eval_id} className="flex justify-between text-xs">
+                  <div className="text-gray-600 dark:text-gray-400">
+                    {new Date(item.created_at).toLocaleString("zh-TW", {
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-xs ${getVerdictColor(item.verdict)}`}>
+                    {getVerdictLabel(item.verdict)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

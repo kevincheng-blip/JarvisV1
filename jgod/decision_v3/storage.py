@@ -156,3 +156,148 @@ def list_latest(symbol: str, n: int = 20) -> List[Dict]:
     snapshots.sort(key=get_sort_key, reverse=True)
     return snapshots[:n]
 
+
+# Evaluation storage functions
+
+def _get_eval_storage_path() -> Path:
+    """Get the storage path for evaluations.jsonl"""
+    project_root = Path(__file__).parent.parent.parent
+    path = project_root / "data" / "decision_v3" / "evaluations.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_evaluation(evaluation: Dict) -> str:
+    """
+    Save an evaluation to JSONL file.
+    
+    Args:
+        evaluation: Evaluation dict (must contain eval_id or will generate one)
+        
+    Returns:
+        eval_id (str)
+    """
+    path = _get_eval_storage_path()
+    
+    # Generate eval_id if not present
+    if "eval_id" not in evaluation:
+        evaluation["eval_id"] = str(uuid.uuid4())
+    
+    # Ensure created_at is ISO format string
+    if "created_at" in evaluation and isinstance(evaluation["created_at"], datetime):
+        evaluation["created_at"] = evaluation["created_at"].isoformat()
+    elif "created_at" not in evaluation:
+        evaluation["created_at"] = datetime.now().isoformat()
+    
+    # Append to file (JSONL format)
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(evaluation, ensure_ascii=False, default=str) + '\n')
+    
+    logger.info(f"Saved Decision V3 evaluation {evaluation['eval_id']} for {evaluation.get('symbol', 'unknown')}")
+    return evaluation["eval_id"]
+
+
+def load_latest_evaluation(symbol: str) -> Optional[Dict]:
+    """
+    Load the latest evaluation for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        
+    Returns:
+        Evaluation dict if found, None otherwise
+    """
+    path = _get_eval_storage_path()
+    
+    if not path.exists():
+        return None
+    
+    latest_eval = None
+    latest_time = None
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("symbol") == symbol:
+                        # Parse created_at if it's a string
+                        if "created_at" in data and isinstance(data["created_at"], str):
+                            try:
+                                data["created_at"] = datetime.fromisoformat(data["created_at"])
+                            except (ValueError, AttributeError):
+                                pass
+                        
+                        if latest_time is None or (
+                            isinstance(data.get("created_at"), datetime) and
+                            (latest_time is None or data["created_at"] > latest_time)
+                        ) or (
+                            isinstance(data.get("created_at"), str) and
+                            (latest_time is None or data["created_at"] > latest_time)
+                        ):
+                            latest_eval = data
+                            if isinstance(data.get("created_at"), datetime):
+                                latest_time = data["created_at"]
+                            elif isinstance(data.get("created_at"), str):
+                                latest_time = data["created_at"]
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse evaluation line: {e}")
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to load evaluations: {e}", exc_info=True)
+    
+    return latest_eval
+
+
+def list_evaluations(symbol: str, n: int = 20) -> List[Dict]:
+    """
+    List the latest N evaluations for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        n: Maximum number of evaluations to return
+        
+    Returns:
+        List of evaluation dicts (newest first)
+    """
+    path = _get_eval_storage_path()
+    evaluations = []
+    
+    if not path.exists():
+        return evaluations
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("symbol") == symbol:
+                        # Parse created_at if it's a string
+                        if "created_at" in data and isinstance(data["created_at"], str):
+                            try:
+                                data["created_at"] = datetime.fromisoformat(data["created_at"])
+                            except (ValueError, AttributeError):
+                                pass
+                        evaluations.append(data)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse evaluation line: {e}")
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to load evaluations: {e}", exc_info=True)
+    
+    # Sort by created_at (newest first) and take top N
+    def get_sort_key(e: Dict) -> str:
+        created_at = e.get("created_at")
+        if isinstance(created_at, datetime):
+            return created_at.isoformat()
+        elif isinstance(created_at, str):
+            return created_at
+        return ""
+    
+    evaluations.sort(key=get_sort_key, reverse=True)
+    return evaluations[:n]
+

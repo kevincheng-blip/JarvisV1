@@ -10,7 +10,12 @@ from datetime import datetime
 
 from jgod.decision_v3.engine import DecisionEngineV3
 from jgod.decision_v3.models import DecisionV3Result
-from jgod.decision_v3.storage import save_snapshot, load_latest, list_latest
+from jgod.decision_v3.storage import (
+    save_snapshot, load_latest, list_latest,
+    save_evaluation, load_latest_evaluation, list_evaluations,
+)
+from jgod.decision_v3.evaluation import evaluate_decision_v3, EvaluationVerdict
+from jgod.observer.prediction_stability import TimelineItem
 
 logger = logging.getLogger(__name__)
 
@@ -128,4 +133,170 @@ def list_snapshots(symbol: str, n: int = 20) -> List[Dict]:
         List of snapshot dicts (newest first)
     """
     return list_latest(symbol, n)
+
+
+def _fetch_timeline_items(symbol: str, limit: int = 60) -> List[TimelineItem]:
+    """
+    Fetch prediction timeline items for a symbol from database.
+    
+    Args:
+        symbol: Stock symbol
+        limit: Maximum number of items to fetch
+        
+    Returns:
+        List of TimelineItem dicts (newest first)
+    """
+    try:
+        from jgod.storage.models import PredictionSnapshot
+        from jgod.storage.db import get_session
+        
+        session = next(get_session())
+        
+        predictions = session.query(PredictionSnapshot).filter(
+            PredictionSnapshot.symbol == symbol
+        ).order_by(
+            PredictionSnapshot.date.desc()
+        ).limit(limit).all()
+        
+        items = []
+        for pred in predictions:
+            raw_score = pred.score if hasattr(pred, 'score') and pred.score is not None else (pred.total_score or 0.0)
+            signal = pred.signal or pred.verdict or "UNKNOWN"
+            
+            items.append({
+                "date": pred.date.isoformat(),
+                "final_score": float(raw_score),
+                "signal": signal,
+            })
+        
+        session.close()
+        return items
+    except Exception as e:
+        logger.warning(f"Failed to fetch timeline for {symbol}: {e}")
+        return []
+
+
+def compute_evaluation(
+    symbol: str,
+    mode: str = "performance",
+    limit: int = 60,
+    k: int = 5,
+    window: int = 20,
+) -> Dict:
+    """
+    Compute evaluation for a symbol (no storage).
+    
+    Args:
+        symbol: Stock symbol
+        mode: "performance" (default) or "signals"
+        limit: Number of timeline items to use
+        k: Number of top strategies to recommend
+        window: Evaluation window size
+        
+    Returns:
+        Evaluation dict with metrics and verdict
+    """
+    # Step 1: Get decision result
+    decision_result = compute_decision(symbol, mode, limit, k)
+    decision_dict = _result_to_dict(decision_result)
+    
+    # Step 2: Fetch timeline items
+    timeline_items = _fetch_timeline_items(symbol, limit)
+    
+    # Step 3: Evaluate
+    metrics = evaluate_decision_v3(timeline_items, decision_dict, window)
+    
+    # Step 4: Build evaluation result
+    return {
+        "symbol": symbol,
+        "mode": mode,
+        "limit": limit,
+        "k": k,
+        "window": window,
+        "decision": {
+            "primary_strategy": decision_result.selected_primary_strategy,
+            "risk_plan": {
+                "position_scale": decision_result.risk_plan.position_scale if decision_result.risk_plan else 0.0,
+                "risk_state": decision_result.risk_plan.risk_state if decision_result.risk_plan else "RISK_OFF",
+            },
+            "confidence": decision_result.confidence,
+        },
+        "inputs_summary": {
+            "mode": mode,
+            "limit": limit,
+            "k": k,
+            "stability_grade": "UNKNOWN",  # Can be enhanced later
+            "perf_grade": "UNKNOWN",  # Can be enhanced later
+        },
+        "metrics": metrics,
+    }
+
+
+def recompute_evaluation_and_save(
+    symbol: str,
+    mode: str = "performance",
+    limit: int = 60,
+    k: int = 5,
+    window: int = 20,
+) -> Dict:
+    """
+    Recompute evaluation and save as snapshot.
+    
+    Args:
+        symbol: Stock symbol
+        mode: "performance" (default) or "signals"
+        limit: Number of timeline items to use
+        k: Number of top strategies to recommend
+        window: Evaluation window size
+        
+    Returns:
+        Evaluation snapshot dict with eval_id, created_at, and full evaluation
+    """
+    # Compute evaluation
+    evaluation = compute_evaluation(symbol, mode, limit, k, window)
+    
+    # Build snapshot dict
+    snapshot = {
+        "created_at": datetime.now(),
+        "symbol": symbol,
+        "mode": mode,
+        "limit": limit,
+        "k": k,
+        "window": window,
+        "evaluation": evaluation,
+    }
+    
+    # Save to storage
+    eval_id = save_evaluation(snapshot)
+    snapshot["eval_id"] = eval_id
+    
+    logger.info(f"Recomputed and saved Decision V3 evaluation {eval_id} for {symbol}")
+    return snapshot
+
+
+def get_latest_evaluation(symbol: str) -> Optional[Dict]:
+    """
+    Get the latest saved evaluation for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        
+    Returns:
+        Evaluation snapshot dict if found, None otherwise
+    """
+    return load_latest_evaluation(symbol)
+
+
+def list_evaluation_snapshots(symbol: str, n: int = 20) -> List[Dict]:
+    """
+    List the latest N evaluation snapshots for a symbol.
+    
+    Args:
+        symbol: Stock symbol
+        n: Maximum number of snapshots to return
+        
+    Returns:
+        List of evaluation snapshot dicts (newest first)
+    """
+    return list_evaluations(symbol, n)
 

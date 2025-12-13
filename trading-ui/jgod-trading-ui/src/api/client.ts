@@ -578,5 +578,160 @@ export const api = {
     });
     return response.data;
   },
+
+  // Decision V3 Evaluation APIs
+  recomputeDecisionV3Eval: async (
+    symbol: string,
+    options: {
+      mode?: string;
+      limit?: number;
+      k?: number;
+      window?: number;
+    } = {}
+  ): Promise<{
+    eval_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    limit: number;
+    k: number;
+    window: number;
+    evaluation: {
+      symbol: string;
+      mode: string;
+      limit: number;
+      k: number;
+      window: number;
+      decision: {
+        primary_strategy: string | null;
+        risk_plan: {
+          position_scale: number;
+          risk_state: string;
+        };
+        confidence: number;
+      };
+      inputs_summary: {
+        mode: string;
+        limit: number;
+        k: number;
+        stability_grade: string;
+        perf_grade: string;
+      };
+      metrics: {
+        n_points: number;
+        hit_rate_proxy: number;
+        avg_return_proxy: number;
+        max_drawdown_proxy: number;
+        turnover_proxy: number;
+        decision_consistency: number;
+        verdict: string;
+        recommendation_next_step: string;
+      };
+    };
+  }> => {
+    try {
+      const response = await client.post(
+        `/api/v1/decision-v3/eval/recompute/${symbol}`,
+        {},
+        {
+          params: {
+            mode: options.mode || "performance",
+            limit: options.limit || 60,
+            k: options.k || 5,
+            window: options.window || 20,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`Evaluation not found for ${symbol}`);
+      }
+      throw error;
+    }
+  },
+
+  getDecisionV3EvalLatest: async (symbol: string): Promise<{
+    eval_id: string;
+    created_at: string;
+    symbol: string;
+    mode: string;
+    limit: number;
+    k: number;
+    window: number;
+    evaluation: {
+      symbol: string;
+      mode: string;
+      limit: number;
+      k: number;
+      window: number;
+      decision: {
+        primary_strategy: string | null;
+        risk_plan: {
+          position_scale: number;
+          risk_state: string;
+        };
+        confidence: number;
+      };
+      inputs_summary: {
+        mode: string;
+        limit: number;
+        k: number;
+        stability_grade: string;
+        perf_grade: string;
+      };
+      metrics: {
+        n_points: number;
+        hit_rate_proxy: number;
+        avg_return_proxy: number;
+        max_drawdown_proxy: number;
+        turnover_proxy: number;
+        decision_consistency: number;
+        verdict: string;
+        recommendation_next_step: string;
+      };
+    };
+  } | null> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/eval/latest/${symbol}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  listDecisionV3Evals: async (
+    symbol: string,
+    n: number = 20
+  ): Promise<{
+    symbol: string;
+    items: Array<{
+      eval_id: string;
+      created_at: string;
+      symbol: string;
+      verdict: string;
+      metrics_summary: {
+        hit_rate_proxy: number;
+        avg_return_proxy: number;
+        max_drawdown_proxy: number;
+      };
+    }>;
+    total: number;
+  }> => {
+    try {
+      const response = await client.get(`/api/v1/decision-v3/eval/list/${symbol}`, {
+        params: { n },
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return { symbol, items: [], total: 0 };
+      }
+      throw error;
+    }
+  },
 };
 

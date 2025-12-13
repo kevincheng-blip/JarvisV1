@@ -20,12 +20,21 @@ from jgod.api.schemas.decision_v3_snapshot import (
     snapshot_to_response_schema,
     snapshot_list_to_response_schema,
 )
+from jgod.api.schemas.decision_v3_eval import (
+    DecisionV3EvalSnapshotResponseSchema,
+    DecisionV3EvalListResponseSchema,
+    eval_snapshot_to_response_schema,
+    eval_list_to_response_schema,
+)
 from jgod.decision_v3.engine import DecisionEngineV3
 from jgod.decision_v3.service import (
     compute_decision,
     recompute_and_save,
     get_latest_snapshot,
     list_snapshots,
+    recompute_evaluation_and_save,
+    get_latest_evaluation,
+    list_evaluation_snapshots,
 )
 
 logger = logging.getLogger(__name__)
@@ -216,6 +225,205 @@ async def list_decision_v3_snapshots(
         logger.error(f"Error listing Decision V3 snapshots for {symbol}: {e}", exc_info=True)
         # Even on error, return empty list - still 200
         return DecisionV3SnapshotListResponseSchema(
+            symbol=symbol,
+            items=[],
+            total=0,
+        )
+
+
+# Evaluation endpoints
+
+@router.post(
+    "/eval/recompute/{symbol}",
+    response_model=DecisionV3EvalSnapshotResponseSchema,
+    summary="Recompute and save Decision V3 evaluation",
+    description="重新計算並存檔 Decision V3 評估快照",
+)
+async def recompute_decision_v3_eval(
+    symbol: str,
+    mode: str = Query("performance", description="Decision mode: 'performance' or 'signals'"),
+    limit: int = Query(60, ge=1, le=200, description="Number of timeline items to use"),
+    k: int = Query(5, ge=1, le=10, description="Number of top strategies to recommend"),
+    window: int = Query(20, ge=5, le=100, description="Evaluation window size"),
+) -> DecisionV3EvalSnapshotResponseSchema:
+    """Recompute evaluation and save as snapshot (always returns 200)"""
+    try:
+        snapshot = recompute_evaluation_and_save(symbol, mode, limit, k, window)
+        return eval_snapshot_to_response_schema(snapshot)
+    except Exception as e:
+        logger.error(f"Error recomputing Decision V3 evaluation for {symbol}: {e}", exc_info=True)
+        # Even on error, return a valid response (NO_DATA)
+        from jgod.decision_v3.evaluation import EvaluationVerdict
+        error_snapshot = {
+            "eval_id": "",
+            "created_at": datetime.now(),
+            "symbol": symbol,
+            "mode": mode,
+            "limit": limit,
+            "k": k,
+            "window": window,
+            "evaluation": {
+                "symbol": symbol,
+                "mode": mode,
+                "limit": limit,
+                "k": k,
+                "window": window,
+                "decision": {
+                    "primary_strategy": None,
+                    "risk_plan": {
+                        "position_scale": 0.20,
+                        "risk_state": "RISK_OFF",
+                    },
+                    "confidence": 0.0,
+                },
+                "inputs_summary": {
+                    "mode": mode,
+                    "limit": limit,
+                    "k": k,
+                    "stability_grade": "NO_DATA",
+                    "perf_grade": "NO_DATA",
+                },
+                "metrics": {
+                    "n_points": 0,
+                    "hit_rate_proxy": 0.0,
+                    "avg_return_proxy": 0.0,
+                    "max_drawdown_proxy": 0.0,
+                    "turnover_proxy": 0.0,
+                    "decision_consistency": 0.0,
+                    "verdict": EvaluationVerdict.NO_DATA,
+                    "recommendation_next_step": f"無法為 {symbol} 產生評估：系統發生錯誤。請稍後再試。",
+                },
+            },
+        }
+        return eval_snapshot_to_response_schema(error_snapshot)
+
+
+@router.get(
+    "/eval/latest/{symbol}",
+    response_model=DecisionV3EvalSnapshotResponseSchema,
+    summary="Get latest Decision V3 evaluation for symbol",
+    description="讀取最新存檔的 Decision V3 評估快照",
+)
+async def get_latest_decision_v3_eval(
+    symbol: str,
+) -> DecisionV3EvalSnapshotResponseSchema:
+    """Get latest saved evaluation for a symbol (always returns 200, never 404)"""
+    try:
+        snapshot = get_latest_evaluation(symbol)
+        
+        if not snapshot:
+            # Return empty snapshot (NO_DATA) - still 200
+            from jgod.decision_v3.evaluation import EvaluationVerdict
+            empty_snapshot = {
+                "eval_id": "",
+                "created_at": datetime.now(),
+                "symbol": symbol,
+                "mode": "performance",
+                "limit": 60,
+                "k": 5,
+                "window": 20,
+                "evaluation": {
+                    "symbol": symbol,
+                    "mode": "performance",
+                    "limit": 60,
+                    "k": 5,
+                    "window": 20,
+                    "decision": {
+                        "primary_strategy": None,
+                        "risk_plan": {
+                            "position_scale": 0.20,
+                            "risk_state": "RISK_OFF",
+                        },
+                        "confidence": 0.0,
+                    },
+                    "inputs_summary": {
+                        "mode": "performance",
+                        "limit": 60,
+                        "k": 5,
+                        "stability_grade": "NO_DATA",
+                        "perf_grade": "NO_DATA",
+                    },
+                    "metrics": {
+                        "n_points": 0,
+                        "hit_rate_proxy": 0.0,
+                        "avg_return_proxy": 0.0,
+                        "max_drawdown_proxy": 0.0,
+                        "turnover_proxy": 0.0,
+                        "decision_consistency": 0.0,
+                        "verdict": EvaluationVerdict.NO_DATA,
+                        "recommendation_next_step": f"目前 {symbol} 暫無存檔的評估快照。請使用 recompute 端點產生快照。",
+                    },
+                },
+            }
+            return eval_snapshot_to_response_schema(empty_snapshot)
+        
+        return eval_snapshot_to_response_schema(snapshot)
+    except Exception as e:
+        logger.error(f"Error getting latest Decision V3 evaluation for {symbol}: {e}", exc_info=True)
+        # Even on error, return a valid response
+        from jgod.decision_v3.evaluation import EvaluationVerdict
+        empty_snapshot = {
+            "eval_id": "",
+            "created_at": datetime.now(),
+            "symbol": symbol,
+            "mode": "performance",
+            "limit": 60,
+            "k": 5,
+            "window": 20,
+            "evaluation": {
+                "symbol": symbol,
+                "mode": "performance",
+                "limit": 60,
+                "k": 5,
+                "window": 20,
+                "decision": {
+                    "primary_strategy": None,
+                    "risk_plan": {
+                        "position_scale": 0.20,
+                        "risk_state": "RISK_OFF",
+                    },
+                    "confidence": 0.0,
+                },
+                "inputs_summary": {
+                    "mode": "performance",
+                    "limit": 60,
+                    "k": 5,
+                    "stability_grade": "NO_DATA",
+                    "perf_grade": "NO_DATA",
+                },
+                "metrics": {
+                    "n_points": 0,
+                    "hit_rate_proxy": 0.0,
+                    "avg_return_proxy": 0.0,
+                    "max_drawdown_proxy": 0.0,
+                    "turnover_proxy": 0.0,
+                    "decision_consistency": 0.0,
+                    "verdict": EvaluationVerdict.NO_DATA,
+                    "recommendation_next_step": f"無法讀取 {symbol} 的評估快照：系統發生錯誤。",
+                },
+            },
+        }
+        return eval_snapshot_to_response_schema(empty_snapshot)
+
+
+@router.get(
+    "/eval/list/{symbol}",
+    response_model=DecisionV3EvalListResponseSchema,
+    summary="List Decision V3 evaluations for symbol",
+    description="列出指定股票的 Decision V3 評估快照列表",
+)
+async def list_decision_v3_evaluations(
+    symbol: str,
+    n: int = Query(20, ge=1, le=100, description="Maximum number of evaluations to return"),
+) -> DecisionV3EvalListResponseSchema:
+    """List evaluations for a symbol (always returns 200, empty list if no evaluations)"""
+    try:
+        snapshots = list_evaluation_snapshots(symbol, n)
+        return eval_list_to_response_schema(snapshots, symbol)
+    except Exception as e:
+        logger.error(f"Error listing Decision V3 evaluations for {symbol}: {e}", exc_info=True)
+        # Even on error, return empty list - still 200
+        return DecisionV3EvalListResponseSchema(
             symbol=symbol,
             items=[],
             total=0,

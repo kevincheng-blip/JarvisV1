@@ -70,6 +70,18 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - 決策說明：自動生成繁中決策摘要
 - War Room V2 DecisionV3Card（顯示主要策略、風險狀態、信心度、決策理由）
 
+**v0.6.1-A2 新增功能：**
+- Decision V3 Snapshot Storage（JSONL append-only）
+- 決策快照 API：`POST /api/v1/decision-v3/recompute/{symbol}`, `GET /api/v1/decision-v3/latest/{symbol}`, `GET /api/v1/decision-v3/list/{symbol}`
+- War Room V2 DecisionV3Card 升級（顯示快照歷史 + Recompute 按鈕）
+
+**v0.6.2-A3 新增功能：**
+- Decision V3 Evaluation Loop（Self-Compare / Self-Evolve）
+- 評估指標：hit_rate_proxy, avg_return_proxy, max_drawdown_proxy, turnover_proxy, decision_consistency
+- Verdict：IMPROVED / NEUTRAL / REGRESSED / NO_DATA
+- 評估 API：`POST /api/v1/decision-v3/eval/recompute/{symbol}`, `GET /api/v1/decision-v3/eval/latest/{symbol}`, `GET /api/v1/decision-v3/eval/list/{symbol}`
+- War Room V2 DecisionV3Card 升級（Evaluation 區塊：verdict badge + metrics grid + recommendation）
+
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）
 - 資料完整性待補齊
