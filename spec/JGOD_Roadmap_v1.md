@@ -100,6 +100,15 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - 競技場 API：`POST /api/v1/decision-v3/arena/recompute/{symbol}`, `GET /api/v1/decision-v3/arena/latest/{symbol}`, `GET /api/v1/decision-v3/arena/list/{symbol}`
 - War Room V2 DecisionV3Card 升級（Arena 區塊：winner badge + regression alert + scoreboard table + auto-tuning results）
 
+**v0.6.5-A6 新增功能：**
+- Execution Grounding（執行層基礎化）
+- Virtual Ledger（虛擬帳本）：追蹤現金、持倉、平均成本、已實現/未實現損益、NAV
+- Order Generation Engine（訂單生成引擎）：將 Decision V3 轉換為 OrderRequest（BUY/SELL/HOLD + qty）
+- P&L-based Evaluation/Arena：Decision V3 評估與競技場使用虛擬帳本 P&L（取代代理報酬指標）
+- 手續費/稅率：買入手續費 0.1425%，賣出稅 0.3%
+- 執行 API：`GET /api/v1/execution/ledger/latest/{symbol}`, `POST /api/v1/execution/ledger/recompute/{symbol}`, `POST /api/v1/execution/order/simulate/{symbol}`
+- War Room V2 LedgerStatusCard（顯示 NAV、現金、P&L、持倉資訊 + Reset Ledger / Simulate Order 按鈕）
+
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）
 - 資料完整性待補齊

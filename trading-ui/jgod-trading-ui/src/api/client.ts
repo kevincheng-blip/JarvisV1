@@ -1013,5 +1013,187 @@ export const api = {
       throw error;
     }
   },
+
+  // Execution API wrappers
+  /**
+   * Get latest execution ledger for a symbol
+   * Returns ledger snapshot with NAV, cash, positions, P&L
+   */
+  getExecutionLedgerLatest: async (symbol: string): Promise<{
+    snapshot_id: string;
+    created_at: string;
+    symbol: string;
+    ledger: {
+      symbol: string;
+      cash: number;
+      position: {
+        qty: number;
+        avg_cost: number;
+        market_value: number;
+        unrealized_pnl: number;
+      };
+      realized_pnl: number;
+      unrealized_pnl: number;
+      nav: number;
+      last_price: number;
+      updated_at: string;
+    };
+    is_default: boolean;
+  }> => {
+    try {
+      const response = await client.get(`/api/v1/execution/ledger/latest/${symbol}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Return default ledger state
+        return {
+          snapshot_id: "",
+          created_at: new Date().toISOString(),
+          symbol,
+          ledger: {
+            symbol,
+            cash: 1000000.0,
+            position: {
+              qty: 0,
+              avg_cost: 0.0,
+              market_value: 0.0,
+              unrealized_pnl: 0.0,
+            },
+            realized_pnl: 0.0,
+            unrealized_pnl: 0.0,
+            nav: 1000000.0,
+            last_price: 0.0,
+            updated_at: new Date().toISOString(),
+          },
+          is_default: true,
+        };
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Recompute (reset) execution ledger for a symbol
+   */
+  recomputeExecutionLedger: async (
+    symbol: string,
+    initialCash: number = 1000000.0
+  ): Promise<{
+    snapshot_id: string;
+    created_at: string;
+    symbol: string;
+    ledger: {
+      symbol: string;
+      cash: number;
+      position: {
+        qty: number;
+        avg_cost: number;
+        market_value: number;
+        unrealized_pnl: number;
+      };
+      realized_pnl: number;
+      unrealized_pnl: number;
+      nav: number;
+      last_price: number;
+      updated_at: string;
+    };
+    is_default: boolean;
+  }> => {
+    const response = await client.post(
+      `/api/v1/execution/ledger/recompute/${symbol}`,
+      null,
+      { params: { initial_cash: initialCash } }
+    );
+    return response.data;
+  },
+
+  /**
+   * Simulate order from latest Decision V3
+   */
+  simulateExecutionOrder: async (
+    symbol: string,
+    params: {
+      mode?: "signals" | "performance";
+      limit?: number;
+      k?: number;
+    } = {}
+  ): Promise<{
+    symbol: string;
+    ledger: {
+      symbol: string;
+      cash: number;
+      position: {
+        qty: number;
+        avg_cost: number;
+        market_value: number;
+        unrealized_pnl: number;
+      };
+      realized_pnl: number;
+      unrealized_pnl: number;
+      nav: number;
+      last_price: number;
+      updated_at: string;
+    };
+    decision_v3: any;
+    order_request: {
+      symbol: string;
+      side: "BUY" | "SELL" | "HOLD";
+      qty: number;
+      reason: string;
+      target_position_scale: number;
+      current_position_scale: number;
+    };
+    price: number;
+    has_data: boolean;
+  }> => {
+    try {
+      const response = await client.post(
+        `/api/v1/execution/order/simulate/${symbol}`,
+        null,
+        {
+          params: {
+            mode: params.mode || "performance",
+            limit: params.limit || 60,
+            k: params.k || 5,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      // Backend guarantees 200, but handle gracefully
+      if (error.response?.status === 404) {
+        return {
+          symbol,
+          ledger: {
+            symbol,
+            cash: 1000000.0,
+            position: {
+              qty: 0,
+              avg_cost: 0.0,
+              market_value: 0.0,
+              unrealized_pnl: 0.0,
+            },
+            realized_pnl: 0.0,
+            unrealized_pnl: 0.0,
+            nav: 1000000.0,
+            last_price: 0.0,
+            updated_at: new Date().toISOString(),
+          },
+          decision_v3: {},
+          order_request: {
+            symbol,
+            side: "HOLD",
+            qty: 0,
+            reason: "資料不足",
+            target_position_scale: 0.0,
+            current_position_scale: 0.0,
+          },
+          price: 0.0,
+          has_data: false,
+        };
+      }
+      throw error;
+    }
+  },
 };
 

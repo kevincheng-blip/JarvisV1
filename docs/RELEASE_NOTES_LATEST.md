@@ -1,7 +1,7 @@
 # J-GOD Latest Release Notes
 
-**Last Updated:** 2025-12-13  
-**Current Version:** v0.6.4-A5
+**Last Updated:** 2025-12-14  
+**Current Version:** v0.6.5-A6
 
 ---
 
@@ -15,6 +15,7 @@ This release includes six major feature packages:
 4. **v0.6.2-A3**: Decision V3 Evaluation Loop (Self-Compare / Self-Evolve)
 5. **v0.6.3-A4**: Decision V3 Compare vs Baseline (V3 vs Baseline Compare + Evolution Report)
 6. **v0.6.4-A5**: Decision V3 Arena (Multi-Compare + Champion/Challenger + Auto-Tuning)
+7. **v0.6.5-A6**: Execution Grounding (Virtual Ledger + Order Generation + P&L-based Eval/Arena)
 
 ---
 
@@ -50,6 +51,11 @@ This release includes six major feature packages:
 - `GET /api/v1/decision-v3/arena/latest/{symbol}` - Get latest arena snapshot
 - `GET /api/v1/decision-v3/arena/list/{symbol}?n=20` - List arena snapshots
 
+### Execution API (v0.6.5-A6)
+- `GET /api/v1/execution/ledger/latest/{symbol}` - Get latest virtual ledger snapshot
+- `POST /api/v1/execution/ledger/recompute/{symbol}?initial_cash=1000000` - Reset and create new ledger snapshot
+- `POST /api/v1/execution/order/simulate/{symbol}?mode=performance&limit=60&k=5` - Simulate order generation from Decision V3
+
 ### Doctrine Patch (Enhanced)
 - `POST /api/v1/doctrine/patches/{patchId}/approve` - Approve patch (with request body)
 - `POST /api/v1/doctrine/patches/{patchId}/reject` - Reject patch (with request body)
@@ -69,6 +75,8 @@ This release includes six major feature packages:
 - `tests/test_decision_v3_eval_contract.py` - Decision V3 evaluation contract tests (v0.6.2-A3)
 - `tests/test_decision_v3_compare_contract.py` - Decision V3 compare contract tests (v0.6.3-A4)
 - `tests/test_decision_v3_arena_contract.py` - Decision V3 arena contract tests (v0.6.4-A5)
+- `tests/test_virtual_ledger_contract.py` - Virtual Ledger contract tests (v0.6.5-A6)
+- `tests/test_execution_api_contract.py` - Execution API contract tests (v0.6.5-A6)
 
 ### Updated Smoke Tests
 - `tests/test_war_room_v2_smoke.py` - Added health checks for:
@@ -77,7 +85,7 @@ This release includes six major feature packages:
   - Decision V3 decide/latest/recompute
 
 ### CI Quick Check
-- `scripts/ci_quick_check.sh` - Now includes 13 checks:
+- `scripts/ci_quick_check.sh` - Now includes 15 checks:
   1. Compileall syntax check
   2. War Room V2 smoke test
   3. Predictions timeline contract test
@@ -91,6 +99,8 @@ This release includes six major feature packages:
   11. Decision V3 Evaluation contract test
   12. Decision V3 Compare contract test
   13. Decision V3 Arena contract test
+  14. Virtual Ledger contract test (v0.6.5-A6)
+  15. Execution API contract test (v0.6.5-A6)
 
 ---
 
@@ -156,6 +166,7 @@ curl "http://127.0.0.1:8000/api/v1/decision-v3/latest/2330"
 - Decision V3 Evaluations: `data/decision_v3/evaluations.jsonl` (v0.6.2-A3)
 - Decision V3 Compares: `data/decision_v3/compare.jsonl` (v0.6.3-A4)
 - Decision V3 Arena: `data/decision_v3/arena.jsonl` (v0.6.4-A5)
+- Execution Ledger Snapshots: `data/execution/ledger_snapshots.jsonl` (v0.6.5-A6)
 
 ---
 
@@ -166,4 +177,5 @@ curl "http://127.0.0.1:8000/api/v1/decision-v3/latest/2330"
 - `docs/release_notes_v0.6.2-a3.md`
 - `docs/release_notes_v0.6.3-a4.md`
 - `docs/release_notes_v0.6.4-a5.md`
+- `docs/release_notes_v0.6.5-a6.md`
 

@@ -261,3 +261,25 @@ def test_decision_v3_arena_list_health_check():
     assert "symbol" in data, "Response should have 'symbol' field"
     assert "items" in data, "Response should have 'items' field"
     assert isinstance(data["items"], list), "items should be a list"
+
+
+def test_execution_ledger_latest_health_check():
+    """測試 Execution Ledger Latest API 健康檢查（允許 default ledger）"""
+    response = client.get("/api/v1/execution/ledger/latest/2330")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "ledger" in data, "Response should have 'ledger' field"
+    assert "is_default" in data, "Response should have 'is_default' field"
+
+
+def test_execution_order_simulate_health_check():
+    """測試 Execution Order Simulate API 健康檢查（允許 HOLD）"""
+    response = client.post("/api/v1/execution/order/simulate/2330")
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, dict), "Response should be a dictionary"
+    assert "symbol" in data, "Response should have 'symbol' field"
+    assert "order_request" in data, "Response should have 'order_request' field"
+    assert data["order_request"]["side"] in ["BUY", "SELL", "HOLD"], "order_request.side should be BUY/SELL/HOLD"

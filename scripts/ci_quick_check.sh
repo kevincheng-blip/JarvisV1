@@ -157,6 +157,28 @@ else
 fi
 echo ""
 
+# Check 14: Virtual Ledger contract test
+echo "1️⃣4️⃣  Running Virtual Ledger contract test..."
+pytest tests/test_virtual_ledger_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Virtual Ledger contract test passed"
+else
+    echo "   ❌ Virtual Ledger contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 15: Execution API contract test
+echo "1️⃣5️⃣  Running Execution API contract test..."
+pytest tests/test_execution_api_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Execution API contract test passed"
+else
+    echo "   ❌ Execution API contract test failed"
+    exit 1
+fi
+echo ""
+
 echo "================================"
 echo "✅ All CI quick checks passed!"
 echo ""
