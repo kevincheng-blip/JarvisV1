@@ -235,6 +235,27 @@ class VirtualLedger:
             "message": f"賣出 {qty_executed} 股 @ {price:.2f}，手續費 {fee:.2f}，稅 {tax:.2f}，已實現損益 {realized_pnl:.2f}"
         }
     
+    def apply_fill(self, fill) -> Dict[str, any]:
+        """
+        Apply order fill to ledger.
+        
+        Args:
+            fill: OrderFill object (from fill_engine)
+            
+        Returns:
+            dict with 'success', 'message'
+        """
+        if fill.side == "HOLD":
+            return {
+                "success": True,
+                "message": "HOLD 訂單，無需執行"
+            }
+        
+        if fill.side == "BUY":
+            return self.buy(fill.symbol, fill.qty_executed, fill.fill_price, fill.fee)
+        else:  # SELL
+            return self.sell(fill.symbol, fill.qty_executed, fill.fill_price, fill.fee, fill.tax)
+    
     def snapshot(self, symbol: str) -> Dict:
         """Create snapshot dict for storage/API."""
         pos = self.positions.get(symbol, PositionState(symbol=symbol))

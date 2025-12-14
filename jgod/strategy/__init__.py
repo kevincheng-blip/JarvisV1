@@ -1,24 +1,5 @@
 """
-Strategy Engine - 策略引擎
-提供策略基類、突破策略、AI 訊號橋接等功能
+Strategy Module: Portfolio management and allocation
+
+v0.6.10-A10: Portfolio Manager for multi-symbol coordination
 """
-from .base_strategy import BaseStrategy, Signal, SignalType
-from .breakout_strategy import BreakoutStrategy
-from .ai_signal_bridge import AISignalBridge
-from .strategy_engine_v1 import (
-    StrategyEngineV1,
-    StrategySignal,
-    DailySignalSet,
-)
-
-__all__ = [
-    "BaseStrategy",
-    "Signal",
-    "SignalType",
-    "BreakoutStrategy",
-    "AISignalBridge",
-    "StrategyEngineV1",
-    "StrategySignal",
-    "DailySignalSet",
-]
-

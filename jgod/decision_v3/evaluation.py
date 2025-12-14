@@ -5,6 +5,7 @@ Evaluates Decision V3 decisions by replaying prediction timeline and computing m
 Pure Python implementation (no external dependencies).
 
 v0.6.5-A6: Added VirtualLedger-based P&L evaluation for execution grounding.
+v0.6.6-A7: Added BacktestCore-based evaluation (OHLCV + Fill Engine) for realism.
 """
 
 import math
@@ -15,6 +16,15 @@ from datetime import date
 from jgod.observer.prediction_stability import TimelineItem
 
 logger = logging.getLogger(__name__)
+
+# v0.6.6-A7: Import BacktestEngine for realism
+try:
+    from jgod.research.backtest_engine import BacktestEngine, BacktestConfig as BTConfig
+    BACKTEST_AVAILABLE = True
+except ImportError:
+    BACKTEST_AVAILABLE = False
+    BTConfig = None
+    logger.warning("BacktestEngine not available, falling back to proxy evaluation")
 
 
 class EvaluationVerdict:
@@ -458,4 +468,123 @@ def evaluate_decision_v3(
         "verdict": verdict,
         "recommendation_next_step": recommendation_next_step,
     }
+
+
+def evaluate_decision_v3_with_backtest(
+    symbol: str,
+    decision_result: Dict,
+    start_date: str,
+    end_date: str,
+    window: int = 20,
+    config: Optional[BTConfig] = None,
+) -> Dict:
+    """
+    Evaluate Decision V3 using BacktestCore (OHLCV + Fill Engine).
+    
+    v0.6.6-A7: New method using BacktestEngine for realistic P&L.
+    
+    Args:
+        symbol: Stock symbol
+        decision_result: Decision V3 result dict
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD)
+        window: Evaluation window size (not used in backtest, kept for compatibility)
+        config: Backtest configuration
+        
+    Returns:
+        Evaluation metrics dict (same format as evaluate_decision_v3)
+    """
+    if not BACKTEST_AVAILABLE:
+        logger.warning("BacktestEngine not available, falling back to proxy evaluation")
+        return {
+            "n_points": 0,
+            "hit_rate_proxy": 0.0,
+            "avg_return_proxy": 0.0,
+            "max_drawdown_proxy": 0.0,
+            "turnover_proxy": 0.0,
+            "decision_consistency": 0.0,
+            "verdict": EvaluationVerdict.NO_DATA,
+            "recommendation_next_step": "BacktestEngine 不可用，無法進行真實性評估",
+        }
+    
+    try:
+        from jgod.research.backtest_engine import BacktestEngine, BacktestConfig as BTConfig
+        
+        # Create backtest engine
+        engine = BacktestEngine(use_mock_mdts=False)  # Use real DB if available
+        
+        if config is None:
+            config = BTConfig(
+                initial_cash=1_000_000.0,
+                mode=decision_result.get("mode", "performance"),
+                limit=decision_result.get("limit", 60),
+                k=decision_result.get("k", 5),
+            )
+        
+        # Run backtest
+        report = engine.run(symbol, start_date, end_date, config)
+        
+        # Extract metrics
+        n_points = len(report.daily_log)
+        
+        if n_points < 10:
+            return {
+                "n_points": n_points,
+                "hit_rate_proxy": 0.0,
+                "avg_return_proxy": 0.0,
+                "max_drawdown_proxy": 0.0,
+                "turnover_proxy": 0.0,
+                "decision_consistency": 0.0,
+                "verdict": EvaluationVerdict.NO_DATA,
+                "recommendation_next_step": "資料點不足（< 10），無法進行評估",
+            }
+        
+        # Use backtest metrics
+        avg_return_proxy = report.metrics.avg_daily_return
+        max_drawdown_proxy = report.metrics.max_drawdown
+        turnover_proxy = report.metrics.turnover
+        hit_rate_proxy = report.metrics.hit_rate
+        
+        # Decision consistency (simplified: based on primary strategy consistency)
+        # TODO: In A8, this will be computed from daily_log decision history
+        decision_consistency = 0.5  # Placeholder
+        
+        # Verdict logic (same as original)
+        if avg_return_proxy > 0 and hit_rate_proxy >= 0.55 and max_drawdown_proxy <= 0.18:
+            verdict = EvaluationVerdict.IMPROVED
+            recommendation_next_step = "表現優異，建議維持當前配置並持續監控。"
+        elif avg_return_proxy < 0 and max_drawdown_proxy > 0.25:
+            verdict = EvaluationVerdict.REGRESSED
+            recommendation_next_step = "表現不佳，建議檢視決策邏輯與風險參數。"
+        else:
+            verdict = EvaluationVerdict.NEUTRAL
+            recommendation_next_step = "表現中性，建議持續觀察並適時調整。"
+        
+        return {
+            "n_points": n_points,
+            "hit_rate_proxy": round(hit_rate_proxy, 4),
+            "avg_return_proxy": round(avg_return_proxy, 4),
+            "max_drawdown_proxy": round(max_drawdown_proxy, 4),
+            "turnover_proxy": round(turnover_proxy, 4),
+            "decision_consistency": round(decision_consistency, 4),
+            "verdict": verdict,
+            "recommendation_next_step": recommendation_next_step,
+            "backtest_report": {
+                "final_nav": report.final_nav,
+                "total_return": report.metrics.total_return,
+                "sharpe_ratio": report.metrics.sharpe_ratio,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Backtest evaluation failed: {e}", exc_info=True)
+        return {
+            "n_points": 0,
+            "hit_rate_proxy": 0.0,
+            "avg_return_proxy": 0.0,
+            "max_drawdown_proxy": 0.0,
+            "turnover_proxy": 0.0,
+            "decision_consistency": 0.0,
+            "verdict": EvaluationVerdict.NO_DATA,
+            "recommendation_next_step": f"回測評估失敗：{str(e)}",
+        }
 

@@ -1,7 +1,7 @@
 # J-GOD Latest Release Notes
 
 **Last Updated:** 2025-12-14  
-**Current Version:** v0.6.5-A6
+**Current Version:** v0.6.12-A12
 
 ---
 

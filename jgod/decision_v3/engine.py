@@ -2,10 +2,12 @@
 Decision Engine V3
 
 Rule-based decision engine powered by S-Rank V2 and Performance Feed.
+
+v0.6.8-A8: Parameterized with features and doctrine_config
 """
 
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import date
 
 from jgod.decision_v3.models import DecisionV3Result, StrategyWeight, RiskPlan
@@ -13,6 +15,14 @@ from jgod.s_rank_v2.service import get_recommendation
 from jgod.s_rank_v2.models import StabilityGrade
 
 logger = logging.getLogger(__name__)
+
+# v0.6.8-A8: Import DoctrineConfig
+try:
+    from jgod.config.doctrine import DoctrineConfig, load_doctrine
+    DOCTRINE_AVAILABLE = True
+except ImportError:
+    DOCTRINE_AVAILABLE = False
+    logger.warning("DoctrineConfig not available, using defaults")
 
 
 class DecisionEngineV3:
@@ -29,9 +39,15 @@ class DecisionEngineV3:
         limit: int = 60,
         k: int = 5,
         as_of_date: Optional[date] = None,
+        *,
+        features: Optional[Dict] = None,
+        doctrine_config: Optional[DoctrineConfig] = None,
+        feature_subset: Optional[List[str]] = None,
     ) -> DecisionV3Result:
         """
         Make decision for a symbol.
+        
+        v0.6.8-A8: Now accepts features and doctrine_config for Walk-Forward.
         
         Args:
             symbol: Stock symbol
@@ -39,12 +55,31 @@ class DecisionEngineV3:
             limit: Number of timeline items to use
             k: Number of top strategies to recommend
             as_of_date: Optional date (defaults to today)
+            features: Optional features dict (from FeatureService)
+            doctrine_config: Optional DoctrineConfig (if None, loads default)
+            feature_subset: Optional list of feature names to use (if None, use all)
             
         Returns:
             DecisionV3Result
+            
+        Raises:
+            ValueError: If features is required but not provided (A8 mode)
         """
         if as_of_date is None:
             as_of_date = date.today()
+        
+        # v0.6.8-A8: Load doctrine config if not provided
+        if doctrine_config is None:
+            if DOCTRINE_AVAILABLE:
+                doctrine_config = load_doctrine("v1.0")
+            else:
+                # Fallback to default
+                doctrine_config = DoctrineConfig() if DOCTRINE_AVAILABLE else None
+        
+        # v0.6.8-A8: Apply feature_subset filter if provided
+        if features is not None and feature_subset is not None:
+            filtered_features = {k: v for k, v in features.items() if k in feature_subset}
+            features = filtered_features
         
         # Step 1: Get recommendation from S-Rank V2
         try:
@@ -127,8 +162,10 @@ class DecisionEngineV3:
                 )
             )
         
-        # Step 4: Calculate risk plan
-        risk_plan = self._calculate_risk_plan(metrics, mode, snapshot, symbol)
+        # Step 4: Calculate risk plan (use doctrine_config if available)
+        risk_plan = self._calculate_risk_plan(
+            metrics, mode, snapshot, symbol, doctrine_config=doctrine_config
+        )
         
         # Step 5: Calculate confidence
         confidence = self._calculate_confidence(metrics, items, weights_dict)
@@ -156,26 +193,41 @@ class DecisionEngineV3:
         mode: str,
         snapshot,
         symbol: str,
+        doctrine_config: Optional[DoctrineConfig] = None,
     ) -> RiskPlan:
-        """Calculate risk plan based on metrics"""
+        """Calculate risk plan based on metrics and doctrine config"""
         reasons = []
         position_scale = 1.0
         
-        # Base position scale from stability grade
-        if metrics.stability_grade == StabilityGrade.VOLATILE:
-            position_scale = 0.35
+        # v0.6.8-A8: Use doctrine_config risk_mapping if available
+        if doctrine_config and doctrine_config.risk_mapping:
+            risk_mapping = doctrine_config.risk_mapping
+        else:
+            # Default risk mapping
+            risk_mapping = {
+                "STABLE": 0.80,
+                "WATCH": 0.55,
+                "VOLATILE": 0.35,
+                "NO_DATA": 0.20,
+            }
+        
+        # Base position scale from stability grade (use doctrine mapping)
+        stability_grade_str = metrics.stability_grade.value if hasattr(metrics.stability_grade, 'value') else str(metrics.stability_grade)
+        
+        if stability_grade_str == "VOLATILE":
+            position_scale = risk_mapping.get("VOLATILE", 0.35)
             risk_state = "CAUTION"
             reasons.append("預測穩定性為 VOLATILE，建議降低倉位")
-        elif metrics.stability_grade == StabilityGrade.WATCH:
-            position_scale = 0.55
+        elif stability_grade_str == "WATCH":
+            position_scale = risk_mapping.get("WATCH", 0.55)
             risk_state = "CAUTION"
             reasons.append("預測穩定性為 WATCH，建議謹慎操作")
-        elif metrics.stability_grade == StabilityGrade.STABLE:
-            position_scale = 0.80
+        elif stability_grade_str == "STABLE":
+            position_scale = risk_mapping.get("STABLE", 0.80)
             risk_state = "RISK_ON"
             reasons.append("預測穩定性為 STABLE，可正常操作")
         else:  # NO_DATA
-            position_scale = 0.20
+            position_scale = risk_mapping.get("NO_DATA", 0.20)
             risk_state = "RISK_OFF"
             reasons.append("暫無預測資料，建議暫停操作")
         

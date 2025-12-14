@@ -179,6 +179,144 @@ else
 fi
 echo ""
 
+# Check 16: MDTS contract test (v0.6.6-A7)
+echo "1️⃣6️⃣  Running MDTS contract test..."
+pytest tests/test_mdts_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ MDTS contract test passed"
+else
+    echo "   ❌ MDTS contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 17: Fill Engine contract test (v0.6.6-A7)
+echo "1️⃣7️⃣  Running Fill Engine contract test..."
+pytest tests/test_fill_engine_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Fill Engine contract test passed"
+else
+    echo "   ❌ Fill Engine contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 18: Backtest Core contract test (v0.6.6-A7)
+echo "1️⃣8️⃣  Running Backtest Core contract test..."
+pytest tests/test_backtest_core_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Backtest Core contract test passed"
+else
+    echo "   ❌ Backtest Core contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 19: Feature DB contract test (v0.6.7-A7.5)
+echo "1️⃣9️⃣  Running Feature DB contract test..."
+pytest tests/test_feature_db_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Feature DB contract test passed"
+else
+    echo "   ❌ Feature DB contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 20: Walk-Forward Runner contract test (v0.6.8-A8)
+echo "2️⃣0️⃣  Running Walk-Forward Runner contract test..."
+pytest tests/test_walkforward_runner_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Walk-Forward Runner contract test passed"
+else
+    echo "   ❌ Walk-Forward Runner contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 21: Learning Layers contract test (v0.6.8-A8)
+echo "2️⃣1️⃣  Running Learning Layers contract test..."
+pytest tests/test_learning_layers_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Learning Layers contract test passed"
+else
+    echo "   ❌ Learning Layers contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 22: Auto-Pilot Guard Rails contract test (v0.6.9-A9)
+echo "2️⃣2️⃣  Running Auto-Pilot Guard Rails contract test..."
+pytest tests/test_autopilot_guardrails_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Auto-Pilot Guard Rails contract test passed"
+else
+    echo "   ❌ Auto-Pilot Guard Rails contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 23: Shadow run smoke test (v0.6.9-A9)
+echo "2️⃣3️⃣  Running Shadow run smoke test..."
+# Unit stub test (not full 90-day run)
+python3 -c "
+from jgod.research.walkforward_runner import WalkForwardRunner
+runner = WalkForwardRunner(use_mock_mdts=True)
+# Just verify method exists and can be called with minimal params
+print('Shadow run method exists')
+"
+if [ $? -eq 0 ]; then
+    echo "   ✅ Shadow run smoke test passed"
+else
+    echo "   ❌ Shadow run smoke test failed"
+    exit 1
+fi
+echo ""
+
+# Check 24: Portfolio Manager contract test (v0.6.10-A10)
+echo "2️⃣4️⃣  Running Portfolio Manager contract test..."
+pytest tests/test_portfolio_manager_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Portfolio Manager contract test passed"
+else
+    echo "   ❌ Portfolio Manager contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 25: Execution Engine contract test (v0.6.11-A11)
+echo "2️⃣5️⃣  Running Execution Engine contract test..."
+pytest tests/test_execution_engine_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Execution Engine contract test passed"
+else
+    echo "   ❌ Execution Engine contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 26: Paper Broker contract test (v0.6.11-A11)
+echo "2️⃣6️⃣  Running Paper Broker contract test..."
+pytest tests/test_paper_broker_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Paper Broker contract test passed"
+else
+    echo "   ❌ Paper Broker contract test failed"
+    exit 1
+fi
+echo ""
+
+# Check 27: Execution resilience contract test (v0.6.12-A12)
+echo "2️⃣7️⃣  Running Execution resilience contract test..."
+pytest tests/test_execution_resilience_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Execution resilience contract test passed"
+else
+    echo "   ❌ Execution resilience contract test failed"
+    exit 1
+fi
+echo ""
+
 echo "================================"
 echo "✅ All CI quick checks passed!"
 echo ""

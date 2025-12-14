@@ -1,11 +1,5 @@
 """
-J-GOD Config Utilities
+Config Module: Doctrine configuration management
 
-配置檔案載入工具。
+v0.6.8-A8: Doctrine versioning and patch management
 """
-
-from jgod.config.experiment_config_loader import load_experiment_config
-
-__all__ = [
-    "load_experiment_config",
-]

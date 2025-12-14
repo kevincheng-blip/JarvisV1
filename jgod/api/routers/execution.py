@@ -1,145 +1,156 @@
 """
 Execution API Router
 
-Endpoints for virtual ledger and order simulation.
+v0.6.11-A11: Real-time execution engine API endpoints
 """
 
 import logging
-from datetime import datetime
-from fastapi import APIRouter, Query
-from typing import Optional
+from fastapi import APIRouter, Body
+from typing import List
+from pydantic import BaseModel
 
-from jgod.api.schemas.execution import (
-    LedgerResponseSchema,
-    ExecutionSimulateResponseSchema,
-    LedgerSnapshotSchema,
-    OrderRequestSchema,
-)
-from jgod.execution.service import (
-    get_latest_ledger,
-    recompute_ledger,
-    simulate_order_from_latest_decision,
-)
+from jgod.execution.engine import ExecutionEngine, ExecutionStatus
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["execution"])
+router = APIRouter(prefix="/api/v1/execution", tags=["execution"])
 
 
-@router.get(
-    "/ledger/latest/{symbol}",
-    response_model=LedgerResponseSchema,
-    summary="Get Latest Ledger",
-    description="Get the latest ledger snapshot for a symbol (always returns 200, default ledger if no data)",
-)
-async def get_ledger_latest(
-    symbol: str,
-) -> LedgerResponseSchema:
-    """Get latest ledger snapshot (always returns 200, default if no data)"""
+@router.get("/metrics")
+async def get_execution_metrics() -> dict:
+    """
+    Get execution metrics snapshot.
+    
+    Always returns 200.
+    """
     try:
-        snapshot = get_latest_ledger(symbol)
-        
-        return LedgerResponseSchema(
-            snapshot_id=snapshot.get("snapshot_id", ""),
-            created_at=snapshot.get("created_at", datetime.now().isoformat()),
-            symbol=snapshot.get("symbol", symbol),
-            ledger=LedgerSnapshotSchema(**snapshot.get("ledger", {})),
-            is_default=snapshot.get("is_default", False),
-        )
+        engine = ExecutionEngine.get_instance()
+        snapshot = engine.metrics_logger.snapshot()
+        return {
+            "success": True,
+            "metrics": snapshot,
+        }
     except Exception as e:
-        logger.error(f"Error getting ledger for {symbol}: {e}", exc_info=True)
-        # Return default on error - still 200
-        return LedgerResponseSchema(
-            snapshot_id="",
-            created_at=datetime.now().isoformat(),
-            symbol=symbol,
-            ledger=LedgerSnapshotSchema(
-                symbol=symbol,
-                cash=1_000_000.0,
-            ),
-            is_default=True,
-        )
+        logger.error(f"Failed to get metrics: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "metrics": {},
+        }
 
 
-@router.post(
-    "/ledger/recompute/{symbol}",
-    response_model=LedgerResponseSchema,
-    summary="Recompute Ledger",
-    description="Create and save a fresh ledger snapshot (reset)",
-)
-async def recompute_ledger_endpoint(
-    symbol: str,
-    initial_cash: float = Query(1_000_000.0, ge=0, description="Initial cash amount"),
-) -> LedgerResponseSchema:
-    """Recompute ledger and save snapshot (always returns 200)"""
+@router.get("/alerts")
+async def get_execution_alerts(
+    level: Optional[str] = None,
+    limit: int = 50,
+) -> dict:
+    """
+    Get execution alerts.
+    
+    Always returns 200.
+    """
     try:
-        snapshot = recompute_ledger(symbol, initial_cash)
+        engine = ExecutionEngine.get_instance()
         
-        return LedgerResponseSchema(
-            snapshot_id=snapshot.get("snapshot_id", ""),
-            created_at=snapshot.get("created_at", datetime.now().isoformat()),
-            symbol=snapshot.get("symbol", symbol),
-            ledger=LedgerSnapshotSchema(**snapshot.get("ledger", {})),
-            is_default=snapshot.get("is_default", False),
-        )
+        if level:
+            alerts = engine.alerting_service.get_alerts(level=level, limit=limit)
+        else:
+            alerts = engine.alerting_service.get_alerts(limit=limit)
+        
+        return {
+            "success": True,
+            "alerts": alerts,
+            "total": len(alerts),
+        }
     except Exception as e:
-        logger.error(f"Error recomputing ledger for {symbol}: {e}", exc_info=True)
-        # Return default on error - still 200
-        return LedgerResponseSchema(
-            snapshot_id="",
-            created_at=datetime.now().isoformat(),
-            symbol=symbol,
-            ledger=LedgerSnapshotSchema(
-                symbol=symbol,
-                cash=initial_cash,
-            ),
-            is_default=True,
-        )
+        logger.error(f"Failed to get alerts: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "alerts": [],
+        }
 
 
-@router.post(
-    "/order/simulate/{symbol}",
-    response_model=ExecutionSimulateResponseSchema,
-    summary="Simulate Order",
-    description="Simulate order generation from latest Decision V3 (always returns 200)",
-)
-async def simulate_order(
-    symbol: str,
-    mode: str = Query("performance", description="Decision mode: 'performance' or 'signals'"),
-    limit: int = Query(60, ge=10, le=200, description="Number of timeline items to fetch"),
-    k: int = Query(5, ge=1, le=10, description="Number of top strategies to consider"),
-) -> ExecutionSimulateResponseSchema:
-    """Simulate order from latest Decision V3 (always returns 200)"""
+class ExecutionStartRequest(BaseModel):
+    """Execution start request schema."""
+    symbols: List[str]
+    tick_interval: float = 5.0
+    doctrine_version: str = "v1.0"
+    feature_version: str = "v1.0"
+
+
+@router.post("/start")
+async def start_execution(request: ExecutionStartRequest) -> dict:
+    """
+    Start execution engine.
+    
+    Always returns 200 (with error field if failed).
+    """
     try:
-        result = simulate_order_from_latest_decision(symbol, mode, limit, k)
+        engine = ExecutionEngine.get_instance()
+        success = engine.start(symbols=request.symbols)
         
-        return ExecutionSimulateResponseSchema(
-            symbol=result.get("symbol", symbol),
-            ledger=LedgerSnapshotSchema(**result.get("ledger", {})),
-            decision_v3=result.get("decision_v3", {}),
-            order_request=OrderRequestSchema(**result.get("order_request", {})),
-            price=result.get("price", 0.0),
-            has_data=result.get("has_data", False),
-        )
+        if success:
+            return {
+                "success": True,
+                "status": engine.get_status(),
+                "message": "Execution engine started",
+            }
+        else:
+            return {
+                "success": False,
+                "status": engine.get_status(),
+                "error": "Execution engine already running",
+            }
     except Exception as e:
-        logger.error(f"Error simulating order for {symbol}: {e}", exc_info=True)
-        # Return empty state on error - still 200
-        return ExecutionSimulateResponseSchema(
-            symbol=symbol,
-            ledger=LedgerSnapshotSchema(
-                symbol=symbol,
-                cash=1_000_000.0,
-            ),
-            decision_v3={},
-            order_request=OrderRequestSchema(
-                symbol=symbol,
-                side="HOLD",
-                qty=0,
-                reason=f"計算失敗：{str(e)}",
-                target_position_scale=0.0,
-                current_position_scale=0.0,
-            ),
-            price=0.0,
-            has_data=False,
-        )
+        logger.error(f"Failed to start execution engine: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+        }
 
+
+@router.post("/stop")
+async def stop_execution() -> dict:
+    """
+    Stop execution engine.
+    
+    Always returns 200.
+    """
+    try:
+        engine = ExecutionEngine.get_instance()
+        success = engine.stop()
+        
+        return {
+            "success": success,
+            "status": engine.get_status(),
+            "message": "Execution engine stopped" if success else "Execution engine was not running",
+        }
+    except Exception as e:
+        logger.error(f"Failed to stop execution engine: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@router.get("/status")
+async def get_execution_status() -> dict:
+    """
+    Get execution engine status.
+    
+    Always returns 200.
+    """
+    try:
+        engine = ExecutionEngine.get_instance()
+        return {
+            "success": True,
+            "status": engine.get_status(),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get execution status: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "status": {"status": ExecutionStatus.ERROR.value},
+        }

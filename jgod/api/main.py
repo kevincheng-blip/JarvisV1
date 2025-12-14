@@ -55,7 +55,16 @@ app.include_router(s_rank_engine.router, prefix="/api/v1/s-rank", tags=["s-rank"
 app.include_router(s_rank_v2.router, prefix="/api/v1/s-rank-v2", tags=["s-rank-v2"])
 app.include_router(strategy_perf.router, prefix="/api/v1/strategy-perf", tags=["strategy-perf"])
 app.include_router(observer.router, prefix="/api/v1/observer", tags=["observer"])
-app.include_router(execution.router, prefix="/api/v1/execution", tags=["execution"])
+
+# v0.6.8-A8: Walk-Forward & Config routers
+# v0.6.11-A11: Execution Engine router (already registered above at line 41)
+from jgod.api.routers import walkforward, config
+app.include_router(walkforward.router, prefix="/api/v1/walkforward", tags=["walkforward"])
+app.include_router(config.router, prefix="/api/v1", tags=["config"])
+
+# v0.6.11-A11: Execution Engine router
+from jgod.api.routers import execution as execution_router
+app.include_router(execution_router.router)  # Already has /api/v1/execution prefix
 
 
 @app.get("/")

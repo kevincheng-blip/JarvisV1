@@ -6,6 +6,7 @@ J-GOD API Routers
 
 from jgod.api.routers import (
     backtest,
+    config,
     decision,
     decision_ab,
     decision_v3,
@@ -29,10 +30,12 @@ from jgod.api.routers import (
     signal_conflict,
     strategy,
     universe,
+    walkforward,
 )
 
 __all__ = [
     "backtest",
+    "config",
     "decision",
     "decision_ab",
     "decision_v3",
@@ -56,4 +59,5 @@ __all__ = [
     "signal_conflict",
     "strategy",
     "universe",
+    "walkforward",
 ]

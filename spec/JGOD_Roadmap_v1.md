@@ -109,6 +109,74 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - 執行 API：`GET /api/v1/execution/ledger/latest/{symbol}`, `POST /api/v1/execution/ledger/recompute/{symbol}`, `POST /api/v1/execution/order/simulate/{symbol}`
 - War Room V2 LedgerStatusCard（顯示 NAV、現金、P&L、持倉資訊 + Reset Ledger / Simulate Order 按鈕）
 
+**v0.6.6-A7 新增功能：**
+- Realism Foundation（真實性基礎化）
+- Market Data Time Series Service (MDTS)：提供 OHLCV 時序（DB 或 mock）
+- Fill Engine（撮合引擎）：模擬訂單執行（slippage + fee + tax）
+- Backtest Core（回測核心）：deterministic 回測引擎（OHLCV + Fill + Ledger）
+- Decision V3 Evaluation 升級：新增 `evaluate_decision_v3_with_backtest()`（使用 BacktestCore）
+
+**v0.6.7-A7.5 新增功能：**
+- Feature DB/Cache & Data Pipeline（資料加速化）
+- FeatureSchema：`(symbol, date, version)` 作為唯一 key
+- Feature Computer：最小因子集合（SMA/RSI/RET/VOL，deterministic）
+- Feature Storage：JSONL append-only（`data/features/features.jsonl`）
+- Feature Service：統一入口（cache hit → miss → compute → save → return）
+- BacktestEngine 解耦：不再內部計算因子，改用 FeatureService
+- 版本管理：支援多版本並存（v1.0, v1.1, ...）
+
+**v0.6.8-A8 新增功能：**
+- Walk-Forward Runner & Learning Layers（AI 自我演化閉環）
+- WalkForwardRunner：嚴格使用 T-1 資料，觸發學習週期
+- DecisionEngineV3 參數化：接受 features + doctrine_config + feature_subset
+- Thought Layer（5 日調參）：產生 TuningPatch 建議
+- Method Layer（10/20 日）：產生 FeatureSubset 建議
+- Strategy Layer（季）：產生 StrategyAllocation 建議
+- Doctrine 版本管理：支援 apply_patch 和 rollback
+- 所有學習建議需手動審核（不自動套用）
+
+**v0.6.9-A9 新增功能：**
+- Auto-Pilot Activation & Guard Rails（條件式自動進化 + 異步學習）
+- Learning BaseLayer：品質分數計算與門檻判斷（Thought: 0.15, Method: 0.12, Strategy: 0.10）
+- 狀態機強化：PENDING_APPROVAL / AUTO_APPLY / REJECTED
+- Snapshot Consistency：學習觸發時凍結資料快照（snapshot_id）
+- Async Learning：Method/Strategy 不阻塞 daily cycle（ThreadPoolExecutor）
+- Auto-Apply 流程：Runner 在 AUTO_APPLY 時自動套用 doctrine patch
+- Shadow Run（90 天）：對照測試 autopilot vs baseline
+- Notification System：學習結束寫通知 log
+- Feature Flags：autopilot_enabled, async_learning_enabled（可關閉）
+
+**v0.6.10-A10 新增功能：**
+- Portfolio Coordination & Multi-Symbol Scaling（組合級運行能力）
+- Portfolio Manager：多 runner 協調 + 資本分配（equal_weight / vol_parity）
+- Data Service Interface：資料解耦抽象層（DataServiceInterface + DefaultDataService）
+- Portfolio Logs：組合級 NAV/P&L 報告（append-only JSONL）
+- Time Sync Check：確保多 runner 使用同一決策日期 T
+- Multi-Symbol Learning：FeatureSelector 支援 global scope（跨標的因子篩選）
+- Runner 隔離：每個 symbol 獨立 ledger / runner / 狀態
+- Portfolio APIs：組合 Walk-Forward 端點（run / latest / list）
+
+**v0.6.11-A11 新增功能：**
+- Real-Time Execution Engine & Broker Integration（即時事件驅動執行）
+- ExecutionEngine：常駐事件驅動執行引擎（Singleton，tick loop）
+- BrokerAdapterInterface：決策與成交解耦抽象層
+- PaperTradingAdapter：第一個實戰 Adapter（包裝 VirtualLedger + FillEngine）
+- OrderEngine 解耦：不再直接呼叫 FillEngine，改為透過 Broker Adapter
+- Data Interface 擴展：新增 get_latest_data() 支援即時資料
+- Execution APIs：執行引擎控制端點（start / stop / status）
+- WalkForwardRunner 保留：作為研究用途，不破壞 A10 Portfolio 行為
+
+**v0.6.12-A12 新增功能：**
+- Production Monitoring & Resilience（生產級穩定與 Go-Live 準備）
+- ExecutionStateStore：狀態持久化 / 恢復（engine_status, last_tick_time, broker_status）
+- MetricsLogger：指標記錄（tick_duration_ms, decide_latency_ms, ticks_success/error）
+- AlertingService：告警機制（INFO / WARN / CRITICAL，警報規則）
+- ExecutionEngine 容錯：try/except Guard，任何例外都不可讓 Engine thread 終止
+- PaperTradingAdapter 狀態持久化：Ledger 狀態恢復
+- DataService 容錯：get_latest_data() 回傳 None → 不丟例外
+- Execution API 擴展：metrics / alerts 端點
+- 可恢復、可觀測、可告警、可 Go-Live
+
 **主要限制：**
 - 僅支援模擬模式（DRY_RUN / PAPER）
 - 資料完整性待補齊
