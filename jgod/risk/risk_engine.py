@@ -7,8 +7,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, Any, Literal, Dict, Optional
-import pandas as pd
+from typing import Protocol, Any, Literal, Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 
 @dataclass

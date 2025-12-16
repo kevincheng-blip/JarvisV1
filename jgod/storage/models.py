@@ -5,13 +5,55 @@ ORM models for stocks, indicators, predictions, and virtual trades.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Float, Integer, String, UniqueConstraint
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql import func
+if TYPE_CHECKING:
+    from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Float, Integer, String, UniqueConstraint
+    from sqlalchemy.orm import declarative_base
+    from sqlalchemy.sql import func
+else:
+    try:
+        from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Float, Integer, String, UniqueConstraint
+        from sqlalchemy.orm import declarative_base
+        from sqlalchemy.sql import func
+    except ImportError:
+        # Stubs for environments without sqlalchemy
+        JSON = None
+        Boolean = None
+        
+        def Column(*args, **kwargs):
+            return None
+        
+        def Date(*args, **kwargs):
+            return None
+        
+        def DateTime(*args, **kwargs):
+            return None
+        
+        Float = None
+        Integer = None
+        String = None
+        
+        def UniqueConstraint(*args, **kwargs):
+            return None
+        
+        def declarative_base():
+            class Base:
+                pass
+            return Base
+        
+        class func:
+            @staticmethod
+            def now():
+                return None
 
-Base = declarative_base()
+# Initialize Base (with fallback if sqlalchemy not available)
+try:
+    Base = declarative_base()
+except Exception:
+    # Fallback if declarative_base fails
+    class Base:
+        pass
 
 
 class Stock(Base):

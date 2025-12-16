@@ -317,6 +317,17 @@ else
 fi
 echo ""
 
+# Check 28: Signal Drift Score contract test (v0.6.13-P1.1)
+echo "2️⃣8️⃣  Running Signal Drift Score contract test..."
+pytest tests/test_signal_drift_contract.py -q
+if [ $? -eq 0 ]; then
+    echo "   ✅ Signal Drift Score contract test passed"
+else
+    echo "   ❌ Signal Drift Score contract test failed"
+    exit 1
+fi
+echo ""
+
 echo "================================"
 echo "✅ All CI quick checks passed!"
 echo ""

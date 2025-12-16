@@ -18,8 +18,15 @@ from jgod.decision import DecisionEngineV1
 
 router = APIRouter()
 
-# Decision Engine 實例（單例模式）
-_decision_engine = DecisionEngineV1()
+# Decision Engine 實例（lazy singleton - 避免 import 時觸發 heavy initialization）
+_decision_engine = None
+
+def get_decision_engine():
+    """Lazy getter for DecisionEngineV1 singleton."""
+    global _decision_engine
+    if _decision_engine is None:
+        _decision_engine = DecisionEngineV1()
+    return _decision_engine
 
 
 @router.get("/v1/decision/portfolio")
@@ -68,8 +75,9 @@ async def get_portfolio_plan(
         universe_list = [s.strip() for s in universe.split(",")]
     
     try:
-        # Generate portfolio plan
-        portfolio_plan = _decision_engine.generate_portfolio_for_date(
+        # Generate portfolio plan (lazy initialization)
+        engine = get_decision_engine()
+        portfolio_plan = engine.generate_portfolio_for_date(
             date=as_of_date,
             universe=universe_list,
             long_budget=long_budget,

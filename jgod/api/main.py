@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, decision_v3, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, s_rank_v2, strategy_perf, observer, execution
+from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, decision_v3, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, s_rank_v2, strategy_perf, observer, execution, intelligence
 
 app = FastAPI(
     title="J-GOD Simulation API",
@@ -55,6 +55,7 @@ app.include_router(s_rank_engine.router, prefix="/api/v1/s-rank", tags=["s-rank"
 app.include_router(s_rank_v2.router, prefix="/api/v1/s-rank-v2", tags=["s-rank-v2"])
 app.include_router(strategy_perf.router, prefix="/api/v1/strategy-perf", tags=["strategy-perf"])
 app.include_router(observer.router, prefix="/api/v1/observer", tags=["observer"])
+app.include_router(intelligence.router)  # v0.6.13-P1.1: Intelligence status (already has /api/v1/intelligence prefix)
 
 # v0.6.8-A8: Walk-Forward & Config routers
 # v0.6.11-A11: Execution Engine router (already registered above at line 41)

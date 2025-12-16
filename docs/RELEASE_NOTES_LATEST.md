@@ -51,6 +51,13 @@ This release includes six major feature packages:
 - `GET /api/v1/decision-v3/arena/latest/{symbol}` - Get latest arena snapshot
 - `GET /api/v1/decision-v3/arena/list/{symbol}?n=20` - List arena snapshots
 
+### Execution Grounding (v0.6.5-A6)
+- `GET /api/v1/execution/ledger/latest/{symbol}?initial_cash=1000000.0` - Get latest ledger snapshot (200 OK, returns default if no data)
+- `POST /api/v1/execution/ledger/recompute/{symbol}?initial_cash=1000000.0` - Reset ledger and save snapshot (200 OK)
+- `POST /api/v1/execution/order/simulate/{symbol}?mode=performance&limit=60&k=5` - Simulate order from latest Decision V3 (200 OK, returns HOLD if no data)
+- `GET /api/v1/decision-v3/arena/latest/{symbol}` - Get latest arena snapshot
+- `GET /api/v1/decision-v3/arena/list/{symbol}?n=20` - List arena snapshots
+
 ### Execution API (v0.6.5-A6)
 - `GET /api/v1/execution/ledger/latest/{symbol}` - Get latest virtual ledger snapshot
 - `POST /api/v1/execution/ledger/recompute/{symbol}?initial_cash=1000000` - Reset and create new ledger snapshot

@@ -8,8 +8,20 @@ ErrorEvent objects that can be analyzed by ErrorLearningEngine.
 
 from __future__ import annotations
 
-from typing import Optional
-import pandas as pd
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 from jgod.learning.error_learning_engine import ErrorLearningEngine
 from jgod.learning.error_event import ErrorEvent, CLASS_UTILIZATION_GAP, CLASS_FORM_INSUFFICIENT, CLASS_KNOWLEDGE_GAP

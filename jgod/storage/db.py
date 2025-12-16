@@ -7,10 +7,31 @@ SQLAlchemy engine and session management for J-GOD Taiwan stock database.
 import logging
 import os
 from pathlib import Path
-from typing import Generator
+from typing import Generator, TYPE_CHECKING
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+if TYPE_CHECKING:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+else:
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+    except ImportError:
+        # Stub for environments without sqlalchemy
+        def create_engine(*args, **kwargs):
+            raise ImportError("sqlalchemy not installed")
+        
+        class Session:
+            pass
+        
+        def sessionmaker(*args, **kwargs):
+            raise ImportError("sqlalchemy not installed")
+
+try:
+    from sqlalchemy.orm import sessionmaker
+except ImportError:
+    def sessionmaker(*args, **kwargs):
+        raise ImportError("sqlalchemy not installed")
 
 logger = logging.getLogger(__name__)
 

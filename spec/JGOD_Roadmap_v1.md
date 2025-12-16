@@ -98,6 +98,15 @@ v0.2.0 (目前) → v0.3.x → v0.4.x → v0.5.x → v1.0.0
 - Regression 警報：若 winner != V3 且差距 >= 0.03 → 觸發回歸警報
 - Auto-Tuning：風險映射 + composite weights grid search（9 個組合）
 - 競技場 API：`POST /api/v1/decision-v3/arena/recompute/{symbol}`, `GET /api/v1/decision-v3/arena/latest/{symbol}`, `GET /api/v1/decision-v3/arena/list/{symbol}`
+
+**v0.6.5-A6 新增功能：**
+- Execution Grounding Layer（執行層落地）
+- VirtualLedger：虛擬帳本（現金、持倉、已實現/未實現損益、NAV）
+- Order Generation Engine：從 Decision V3 生成訂單請求（BUY/SELL/HOLD）
+- Execution Storage：JSONL 儲存（`data/execution/ledger_snapshots.jsonl`）
+- Decision V3 Evaluation/Arena 升級：使用 VirtualLedger P&L 取代代理指標
+- 執行 API：`GET /api/v1/execution/ledger/latest/{symbol}`, `POST /api/v1/execution/ledger/recompute/{symbol}`, `POST /api/v1/execution/order/simulate/{symbol}`
+- War Room V2 LedgerStatusCard（顯示 NAV、P&L、持倉 + 重置帳本 + 模擬訂單按鈕）
 - War Room V2 DecisionV3Card 升級（Arena 區塊：winner badge + regression alert + scoreboard table + auto-tuning results）
 
 **v0.6.5-A6 新增功能：**

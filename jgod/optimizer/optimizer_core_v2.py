@@ -12,8 +12,25 @@ Reference:
 
 from __future__ import annotations
 
-import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    try:
+        import numpy as np
+    except ImportError:
+        # Stub for environments without numpy
+        class np:
+            class ndarray:
+                pass
+            def array(*args, **kwargs):
+                pass
+            class nan:
+                pass
+            @staticmethod
+            def isnan(*args):
+                return False
 import warnings
 
 try:

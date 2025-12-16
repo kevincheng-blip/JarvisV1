@@ -24,8 +24,9 @@ from jgod.api.schemas.backtest import (
     PathABacktestSummary,
 )
 from jgod.decision.risk_config_loader import load_risk_config
-from jgod.path_a.path_a_engine_v1 import PathAEngineV1
-from jgod.policy.policy_log_reader_v1 import PolicyLogReaderV1
+# Lazy import to avoid heavy dependencies at module level
+# from jgod.path_a.path_a_engine_v1 import PathAEngineV1
+# from jgod.policy.policy_log_reader_v1 import PolicyLogReaderV1
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +149,9 @@ async def run_path_a_backtest_sync(request: PathABacktestRequest):
                     detail=f"Failed to load RiskConfig: {str(e)}"
                 )
         
-        # 初始化 Path A Engine
+        # 初始化 Path A Engine (lazy import)
         try:
+            from jgod.path_a.path_a_engine_v1 import PathAEngineV1
             engine = PathAEngineV1(
                 initial_capital=request.capital,
                 **decision_config
@@ -270,6 +272,7 @@ async def get_recent_backtest_experiments(
             return []
         
         try:
+            from jgod.policy.policy_log_reader_v1 import PolicyLogReaderV1
             reader = PolicyLogReaderV1(log_path=str(log_path))
         except Exception as e:
             logger.warning(f"Failed to initialize PolicyLogReaderV1: {e}")

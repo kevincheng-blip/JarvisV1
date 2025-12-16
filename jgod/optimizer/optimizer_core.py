@@ -17,10 +17,39 @@ Reference:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional, Dict, TYPE_CHECKING
 
-import numpy as np
-import pandas as pd
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    try:
+        import numpy as np
+    except ImportError:
+        # Stub for environments without numpy
+        class np:
+            class ndarray:
+                pass
+            def array(*args, **kwargs):
+                pass
+            class nan:
+                pass
+            @staticmethod
+            def isnan(*args):
+                return False
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 try:
     from scipy.optimize import minimize

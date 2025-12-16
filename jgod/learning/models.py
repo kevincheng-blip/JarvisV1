@@ -22,9 +22,9 @@ class PatchStatus(str, Enum):
 class FeatureSubset:
     """Feature subset recommendation from Method Layer."""
     date: str  # YYYY-MM-DD
-    symbol: Optional[str] = None  # v0.6.10-A10: Optional for global scope
     recommended_features: List[str]  # e.g., ["SMA_20", "RSI_14", ...]
     reason: str  # Traditional Chinese
+    symbol: Optional[str] = None  # v0.6.10-A10: Optional for global scope
     evidence: Dict = field(default_factory=dict)  # P&L comparison, metrics
     quality_score: float = 0.0  # v0.6.9-A9: Quality score (0.0 ~ 1.0)
     status: PatchStatus = PatchStatus.PENDING_APPROVAL  # v0.6.9-A9: Status enum
@@ -54,8 +54,8 @@ class StrategyAllocation:
     date: str  # YYYY-MM-DD
     symbol: str
     recommended_primary_strategy: str
-    recommended_secondary_strategies: List[str] = field(default_factory=list)
     reason: str  # Traditional Chinese
+    recommended_secondary_strategies: List[str] = field(default_factory=list)
     evidence: Dict = field(default_factory=dict)  # Regime analysis, performance comparison
     quality_score: float = 0.0  # v0.6.9-A9: Quality score (0.0 ~ 1.0)
     status: PatchStatus = PatchStatus.PENDING_APPROVAL  # v0.6.9-A9: Status enum

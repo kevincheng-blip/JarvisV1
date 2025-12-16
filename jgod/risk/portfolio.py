@@ -1,10 +1,22 @@
 """
 投資組合管理器：管理多個標的的持倉
 """
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from datetime import datetime
-import pandas as pd
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 
 @dataclass

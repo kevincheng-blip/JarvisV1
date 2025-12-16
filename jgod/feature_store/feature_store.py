@@ -8,7 +8,17 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, Optional
 
-from sqlalchemy.orm import Session
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+else:
+    try:
+        from sqlalchemy.orm import Session
+    except ImportError:
+        # Stub for environments without sqlalchemy
+        class Session:
+            pass
 
 from jgod.storage.db import get_session
 from jgod.storage.models import IndicatorSnapshot

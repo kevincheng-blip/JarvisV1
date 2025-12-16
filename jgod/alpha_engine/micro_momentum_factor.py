@@ -9,7 +9,19 @@ Based on: structured_books/Path A 歷史回測撈取資料＋分析_AI知識庫�
 from __future__ import annotations
 
 from typing import Optional
-import pandas as pd
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 from jgod.alpha_engine.factor_base import FactorBase
 

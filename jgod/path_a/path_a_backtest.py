@@ -13,10 +13,44 @@ The goal of v1 is **not** to implement all details, but to:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Optional, List
+from typing import Protocol, Optional, List, TYPE_CHECKING
 
-import numpy as np
-import pandas as pd
+if TYPE_CHECKING:
+    import numpy as np
+    import pandas as pd
+else:
+    # Lazy import for type hints only
+    try:
+        import numpy as np
+    except ImportError:
+        # Stub for environments without numpy
+        class np:
+            class ndarray:
+                pass
+            def array(*args, **kwargs):
+                pass
+            class nan:
+                pass
+            class linalg:
+                @staticmethod
+                def eigvals(*args):
+                    pass
+            @staticmethod
+            def any(*args):
+                pass
+            @staticmethod
+            def eye(*args, **kwargs):
+                pass
+    
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 from jgod.path_a.path_a_schema import (
     PathAConfig,

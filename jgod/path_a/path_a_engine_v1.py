@@ -18,7 +18,11 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
-import pandas as pd
+# Lazy import pandas to avoid import-time dependency
+try:
+    import pandas as pd
+except ImportError:
+    pd = None  # Will fail at runtime if actually used
 
 from jgod.decision import DecisionEngineV1, PortfolioPlan, PositionPlan
 from jgod.storage.db import get_session

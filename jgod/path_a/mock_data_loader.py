@@ -19,8 +19,35 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence, Dict
 
-import numpy as np
-import pandas as pd
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    try:
+        import numpy as np
+    except ImportError:
+        # Stub for environments without numpy
+        class np:
+            class ndarray:
+                pass
+            def array(*args, **kwargs):
+                pass
+            class nan:
+                pass
+            @staticmethod
+            def isnan(*args):
+                return False
+    
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 from jgod.path_a.path_a_schema import PathAConfig
 from jgod.path_a.path_a_backtest import PathADataLoader

@@ -19,8 +19,10 @@ from jgod.decision_ab.models import (
 from jgod.decision_ab.aggregator import create_ab_result
 from jgod.decision_ab.storage import AbResultStorage, DecisionAbStorageV1
 from jgod.decision.config import DecisionConfig
-from jgod.path_a.path_a_engine_v1 import PathAEngineV1, BacktestResult
-from jgod.path_a.path_a_engine_v2 import PathAEngineV2, PathAConfig
+# Lazy import to avoid heavy dependencies at module level
+# from jgod.path_a.path_a_engine_v1 import PathAEngineV1, BacktestResult
+# Lazy import to avoid heavy dependencies at module level
+# from jgod.path_a.path_a_engine_v2 import PathAEngineV2, PathAConfig
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,7 @@ class DecisionAbRunnerV1:
     
     def _convert_backtest_metrics_to_arm_metrics(
         self,
-        backtest_result: BacktestResult,
+        backtest_result,  # BacktestResult (lazy import)
     ) -> ArmMetrics:
         """Convert BacktestResult metrics to ArmMetrics
         
@@ -231,7 +233,7 @@ class DecisionAbRunnerV1:
     
     def _backtest_result_to_arm_backtest_result(
         self,
-        backtest_result: BacktestResult,
+        backtest_result,  # BacktestResult (lazy import)
         version: str,
     ) -> ArmBacktestResult:
         """Convert BacktestResult to ArmBacktestResult"""
@@ -257,7 +259,7 @@ class DecisionAbRunnerV1:
             equity_curve=equity_curve,
         )
     
-    def _calculate_turnover(self, backtest_result: BacktestResult) -> float:
+    def _calculate_turnover(self, backtest_result) -> float:  # BacktestResult (lazy import)
         """Calculate turnover from backtest result"""
         if backtest_result.initial_capital <= 0:
             return 0.0
@@ -339,6 +341,7 @@ class DecisionAbRunnerV1:
         
         # Use PathAEngineV2 for both V1 and V2 comparisons
         # PathAEngineV2 supports decision_version parameter to switch between v1/v2
+        from jgod.path_a.path_a_engine_v2 import PathAEngineV2, PathAConfig
         
         # Run baseline (V1)
         logger.info(f"Running baseline (V1) backtest using PathAEngineV2...")

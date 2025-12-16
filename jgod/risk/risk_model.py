@@ -15,9 +15,36 @@ Reference: docs/J-GOD_RISK_MODEL_STANDARD_v1.md
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
-import pandas as pd
-import numpy as np
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import numpy as np
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
+    
+    try:
+        import numpy as np
+    except ImportError:
+        # Stub for environments without numpy
+        class np:
+            class ndarray:
+                pass
+            def array(*args, **kwargs):
+                pass
+            class nan:
+                pass
+            @staticmethod
+            def isnan(*args):
+                return False
 
 from jgod.risk.exposure_schema import FactorExposure
 from jgod.risk.risk_factors import STANDARD_FACTOR_NAMES

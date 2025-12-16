@@ -22,6 +22,14 @@ def _get_walkforward_log_path() -> Path:
     return research_dir / "walkforward_logs.jsonl"
 
 
+def _get_drift_events_path() -> Path:
+    """Get drift events file path."""
+    project_root = Path(__file__).resolve().parents[2]
+    research_dir = project_root / "data" / "research"
+    research_dir.mkdir(parents=True, exist_ok=True)
+    return research_dir / "drift_events.jsonl"
+
+
 def save_daily_log(log_entry: Dict) -> None:
     """
     Save daily walkforward log entry (append-only).
@@ -343,4 +351,208 @@ def list_portfolio_logs(n: int = 20) -> List[Dict]:
     logs.sort(key=lambda x: x.get("date", ""), reverse=True)
     
     return logs[:n]
+
+
+def _get_intelligence_status_path() -> Path:
+    """Get intelligence status storage file path."""
+    project_root = Path(__file__).resolve().parents[2]
+    research_dir = project_root / "data" / "research"
+    research_dir.mkdir(parents=True, exist_ok=True)
+    return research_dir / "intelligence_status.jsonl"
+
+
+def save_intelligence_status(snapshot: Dict) -> None:
+    """
+    Save intelligence status snapshot (append-only).
+    
+    Args:
+        snapshot: IntelligenceStatusSnapshot as dict
+    """
+    storage_path = _get_intelligence_status_path()
+    
+    # Add timestamp if not present
+    if "created_at" not in snapshot:
+        snapshot["created_at"] = datetime.now().isoformat()
+    
+    try:
+        with open(storage_path, "a", encoding="utf-8") as f:
+            json.dump(snapshot, f, ensure_ascii=False)
+            f.write("\n")
+    except Exception as e:
+        logger.error(f"Failed to save intelligence status: {e}", exc_info=True)
+        raise
+
+
+def latest_intelligence_status() -> Dict:
+    """
+    Get latest intelligence status snapshot.
+    
+    Returns:
+        Latest snapshot dict or default empty state
+    """
+    storage_path = _get_intelligence_status_path()
+    
+    if not storage_path.exists():
+        return _get_default_intelligence_status()
+    
+    # Read last line (most recent)
+    try:
+        with open(storage_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            if lines:
+                last_line = lines[-1].strip()
+                if last_line:
+                    return json.loads(last_line)
+    except Exception as e:
+        logger.error(f"Failed to load latest intelligence status: {e}", exc_info=True)
+    
+    return _get_default_intelligence_status()
+
+
+def _get_default_intelligence_status() -> Dict:
+    """Get default empty intelligence status."""
+    return {
+        "evolution": [
+            {"layer": "strategy", "progress": 0, "status": "STABLE", "last_updated": "", "details": {}},
+            {"layer": "thought", "progress": 0, "status": "STABLE", "last_updated": "", "details": {}},
+            {"layer": "method", "progress": 0, "status": "STABLE", "last_updated": "", "details": {}},
+        ],
+        "activities": [],
+        "recent_events": [],
+        "health_flags": {},
+        "snapshot_id": "",
+        "created_at": datetime.now().isoformat(),
+    }
+
+
+def append_evolution_event(event: Dict) -> None:
+    """
+    Append evolution event (append-only).
+    
+    Args:
+        event: EvolutionEvent as dict
+    """
+    storage_path = _get_intelligence_status_path()
+    
+    # Add timestamp if not present
+    if "created_at" not in event:
+        event["created_at"] = datetime.now().isoformat()
+    
+    try:
+        with open(storage_path, "a", encoding="utf-8") as f:
+            json.dump({"type": "event", "event": event}, f, ensure_ascii=False)
+            f.write("\n")
+    except Exception as e:
+        logger.error(f"Failed to append evolution event: {e}", exc_info=True)
+        raise
+
+
+def list_evolution_events(n: int = 50) -> List[Dict]:
+    """
+    List latest N evolution events.
+    
+    Args:
+        n: Maximum number of events to return
+        
+    Returns:
+        List of event dicts (newest first)
+    """
+    storage_path = _get_intelligence_status_path()
+    
+    if not storage_path.exists():
+        return []
+    
+    events = []
+    try:
+        with open(storage_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    if data.get("type") == "event" and "event" in data:
+                        events.append(data["event"])
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON line in {storage_path}: {line}")
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to list evolution events: {e}", exc_info=True)
+        return []
+    
+    # Sort by created_at descending (newest first)
+    events.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    return events[:n]
+
+
+# ============================================================================
+# Drift Events Storage (v0.6.13-P1.1)
+# ============================================================================
+
+def save_drift_event(event: Dict) -> None:
+    """
+    Save drift event (append-only).
+    
+    Args:
+        event: Dict with symbol, date, method_version, baseline_window,
+               current_window, drift_score, features_used, created_at
+    """
+    storage_path = _get_drift_events_path()
+    
+    # Add timestamp if not present
+    if "created_at" not in event:
+        event["created_at"] = datetime.now().isoformat()
+    
+    try:
+        with open(storage_path, "a", encoding="utf-8") as f:
+            json.dump(event, f, ensure_ascii=False)
+            f.write("\n")
+    except Exception as e:
+        logger.error(f"Failed to save drift event: {e}", exc_info=True)
+        raise
+
+
+def latest_drift_event(symbol: Optional[str] = None) -> Optional[Dict]:
+    """
+    Get latest drift event for a symbol (or any symbol if symbol is None).
+    
+    Args:
+        symbol: Optional symbol filter
+    
+    Returns:
+        Latest drift event dict, or None if no data
+    """
+    storage_path = _get_drift_events_path()
+    
+    if not storage_path.exists():
+        return None
+    
+    latest = None
+    latest_time = ""
+    
+    try:
+        with open(storage_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                    # Filter by symbol if provided
+                    if symbol and event.get("symbol") != symbol:
+                        continue
+                    # Track latest by created_at
+                    event_time = event.get("created_at", "")
+                    if event_time > latest_time:
+                        latest_time = event_time
+                        latest = event
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON line in {storage_path}: {line}")
+                    continue
+    except Exception as e:
+        logger.error(f"Failed to load latest drift event: {e}", exc_info=True)
+        return None
+    
+    return latest
 

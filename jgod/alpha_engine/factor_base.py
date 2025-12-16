@@ -6,9 +6,36 @@ This module provides the FactorBase abstract class that all alpha factors must i
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
-import pandas as pd
-import numpy as np
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import numpy as np
+else:
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Series:
+                pass
+            class DataFrame:
+                pass
+    
+    try:
+        import numpy as np
+    except ImportError:
+        # Stub for environments without numpy
+        class np:
+            class ndarray:
+                pass
+            def array(*args, **kwargs):
+                pass
+            class nan:
+                pass
+            @staticmethod
+            def isnan(*args):
+                return False
 
 
 class FactorBase(ABC):

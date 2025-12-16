@@ -141,6 +141,9 @@ class ExecutionEngine:
         
         logger.info(f"Execution engine started for symbols: {symbols}")
         
+        # v0.6.13-A13: Write intelligence status - ExecutionEngine ONLINE
+        self._update_intelligence_status_on_start()
+        
         # Save state
         self._save_state()
         
@@ -202,6 +205,9 @@ class ExecutionEngine:
                 
                 # Update last tick time
                 self._last_tick_time = datetime.now().isoformat()
+                
+                # v0.6.13-A13: Update intelligence status - tick success
+                self._update_intelligence_status_tick_success()
                 
             except Exception as e:
                 # v0.6.12-A12: Critical error - alert but continue

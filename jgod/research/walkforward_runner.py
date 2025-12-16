@@ -20,7 +20,9 @@ from jgod.execution.order_engine import OrderGenerationEngine
 from jgod.execution.fill_engine import FillEngine
 from jgod.decision_v3.engine import DecisionEngineV3
 from jgod.config.doctrine import DoctrineConfig, load_doctrine, apply_patch
-from jgod.research.storage import save_daily_log, load_daily_logs, save_snapshot, save_notification
+from jgod.research.storage import save_daily_log, load_daily_logs, save_snapshot, save_notification, append_evolution_event
+from jgod.monitoring.intelligence_status import EvolutionEvent
+from jgod.learning.models import PatchStatus
 from jgod.research.snapshot import create_snapshot_payload
 from jgod.learning.models import PatchStatus
 

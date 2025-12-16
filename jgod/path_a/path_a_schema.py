@@ -14,9 +14,23 @@ Path A is responsible for:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    # Lazy import for type hints only
+    try:
+        import pandas as pd
+    except ImportError:
+        # Stub for environments without pandas
+        class pd:
+            class Timestamp:
+                pass
+            class Series:
+                pass
+            class DataFrame:
+                pass
 
 
 # ---------------------------------------------------------------------------

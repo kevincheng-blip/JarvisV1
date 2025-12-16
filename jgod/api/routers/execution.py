@@ -2,14 +2,17 @@
 Execution API Router
 
 v0.6.11-A11: Real-time execution engine API endpoints
+v0.6.5-A6: VirtualLedger endpoints for execution grounding
 """
 
 import logging
 from fastapi import APIRouter, Body
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 from jgod.execution.engine import ExecutionEngine, ExecutionStatus
+from jgod.execution.service import get_latest_ledger, recompute_ledger, simulate_order_from_latest_decision
+from jgod.api.schemas.execution import LedgerResponseSchema, ExecutionSimulateResponseSchema
 
 logger = logging.getLogger(__name__)
 
@@ -154,3 +157,119 @@ async def get_execution_status() -> dict:
             "error": str(e),
             "status": {"status": ExecutionStatus.ERROR.value},
         }
+
+
+# v0.6.5-A6: VirtualLedger endpoints for execution grounding
+
+@router.get("/ledger/latest/{symbol}", response_model=LedgerResponseSchema)
+async def get_ledger_latest(symbol: str, initial_cash: float = 1_000_000.0) -> LedgerResponseSchema:
+    """
+    Get latest ledger snapshot for a symbol.
+    
+    Returns default empty ledger if no snapshots exist (200 OK, never 404).
+    
+    Args:
+        symbol: Stock symbol
+        initial_cash: Initial cash for default ledger (if no snapshot exists)
+        
+    Returns:
+        LedgerResponseSchema with ledger snapshot or default ledger
+    """
+    try:
+        snapshot = get_latest_ledger(symbol, initial_cash)
+        return LedgerResponseSchema(**snapshot)
+    except Exception as e:
+        logger.error(f"Failed to get ledger latest for {symbol}: {e}", exc_info=True)
+        # Return default ledger on error
+        from jgod.execution.virtual_ledger import VirtualLedger
+        from datetime import datetime
+        ledger = VirtualLedger(symbol=symbol, cash=initial_cash)
+        ledger.mark_to_market(symbol, 100.0)
+        return LedgerResponseSchema(
+            snapshot_id="",
+            created_at=datetime.now().isoformat(),
+            symbol=symbol,
+            ledger=ledger.snapshot(symbol),
+            is_default=True,
+        )
+
+
+@router.post("/ledger/recompute/{symbol}", response_model=LedgerResponseSchema)
+async def post_ledger_recompute(symbol: str, initial_cash: float = 1_000_000.0) -> LedgerResponseSchema:
+    """
+    Recompute (reset) ledger for a symbol and save snapshot.
+    
+    Always returns 200 OK.
+    
+    Args:
+        symbol: Stock symbol
+        initial_cash: Initial cash amount
+        
+    Returns:
+        LedgerResponseSchema with new snapshot
+    """
+    try:
+        snapshot = recompute_ledger(symbol, initial_cash)
+        return LedgerResponseSchema(**snapshot)
+    except Exception as e:
+        logger.error(f"Failed to recompute ledger for {symbol}: {e}", exc_info=True)
+        # Return default ledger on error
+        from jgod.execution.virtual_ledger import VirtualLedger
+        from datetime import datetime
+        ledger = VirtualLedger(symbol=symbol, cash=initial_cash)
+        ledger.mark_to_market(symbol, 100.0)
+        return LedgerResponseSchema(
+            snapshot_id="",
+            created_at=datetime.now().isoformat(),
+            symbol=symbol,
+            ledger=ledger.snapshot(symbol),
+            is_default=True,
+        )
+
+
+@router.post("/order/simulate/{symbol}", response_model=ExecutionSimulateResponseSchema)
+async def post_order_simulate(
+    symbol: str,
+    mode: str = "performance",
+    limit: int = 60,
+    k: int = 5
+) -> ExecutionSimulateResponseSchema:
+    """
+    Simulate order from latest Decision V3 snapshot.
+    
+    Always returns 200 OK (even if no data, returns HOLD order).
+    
+    Args:
+        symbol: Stock symbol
+        mode: Decision mode (default: "performance")
+        limit: Timeline limit (default: 60)
+        k: Number of top strategies (default: 5)
+        
+    Returns:
+        ExecutionSimulateResponseSchema with ledger, decision, and order request
+    """
+    try:
+        result = simulate_order_from_latest_decision(symbol, mode, limit, k)
+        return ExecutionSimulateResponseSchema(**result)
+    except Exception as e:
+        logger.error(f"Failed to simulate order for {symbol}: {e}", exc_info=True)
+        # Return default response on error
+        from jgod.execution.virtual_ledger import VirtualLedger
+        from datetime import datetime
+        ledger = VirtualLedger(symbol=symbol, cash=1_000_000.0)
+        ledger.mark_to_market(symbol, 100.0)
+        return ExecutionSimulateResponseSchema(
+            symbol=symbol,
+            ledger=ledger.snapshot(symbol),
+            decision_v3={},
+            order_request={
+                "symbol": symbol,
+                "side": "HOLD",
+                "qty": 0,
+                "reason": f"模擬失敗：{str(e)}",
+                "target_position_scale": 0.0,
+                "current_position_scale": 0.0,
+            },
+            price=100.0,
+            has_data=False,
+        )

@@ -9,11 +9,35 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-import yaml
+# Lazy import yaml to avoid import-time dependency
+try:
+    import yaml
+except ImportError:
+    yaml = None  # Will fail at runtime if actually used
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy import func
+else:
+    try:
+        from sqlalchemy import func
+    except ImportError:
+        # Stub for environments without sqlalchemy
+        class func:
+            pass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+else:
+    try:
+        from sqlalchemy.orm import Session
+    except ImportError:
+        # Stub for environments without sqlalchemy
+        class Session:
+            pass
 
 from jgod.storage.db import get_session
 from jgod.storage.models import IndicatorSnapshot, PredictionSnapshot, Stock, DailyBar
@@ -35,6 +59,10 @@ def get_db():
 
 def load_universe(universe_file: str) -> List[dict]:
     """Load universe from YAML file"""
+    if yaml is None:
+        # Return empty if yaml not available
+        return []
+    
     file_path = Path(universe_file)
     if not file_path.exists():
         return []
