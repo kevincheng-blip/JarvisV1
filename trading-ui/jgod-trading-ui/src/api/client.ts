@@ -1195,5 +1195,37 @@ export const api = {
       throw error;
     }
   },
+
+  /**
+   * Get latest intelligence status (including drift score)
+   * GET /api/v1/intelligence/status/latest
+   */
+  getIntelligenceLatest: async (): Promise<{
+    method_layer_drift_score: number;
+    method_layer_drift_status: "LOW" | "MEDIUM" | "HIGH";
+    method_layer_drift_updated_at: string | null;
+    health_flags: Record<string, any>;
+    activities: any[];
+    created_at: string | null;
+  }> => {
+    try {
+      const response = await client.get(`/api/v1/intelligence/status/latest`);
+      return response.data;
+    } catch (error: any) {
+      // Backend guarantees 200, but handle gracefully
+      if (error.response?.status === 404 || error.response?.status >= 500) {
+        // Return default empty status
+        return {
+          method_layer_drift_score: 0.0,
+          method_layer_drift_status: "LOW",
+          method_layer_drift_updated_at: null,
+          health_flags: {},
+          activities: [],
+          created_at: null,
+        };
+      }
+      throw error;
+    }
+  },
 };
 

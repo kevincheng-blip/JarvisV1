@@ -20,6 +20,7 @@ import { PredictionStabilityCard } from "../components/war-room-v2/PredictionSta
 import { SRankRecommendationCard } from "../components/war-room-v2/SRankRecommendationCard";
 import { DecisionV3Card } from "../components/war-room-v2/DecisionV3Card";
 import { LedgerStatusCard } from "../components/war-room-v2/LedgerStatusCard";
+import { IntelligenceStatusCard } from "../components/war-room-v2/IntelligenceStatusCard";
 import { useFinalScoreV2 } from "../hooks/war-room/usePredictions";
 import type { TopLongItem, TopShortItem } from "../types/warRoom";
 
@@ -252,6 +253,7 @@ export function WarRoomV2Dashboard() {
 
           {/* Right Column - Observer & Governance */}
           <div className="space-y-6">
+            <IntelligenceStatusCard />
             <SRankTrendCard />
             <PredictionStabilityCard symbol={selectedSymbol || "2330"} />
             <SRankRecommendationCard symbol={selectedSymbol || "2330"} />
