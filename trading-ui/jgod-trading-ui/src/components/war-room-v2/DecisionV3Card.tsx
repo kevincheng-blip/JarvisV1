@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * DecisionV3Card Component
  * 

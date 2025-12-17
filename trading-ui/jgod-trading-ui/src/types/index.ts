@@ -82,3 +82,5 @@ export interface LatestPrediction {
   risk_flags: string[];
 }
 
+export * from "./governance";
+

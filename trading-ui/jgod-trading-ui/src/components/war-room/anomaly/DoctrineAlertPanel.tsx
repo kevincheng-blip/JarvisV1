@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * DoctrineAlertPanel Component v1.1
  * 

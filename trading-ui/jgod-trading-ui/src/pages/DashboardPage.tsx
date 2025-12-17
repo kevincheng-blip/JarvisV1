@@ -15,6 +15,12 @@ import { PolicyEvolutionPanel } from "../components/PolicyEvolutionPanel";
 import { ErrorDoctrinePanel } from "../components/ErrorDoctrinePanel";
 import { SmartWatchlist } from "../components/SmartWatchlist";
 import { WatchlistPanel } from "../components/WatchlistPanel";
+import { PanelBoundary } from "../components/PanelBoundary";
+import { AIActionCard } from "../components/AIActionCard";
+import { ExecutionRigorCard } from "../components/governance/ExecutionRigorCard";
+import { ClusterRiskCard } from "../components/governance/ClusterRiskCard";
+import { MarketRegimeCard } from "../components/governance/MarketRegimeCard";
+import { useGovernanceSummary } from "../hooks/useGovernanceSummary";
 import { api } from "../api/client";
 import type { CoverageResponse, Prediction } from "../types";
 
@@ -32,6 +38,12 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string>("2330");
   const [timelineSymbol, setTimelineSymbol] = useState<string>("2330");
+  const {
+    data: governanceSummary,
+    isLoading: isGovernanceLoading,
+    isError: isGovernanceError,
+    error: governanceError,
+  } = useGovernanceSummary();
 
   const handleLoad = async () => {
     setLoading(true);
@@ -45,7 +57,6 @@ export function DashboardPage() {
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - 30);
       const cov = await api.getCoverage(
-        "tw_top50_2024",
         fromDate.toISOString().split("T")[0],
         selectedDate
       );
@@ -90,6 +101,24 @@ export function DashboardPage() {
         </button>
       </div>
 
+      <div style={{ marginBottom: "16px" }}>
+        <PanelBoundary title="AI Action">
+          <AIActionCard summary={governanceSummary} isLoading={isGovernanceLoading} error={governanceError} />
+        </PanelBoundary>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "16px" }}>
+        <PanelBoundary title="Execution Rigor">
+          <ExecutionRigorCard data={governanceSummary?.execution_confidence} isLoading={isGovernanceLoading} error={governanceError} />
+        </PanelBoundary>
+        <PanelBoundary title="Cluster Risk">
+          <ClusterRiskCard data={governanceSummary?.cluster_risk} isLoading={isGovernanceLoading} error={governanceError} />
+        </PanelBoundary>
+        <PanelBoundary title="Market Regime">
+          <MarketRegimeCard data={governanceSummary?.regime} marketComplexity={governanceSummary?.market_complexity} isLoading={isGovernanceLoading} error={governanceError} />
+        </PanelBoundary>
+      </div>
+
       <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
         {/* Left: Smart Watchlist */}
         <div style={{ width: "256px", flexShrink: 0 }}>
@@ -103,10 +132,12 @@ export function DashboardPage() {
         <div style={{ flex: 1 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
             <div>
-              <WatchlistPanel
-                predictions={predictions}
-                loading={loading}
-              />
+              <PanelBoundary title="Watchlist">
+                <WatchlistPanel
+                  predictions={predictions}
+                  loading={loading}
+                />
+              </PanelBoundary>
               {predictions.length > 0 && (
                 <div style={{ marginTop: "8px", fontSize: "12px", color: "#666" }}>
                   Click on a symbol to view details (coming soon)
@@ -114,34 +145,46 @@ export function DashboardPage() {
               )}
             </div>
             
-            <PredictionSummaryPanel
-              prediction={selectedPrediction}
-              loading={loading}
-            />
+            <PanelBoundary title="Prediction Summary">
+              <PredictionSummaryPanel
+                prediction={selectedPrediction}
+                loading={loading}
+              />
+            </PanelBoundary>
           </div>
 
           <div>
-            <CoverageHeatmapPanel />
+            <PanelBoundary title="Coverage Heatmap">
+              <CoverageHeatmapPanel />
+            </PanelBoundary>
           </div>
 
           <div style={{ marginTop: "20px" }}>
-            <PredictionTimelinePanel
-              symbol={timelineSymbol}
-              startDate="2024-01-01"
-              endDate="2024-12-31"
-            />
+            <PanelBoundary title="Prediction Timeline">
+              <PredictionTimelinePanel
+                symbol={timelineSymbol}
+                startDate="2024-01-01"
+                endDate="2024-12-31"
+              />
+            </PanelBoundary>
           </div>
 
           <div style={{ marginTop: "20px" }}>
-            <SignalPanel symbol={timelineSymbol} />
+            <PanelBoundary title="Signals">
+              <SignalPanel symbol={timelineSymbol} />
+            </PanelBoundary>
           </div>
 
           <div style={{ marginTop: "20px" }}>
-            <PolicyPanel />
+            <PanelBoundary title="Policy">
+              <PolicyPanel />
+            </PanelBoundary>
           </div>
 
           <div style={{ marginTop: "20px" }}>
-            <ErrorDoctrinePanel />
+            <PanelBoundary title="Error Doctrine">
+              <ErrorDoctrinePanel />
+            </PanelBoundary>
           </div>
         </div>
       </div>

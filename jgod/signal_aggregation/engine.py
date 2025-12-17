@@ -172,9 +172,28 @@ class SignalAggregationEngineV1:
         # Sort by conflict_score (descending) - most conflicted first
         conflict_items.sort(key=lambda x: x.conflict_score, reverse=True)
         
-        # Apply limit
-        if limit:
-            conflict_items = conflict_items[:limit]
+        # --- normalize limit ---
+        DEFAULT_LIMIT = 50
+        MAX_LIMIT = 500
+
+        if limit is None:
+            limit_i = DEFAULT_LIMIT
+        else:
+            try:
+                # allow "60", 60.0, etc.
+                limit_i = int(float(limit))
+            except (TypeError, ValueError):
+                limit_i = DEFAULT_LIMIT
+
+        # clamp
+        if limit_i < 1:
+            limit_i = 1
+        if limit_i > MAX_LIMIT:
+            limit_i = MAX_LIMIT
+
+        # apply slice
+        if limit_i < len(conflict_items):
+            conflict_items = conflict_items[:limit_i]
         
         logger.info(
             f"Generated {len(conflict_items)} conflict items for date {trade_date} "

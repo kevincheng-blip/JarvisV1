@@ -5,6 +5,7 @@ v0.6.10-A10: Default implementation using FeatureService and MarketDataService
 """
 
 import logging
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from jgod.data.data_service_interface import DataServiceInterface

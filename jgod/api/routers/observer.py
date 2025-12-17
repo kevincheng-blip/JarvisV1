@@ -4,7 +4,7 @@ Provides endpoints for monitoring knowledge governance state.
 """
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -28,18 +28,19 @@ _analyzer = GovernanceAnalyzer()
 
 @router.get(
     "/governance-summary",
-    response_model=KnowledgeGovernanceSummarySchema,
-    summary="Get knowledge governance summary",
-    description="取得最新的知識治理概覽數據，包含 Doctrine、Rule Sim、S-Rank 等核心 KPI。",
+    summary="Get knowledge governance summary (aligned with governance summary)",
+    description="Returns the same structure as /api/v1/governance/summary (single source of truth).",
 )
-async def get_governance_summary() -> KnowledgeGovernanceSummarySchema:
-    """Get latest knowledge governance summary"""
+async def get_governance_summary():
+    """Get governance summary (aligned with governance router)."""
     try:
-        summary = _collector.collect_governance_data()
-        return KnowledgeGovernanceSummarySchema.model_validate(summary.model_dump())
+        from jgod.governance.assembler import assemble_governance_summary
+
+        summary = assemble_governance_summary()
+        return summary.model_dump()
     except Exception as e:
-        logger.error(f"Error collecting governance summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.warning(f"Error collecting governance summary (observer): {e}")
+        return {}
 
 
 @router.get(

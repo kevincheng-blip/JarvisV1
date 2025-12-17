@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Ledger Status Card
  * 

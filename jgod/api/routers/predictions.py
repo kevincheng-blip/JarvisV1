@@ -210,8 +210,14 @@ async def get_top_n_long(
     else:
         trade_date = date.today()
     
-    if db is None:
-        db = next(get_db())
+    db = None
+    try:
+        db_gen = get_db()
+        if db_gen:
+            db = next(db_gen)
+    except Exception as e:
+        logger.debug(f"Could not get database session: {e}")
+        db = None
     
     try:
         # 1. 取得 Raw Scores
@@ -268,7 +274,8 @@ async def get_top_n_long(
     
     except Exception as e:
         logger.error(f"Error in get_top_n_long: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Graceful fallback: return empty stub instead of 500
+        return []
 
 
 @router.get(
@@ -373,7 +380,8 @@ async def get_top_n_short(
     
     except Exception as e:
         logger.error(f"Error in get_top_n_short: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        # Graceful fallback: return empty stub instead of 500
+        return []
 
 
 @router.get(

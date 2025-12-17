@@ -127,8 +127,22 @@ class KnowledgeDataCollector:
                     logger.debug(f"Rule Sim Storage not available: {e}")
                     return
             
-            # Load all reports
-            all_reports = self.rule_sim_storage.load_all()
+            storage = self.rule_sim_storage
+
+            def _load_reports():
+                if hasattr(storage, "load_all"):
+                    return storage.load_all()
+                if hasattr(storage, "list_all"):
+                    return storage.list_all()
+                if hasattr(storage, "load_recent"):
+                    return storage.load_recent()
+                return []
+
+            try:
+                all_reports = _load_reports() or []
+            except Exception as e:
+                logger.debug(f"Rule Sim load failed: {e}")
+                return
             
             if not all_reports:
                 return

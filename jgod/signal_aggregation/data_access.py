@@ -80,9 +80,27 @@ def get_strategy_votes_for_date(
             )
             votes_rows.append(votes_row)
         
-        # Apply limit
-        if limit:
-            votes_rows = votes_rows[:limit]
+        # --- normalize limit ---
+        DEFAULT_LIMIT = 50
+        MAX_LIMIT = 500
+
+        if limit is None:
+            limit_i = DEFAULT_LIMIT
+        else:
+            try:
+                # allow "60", 60.0, etc.
+                limit_i = int(float(limit))
+            except (TypeError, ValueError):
+                limit_i = DEFAULT_LIMIT
+
+        # clamp
+        if limit_i < 1:
+            limit_i = 1
+        if limit_i > MAX_LIMIT:
+            limit_i = MAX_LIMIT
+
+        # apply slice
+        votes_rows = votes_rows[:limit_i]
         
         logger.info(f"Retrieved {len(votes_rows)} strategy votes for date {trade_date}")
         return votes_rows

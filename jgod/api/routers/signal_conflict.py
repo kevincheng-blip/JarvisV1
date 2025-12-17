@@ -59,13 +59,19 @@ async def get_signal_conflicts(
         trade_date = date.today()  # Default to today
     
     try:
+        # Ensure limit is int (safety check for config/env/json sources)
+        try:
+            limit_int = int(limit) if limit is not None else None
+        except (TypeError, ValueError):
+            limit_int = 50  # Default fallback
+        
         # Initialize engine
         engine = SignalAggregationEngineV1()
         
         # Get conflicts
         conflict_items = engine.get_conflicts_for_date(
             trade_date=trade_date,
-            limit=limit,
+            limit=limit_int,
             side=side,
         )
         

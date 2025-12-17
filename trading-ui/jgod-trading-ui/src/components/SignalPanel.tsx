@@ -47,6 +47,14 @@ const getSignalColor = (signal: string): string => {
   }
 };
 
+// Safe number formatter - never throws
+const safeNumber = (v?: number | null, digits = 2) => {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return v.toFixed(digits);
+  }
+  return "—";
+};
+
 export function SignalPanel({ symbol }: SignalPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,13 +136,23 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
     );
   }
 
-  const signalColor = getSignalColor(data.signal);
+  // Defensive: ensure all fields exist with fallbacks
+  const signal = data.signal || "NEUTRAL";
+  const score = data.score ?? null;
+  const displaySymbol = data.symbol || symbol || "N/A";
+  const date = data.date || "—";
+  const positive_factors = data.positive_factors || [];
+  const negative_factors = data.negative_factors || [];
+  const risk_flags = data.risk_flags || [];
+
+  const signalColor = getSignalColor(signal);
 
   function getHumanAdvice(
     signal: string,
     score: number | null,
     hasRisk: boolean
   ): string {
+    if (!signal) return "訊號中性，可等待更明確的方向再做決策。";
     const s = signal.toUpperCase();
 
     if (s === "SHORT") {
@@ -171,8 +189,8 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
           alignItems: "center",
         }}
       >
-        <h3>J-GOD Signal – {data.symbol}</h3>
-        <span style={{ fontSize: "12px", color: "#666" }}>{data.date}</span>
+        <h3>J-GOD Signal – {displaySymbol}</h3>
+        <span style={{ fontSize: "12px", color: "#666" }}>{date}</span>
       </div>
 
       {/* Main Signal Block */}
@@ -192,10 +210,10 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
             marginBottom: "8px",
           }}
         >
-          {data.signal}
+          {signal}
         </div>
         <div style={{ fontSize: "18px", color: "#666" }}>
-          Score: <strong>{data.score.toFixed(2)}</strong>
+          Score: <strong>{safeNumber(score, 2)}</strong>
         </div>
       </div>
 
@@ -210,11 +228,11 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
         >
           Positive Factors
         </div>
-        {data.positive_factors.length === 0 ? (
+        {positive_factors.length === 0 ? (
           <div style={{ color: "#999", fontSize: "12px" }}>None</div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {data.positive_factors.map((raw, idx) => {
+            {positive_factors.map((raw, idx) => {
               const code = extractCode(raw);
               return (
                 <span
@@ -250,11 +268,11 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
         >
           Negative Factors
         </div>
-        {data.negative_factors.length === 0 ? (
+        {negative_factors.length === 0 ? (
           <div style={{ color: "#999", fontSize: "12px" }}>None</div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {data.negative_factors.map((raw, idx) => {
+            {negative_factors.map((raw, idx) => {
               const code = extractCode(raw);
               return (
                 <span
@@ -296,7 +314,7 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
         >
           Risk Flags
         </div>
-        {data.risk_flags.length === 0 ? (
+        {risk_flags.length === 0 ? (
           <div style={{ color: "#999", fontSize: "12px" }}>
             No major risk flags.
           </div>
@@ -308,7 +326,7 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
               gap: "4px",
             }}
           >
-            {data.risk_flags.map((raw, idx) => {
+            {risk_flags.map((raw, idx) => {
               const message = extractMessage(raw);
               const severity = extractSeverity(raw) || "info";
               const severityLabel = severity.toUpperCase();
@@ -363,9 +381,9 @@ export function SignalPanel({ symbol }: SignalPanelProps) {
           }}
         >
           {getHumanAdvice(
-            data.signal,
-            data.score,
-            data.risk_flags.length > 0
+            signal,
+            score,
+            risk_flags.length > 0
           )}
         </div>
       </div>

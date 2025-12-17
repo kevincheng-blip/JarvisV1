@@ -6,6 +6,12 @@
 
 import { useState, useEffect } from 'react';
 
+// Safe number formatter - never throws
+const safeNumber = (v: unknown, digits = 2) => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n.toFixed(digits) : "—";
+};
+
 interface PolicySuggestion {
   run_id: string;
   created_at: string;
@@ -88,6 +94,54 @@ export function PolicyPanel() {
     fetchPolicySuggestion();
   };
 
+  // Three-state check: loading, error, empty
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          AI Policy 建議
+        </h2>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          載入中...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          AI Policy 建議
+        </h2>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 text-red-700 dark:text-red-400">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          AI Policy 建議
+        </h2>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          No data
+        </div>
+      </div>
+    );
+  }
+
+  // Defensive: extract run_id with multiple fallbacks
+  const runId =
+    data?.suggestion?.run_id ??
+    (data as any)?.current_run?.run_id ??
+    (data as any)?.run_id ??
+    (data as any)?.meta?.run_id ??
+    "—";
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4">
@@ -129,22 +183,8 @@ export function PolicyPanel() {
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          載入中...
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 text-red-700 dark:text-red-400">
-          {error}
-        </div>
-      )}
-
       {/* Data Display */}
-      {!loading && !error && data && (
+      {data && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Section A: Best Experiment */}
           <div>
@@ -155,49 +195,49 @@ export function PolicyPanel() {
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Run ID:</span>
                 <span className="font-mono text-gray-900 dark:text-white text-xs">
-                  {data.suggestion.run_id.substring(0, 8)}...
+                  {runId !== "—" && typeof runId === "string" ? runId.substring(0, 8) + "..." : runId}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Sharpe Ratio:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {data.suggestion.sharpe_ratio.toFixed(4)}
+                  {safeNumber(data.suggestion?.sharpe_ratio, 4)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Max Drawdown:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(data.suggestion.max_drawdown * 100).toFixed(2)}%
+                  {safeNumber((data.suggestion?.max_drawdown ?? 0) * 100, 2)}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Total Return:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(data.suggestion.total_return * 100).toFixed(2)}%
+                  {safeNumber((data.suggestion?.total_return ?? 0) * 100, 2)}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Win Rate:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(data.suggestion.win_rate * 100).toFixed(2)}%
+                  {safeNumber((data.suggestion?.win_rate ?? 0) * 100, 2)}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Days:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {data.suggestion.num_days}
+                  {data.suggestion?.num_days ?? "—"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Trades:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {data.suggestion.num_trades}
+                  {data.suggestion?.num_trades ?? "—"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Score:</span>
                 <span className="font-semibold text-green-600 dark:text-green-400">
-                  {data.suggestion.score.toFixed(4)}
+                  {safeNumber(data.suggestion?.score, 4)}
                 </span>
               </div>
             </div>
@@ -212,37 +252,37 @@ export function PolicyPanel() {
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Long Budget:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(data.config.long_budget * 100).toFixed(1)}%
+                  {safeNumber((data.config?.long_budget ?? 0) * 100, 1)}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Short Budget:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(data.config.short_budget * 100).toFixed(1)}%
+                  {safeNumber((data.config?.short_budget ?? 0) * 100, 1)}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Max Weight/Symbol:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {(data.config.max_weight_per_symbol * 100).toFixed(1)}%
+                  {safeNumber((data.config?.max_weight_per_symbol ?? 0) * 100, 1)}%
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Min Score:</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {data.config.min_score.toFixed(2)}
+                  {safeNumber(data.config?.min_score, 2)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Allow Short:</span>
-                <span className={`font-semibold ${data.config.allow_short ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {data.config.allow_short ? '是' : '否'}
+                <span className={`font-semibold ${data.config?.allow_short ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {data.config?.allow_short ? '是' : '否'}
                 </span>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  <div>日期區間: {data.suggestion.start_date} ~ {data.suggestion.end_date}</div>
-                  <div className="mt-1">Created: {new Date(data.suggestion.created_at).toLocaleString('zh-TW')}</div>
+                  <div>日期區間: {data.suggestion?.start_date ?? "—"} ~ {data.suggestion?.end_date ?? "—"}</div>
+                  <div className="mt-1">Created: {data.suggestion?.created_at ? new Date(data.suggestion.created_at).toLocaleString('zh-TW') : "—"}</div>
                 </div>
               </div>
             </div>

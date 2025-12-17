@@ -10,7 +10,7 @@ Usage:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, decision_v3, policy, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, s_rank_v2, strategy_perf, observer, execution, intelligence
+from jgod.api.routers import indicators, predictions, predictions_v2, universe, strategy, decision, decision_v3, policy, policy_risk_config, governance, backtest, error_review, orders, error_replay, decision_ab, signal_conflict, doctrine_alert, self_repair, doctrine_v2, doctrine_patch, rule_sim, s_rank_engine, s_rank_v2, strategy_perf, observer, execution, intelligence
 
 app = FastAPI(
     title="J-GOD Simulation API",
@@ -39,7 +39,9 @@ app.include_router(strategy.router, prefix="/api", tags=["strategy"])
 app.include_router(decision.router, prefix="/api", tags=["decision"])
 app.include_router(decision_v3.router, prefix="/api/v1/decision-v3", tags=["decision-v3"])
 app.include_router(execution.router, prefix="/api/v1/execution", tags=["execution"])
+app.include_router(policy_risk_config.router)  # Already has /api/v1/policy prefix - register first to override policy.router
 app.include_router(policy.router, prefix="/api/v1/policy", tags=["policy"])
+app.include_router(governance.router)
 app.include_router(backtest.router)
 app.include_router(error_review.router, prefix="/api/v1/error-review", tags=["error-review"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["orders"])
