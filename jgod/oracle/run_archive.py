@@ -180,8 +180,8 @@ def run_archive(date: str, universe: str, output_dir: Path) -> None:
 
 def create_prophecy(symbol: str, date: str, bucket: str, rank: int, raw_score: float) -> Prophecy:
     """Create a Prophecy object."""
-    # Get baseline price
-    baseline_price, baseline_source = get_baseline_price(symbol, date)
+    # Get baseline price (returns price, source, explain)
+    baseline_price, baseline_source, _ = get_baseline_price(symbol, date)
     
     # Generate forecast matrix
     forecast_matrix = generate_forecast_matrix(symbol, raw_score)
@@ -190,16 +190,20 @@ def create_prophecy(symbol: str, date: str, bucket: str, rank: int, raw_score: f
     resonance_tag = calculate_resonance_tag(forecast_matrix)
     conflict_score = calculate_conflict_score(forecast_matrix)
     
-    # Generate prophecy_id
-    prophecy_id = generate_prophecy_id(date, symbol)
+    # Generate deterministic prophecy_id (64 hex)
+    prophecy_id = generate_prophecy_id(
+        date, 
+        symbol,
+        oracle_core_version="or-os.v1",
+        toolset_version="stub",
+        doctrine_version="stub"
+    )
     
-    # T0 data
+    # T0 data (symbol and universe are now at top level)
     t0 = {
         "timestamp": f"{date}T14:00:00+08:00",
         "baseline_price": baseline_price,
         "baseline_source": baseline_source,
-        "symbol": symbol,
-        "universe": "TOP50",
     }
     
     # Decision footprint (MVP stub)
@@ -210,11 +214,11 @@ def create_prophecy(symbol: str, date: str, bucket: str, rank: int, raw_score: f
         A={"mutual_answer_summary": f"Score-based prediction for {symbol}", "key_conflicts": []},
     )
     
-    # Versions
+    # Versions (for deterministic prophecy_id)
     versions = {
-        "oracle_core_version": "v1",
-        "toolset_version": "v1",
-        "doctrine_version": "v2",
+        "oracle_core_version": "or-os.v1",
+        "toolset_version": "stub",
+        "doctrine_version": "stub",
         "governance_version": "v1",
     }
     
@@ -223,6 +227,8 @@ def create_prophecy(symbol: str, date: str, bucket: str, rank: int, raw_score: f
         "schema_version": "or-os.v1",
         "prophecy_id": prophecy_id,
         "as_of_date": date,
+        "symbol": symbol,
+        "universe": "TOP50",
         "t0": t0,
         "top_bucket": bucket,
         "rank_in_bucket": rank,

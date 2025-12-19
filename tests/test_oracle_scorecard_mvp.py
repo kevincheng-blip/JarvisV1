@@ -29,14 +29,14 @@ def test_grade_prophecy():
     
     prophecy_dict = {
         "schema_version": "or-os.v1",
-        "prophecy_id": "test_prophecy_123",
+        "prophecy_id": "test_prophecy_123" + "0" * 51,  # 64 chars
         "as_of_date": "2025-12-16",
+        "symbol": "2330",
+        "universe": "TOP50",
         "t0": {
             "timestamp": "2025-12-16T14:00:00+08:00",
             "baseline_price": 100.0,
             "baseline_source": "stub",
-            "symbol": "2330",
-            "universe": "TOP50",
         },
         "top_bucket": "UP",
         "rank_in_bucket": 1,
@@ -54,7 +54,7 @@ def test_grade_prophecy():
             "toolset_version": "v1",
             "doctrine_version": "v2",
         },
-        "immutable_hash": "test_hash_64_chars_" + "0" * 40,
+        "immutable_hash": "0" * 64,
     }
     
     prophecy = Prophecy(**prophecy_dict)
@@ -63,19 +63,22 @@ def test_grade_prophecy():
     scorecard = grade_prophecy(prophecy, "T1")
     
     assert scorecard.schema_version == "or-os.v1"
-    assert scorecard.prophecy_id == "test_prophecy_123"
+    assert scorecard.prophecy_id == prophecy_dict["prophecy_id"]
     assert scorecard.horizon == "T1"
     assert scorecard.symbol == "2330"
-    assert scorecard.pred["direction"] == "UP"
-    assert scorecard.pred["target_return"] == 2.0
-    assert "hit_direction" in scorecard.metrics
-    assert "abs_error" in scorecard.metrics
-    assert "signed_error" in scorecard.metrics
-    assert isinstance(scorecard.metrics["abs_error"], float)
-    assert isinstance(scorecard.metrics["hit_direction"], bool)
-    assert scorecard.truth.tN_date == "2025-12-17"
-    assert scorecard.truth.tN_price > 0
-    assert "regime" in scorecard.context
+    assert scorecard.top_bucket == "UP"
+    assert scorecard.rank_in_bucket == 1
+    assert scorecard.pred_direction == "UP"
+    assert scorecard.pred_target_return == 2.0
+    assert scorecard.pred_star == 3
+    assert scorecard.hit_direction is not None
+    assert isinstance(scorecard.abs_error, float)
+    assert isinstance(scorecard.signed_error, float)
+    assert scorecard.baseline_price > 0
+    assert scorecard.baseline_source in ["sqlite", "stub", "none"]
+    assert scorecard.truth_price > 0
+    assert scorecard.truth_source in ["sqlite", "stub", "none"]
+    assert "regime_status" in scorecard.context
 
 
 def test_grade_archive():
@@ -92,25 +95,31 @@ def test_grade_archive():
         
         # Grade archive
         output_path = tmp_path / "scorecard_T1.jsonl"
-        scorecard_rows = grade_archive(archive_path, "T1", output_path)
+        scorecard_rows = grade_archive(archive_path, "T1", output_path, db_path=None)
         
         assert len(scorecard_rows) == 100  # All prophecies should be graded
         assert output_path.exists()
         
-        # Verify scorecard structure
+        # Verify scorecard structure (new flat schema)
         for row in scorecard_rows:
             assert row.schema_version == "or-os.v1"
             assert row.horizon == "T1"
             assert row.score_id
+            assert len(row.score_id) == 64  # SHA256 hex
             assert row.prophecy_id
             assert row.symbol
-            assert "hit_direction" in row.metrics
-            assert "abs_error" in row.metrics
-            assert "signed_error" in row.metrics
-            assert isinstance(row.metrics["abs_error"], (int, float))
-            assert isinstance(row.metrics["hit_direction"], bool)
-            assert row.truth.tN_price > 0
-            assert row.truth.realized_return is not None
+            assert row.top_bucket in ["UP", "DOWN"]
+            assert row.rank_in_bucket >= 1
+            assert isinstance(row.hit_direction, bool)
+            assert isinstance(row.abs_error, float)
+            assert isinstance(row.signed_error, float)
+            assert row.baseline_price > 0
+            assert row.baseline_source in ["sqlite", "stub", "none"]
+            assert row.truth_price > 0
+            assert row.truth_source in ["sqlite", "stub", "none"]
+            assert row.pred_direction in ["UP", "DOWN", "SIDE"]
+            assert isinstance(row.pred_target_return, float)
+            assert row.pred_star >= 1 and row.pred_star <= 5
         
         # Load and verify JSONL
         loaded_rows = []

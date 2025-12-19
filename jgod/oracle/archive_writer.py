@@ -11,23 +11,28 @@ from typing import Dict, List
 from jgod.oracle.schemas import Prophecy, ForecastHorizon, DecisionFootprint
 
 
-def generate_prophecy_id(as_of_date: str, symbol: str, model_version: str = "v1", 
-                         toolset_version: str = "v1", doctrine_version: str = "v2") -> str:
+def generate_prophecy_id(
+    as_of_date: str, 
+    symbol: str, 
+    oracle_core_version: str = "or-os.v1",
+    toolset_version: str = "stub",
+    doctrine_version: str = "stub"
+) -> str:
     """
-    Generate deterministic prophecy_id.
+    Generate deterministic prophecy_id (SHA256 64 hex).
     
     Args:
         as_of_date: YYYY-MM-DD
         symbol: Stock symbol
-        model_version: Model version string
-        toolset_version: Toolset version string
-        doctrine_version: Doctrine version string
+        oracle_core_version: Oracle core version (default: "or-os.v1")
+        toolset_version: Toolset version (default: "stub")
+        doctrine_version: Doctrine version (default: "stub")
         
     Returns:
-        SHA256 hash hex string
+        SHA256 hash hex string (64 chars)
     """
-    content = f"{as_of_date}_{symbol}_{model_version}_{toolset_version}_{doctrine_version}"
-    return hashlib.sha256(content.encode()).hexdigest()[:32]
+    content = f"{as_of_date}|{symbol}|{oracle_core_version}|{toolset_version}|{doctrine_version}"
+    return hashlib.sha256(content.encode()).hexdigest()
 
 
 def compute_immutable_hash(prophecy_dict: Dict) -> str:
@@ -71,7 +76,7 @@ def write_prophecy_archive(prophecies: List[Prophecy], output_path: Path) -> Non
 
 def load_prophecy_archive(archive_path: Path) -> List[Prophecy]:
     """
-    Load prophecies from JSONL file.
+    Load prophecies from JSONL file (with backward compat).
     
     Args:
         archive_path: Path to JSONL file
@@ -86,5 +91,6 @@ def load_prophecy_archive(archive_path: Path) -> List[Prophecy]:
             if not line:
                 continue
             prophecy_dict = json.loads(line)
-            prophecies.append(Prophecy(**prophecy_dict))
+            # Use from_dict for backward compat
+            prophecies.append(Prophecy.from_dict(prophecy_dict))
     return prophecies
