@@ -46,6 +46,17 @@ def assemble_governance_summary() -> GovernanceSummary:
     cluster = providers.get_cluster_risk_status()
     regime, market_complexity = providers.get_market_regime_status()
 
+    # market_complexity comes from RegimeProvider
+    # If regime has a score (ER), use it to derive complexity
+    if regime.score is not None:
+        er = regime.score
+        if er < 0.2:
+            market_complexity = "HIGH"
+        elif er < 0.5:
+            market_complexity = "MEDIUM"
+        else:
+            market_complexity = "LOW"
+
     ai_action, gate_reasons, primary_reason_code, action_confidence, explain, recommended_ops, guardrails = decide_ai_action(
         drift_status=drift.status,
         execution=execution,
@@ -61,11 +72,12 @@ def assemble_governance_summary() -> GovernanceSummary:
 
     summary_reasons: List[str] = list({primary_reason_code, *gate_reasons} - {None})
     module_reasons: List[str] = []
+    # Merge reasons from all modules (deduplicate)
     for mod in (execution, cluster, regime):
         module_reasons.extend(mod.reasons or [])
     if drift.reasons:
         module_reasons.extend(drift.reasons)
-    summary_reasons = list({*summary_reasons, *module_reasons})
+    summary_reasons = list({*summary_reasons, *module_reasons})  # Deduplicate
 
     if primary_reason_code not in REASON_CATALOG:
         summary_reasons.append("UNKNOWN_REASON_CODE")
@@ -80,12 +92,19 @@ def assemble_governance_summary() -> GovernanceSummary:
         "severity": spec.severity,
     })
 
+    # Build decision_context (P2.0 Governance Matrix)
+    decision_context = {
+        "type": "GOVERNANCE_MATRIX",
+        "regime": regime.status,
+        "cluster": cluster.status,
+    }
+    
     return GovernanceSummary(
         drift_status=drift.status,
         execution_confidence=execution,
         cluster_risk=cluster,
         regime=regime,
-        market_complexity="MEDIUM" if market_complexity == "MED" else market_complexity,
+        market_complexity=market_complexity,
         ai_action=ai_action,
         updated_at=datetime.utcnow().isoformat(),
         is_stub=is_stub,
@@ -97,6 +116,7 @@ def assemble_governance_summary() -> GovernanceSummary:
         explain=explain,
         recommended_ops=recommended_ops,
         guardrails=guardrails,
+        decision_context=decision_context,
     )
 
 

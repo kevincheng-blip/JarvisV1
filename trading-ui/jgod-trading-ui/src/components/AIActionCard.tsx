@@ -85,6 +85,17 @@ export function AIActionCard({ summary, isLoading, error }: Props) {
         <div>Suggested exposure cap: {safeNumber((ops as any).suggested_exposure_cap)}</div>
       </div>
 
+      {/* Decision Context (P2.0 Governance Matrix) */}
+      {s?.decision_context && (
+        <div className="mt-2">
+          <div className="text-sm text-gray-900 dark:text-white font-semibold">Decision Context</div>
+          <div className="text-xs text-gray-700 dark:text-gray-200 space-y-1 mb-3">
+            <div>Regime: {safeString((s.decision_context as any)?.regime)}</div>
+            <div>Cluster: {safeString((s.decision_context as any)?.cluster)}</div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-2 text-sm text-gray-900 dark:text-white font-semibold">Details</div>
       <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-200 mt-1">
         <div>Drift: <strong>{safeString(s?.drift_status)}</strong></div>

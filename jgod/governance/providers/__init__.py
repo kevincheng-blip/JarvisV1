@@ -5,6 +5,8 @@ from typing import Tuple
 
 from jgod.api.schemas.governance_summary import GovernanceModuleStatus
 from jgod.governance.providers.execution_provider import get_execution_rigor_status as _exec_provider
+from jgod.governance.providers.cluster_provider import get_cluster_risk_status as _cluster_provider
+from jgod.governance.providers.regime_provider import get_regime_status as _regime_provider
 
 __all__ = [
     "get_execution_rigor_status",
@@ -33,30 +35,37 @@ def get_execution_rigor_status() -> GovernanceModuleStatus:
 
 
 def get_cluster_risk_status() -> GovernanceModuleStatus:
-    """Stubbed cluster risk status."""
-    reason_codes = ["CLUSTER_STUB"]
-    return GovernanceModuleStatus(
-        status="LOW",
-        score=None,
-        updated_at=datetime.utcnow().isoformat(),
-        is_stub=True,
-        reasons=reason_codes,
-        metrics={},
-    )
+    """Get cluster risk status from ClusterProvider."""
+    try:
+        return _cluster_provider()
+    except Exception:
+        # Fallback to stub on error
+        return GovernanceModuleStatus(
+            status="UNKNOWN",
+            score=None,
+            updated_at=datetime.utcnow().isoformat(),
+            is_stub=True,
+            reasons=["CLUSTER_NO_SIGNALS"],
+            metrics={},
+        )
 
 
 def get_market_regime_status() -> Tuple[GovernanceModuleStatus, str]:
-    """Stubbed market regime and complexity."""
-    reason_codes = ["REGIME_STUB"]
-    regime = GovernanceModuleStatus(
-        status="UNKNOWN",
-        score=None,
-        updated_at=datetime.utcnow().isoformat(),
-        is_stub=True,
-        reasons=reason_codes,
-        metrics={},
-    )
-    market_complexity = "MEDIUM"
-    return regime, market_complexity
+    """Get market regime status from RegimeProvider."""
+    try:
+        return _regime_provider()
+    except Exception:
+        # Fallback to stub on error
+        return (
+            GovernanceModuleStatus(
+                status="UNKNOWN",
+                score=None,
+                updated_at=datetime.utcnow().isoformat(),
+                is_stub=True,
+                reasons=["REGIME_STUB"],
+                metrics={},
+            ),
+            "MEDIUM",
+        )
 
 

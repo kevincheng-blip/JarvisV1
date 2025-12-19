@@ -39,6 +39,11 @@ export interface GovernanceSummary {
   updated_at?: string | null;
   is_stub?: boolean;
   reasons?: string[] | null;
+  decision_context?: {
+    type?: string;
+    regime?: string;
+    cluster?: string;
+  } | null;
 }
 
 

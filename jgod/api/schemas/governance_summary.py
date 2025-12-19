@@ -36,5 +36,6 @@ class GovernanceSummary(BaseModel):
     explain: Optional[dict] = None
     recommended_ops: Dict[str, Any] = Field(default_factory=dict)
     guardrails: Dict[str, Any] = Field(default_factory=dict)
+    decision_context: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
