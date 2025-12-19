@@ -1,0 +1,352 @@
+{
+  "schema_version": "or-os.v1",
+  "as_of_date": "2025-01-16",
+  "universe": "TOP50",
+  "rows": 100,
+  "horizons": [
+    "T1",
+    "T5",
+    "T10",
+    "T20",
+    "TM"
+  ],
+  "data_quality": {
+    "baseline_source_counts": {
+      "stub": 485,
+      "sqlite": 15
+    },
+    "truth_source_counts_by_horizon": {
+      "T1": {
+        "stub": 97,
+        "sqlite": 3
+      },
+      "T5": {
+        "stub": 97,
+        "sqlite": 3
+      },
+      "T10": {
+        "stub": 97,
+        "sqlite": 3
+      },
+      "T20": {
+        "stub": 97,
+        "sqlite": 3
+      },
+      "TM": {
+        "stub": 97,
+        "sqlite": 3
+      }
+    },
+    "missing_truth_symbols_by_horizon": {
+      "T1": [],
+      "T5": [],
+      "T10": [],
+      "T20": [],
+      "TM": []
+    }
+  },
+  "forecast_quality_by_horizon": {
+    "T1": {
+      "hit_rate": 0.51,
+      "hit_rate_by_bucket": {
+        "UP": 0.58,
+        "DOWN": 0.44
+      },
+      "mae": 54.2044,
+      "rmse": 70.1827,
+      "mae_by_bucket": {
+        "UP": 49.0497,
+        "DOWN": 59.3591
+      },
+      "rank_ic_overall": 0.012,
+      "rank_ic_up_bucket": -0.141,
+      "rank_ic_down_bucket": 0.168,
+      "star_calibration": [
+        {
+          "star": 2,
+          "count": 23,
+          "hit_rate": 0.4782608695652174,
+          "mae": 27.859421739130436
+        },
+        {
+          "star": 3,
+          "count": 34,
+          "hit_rate": 0.5,
+          "mae": 98.80330294117644
+        },
+        {
+          "star": 4,
+          "count": 33,
+          "hit_rate": 0.5454545454545454,
+          "mae": 33.67619696969696
+        },
+        {
+          "star": 5,
+          "count": 10,
+          "hit_rate": 0.5,
+          "mae": 30.90484
+        }
+      ],
+      "star_reliability_index": 0.75,
+      "context_attribution": [
+        {
+          "regime": "UNKNOWN",
+          "cluster": "UNKNOWN",
+          "drift": "UNKNOWN",
+          "count": 100,
+          "hit_rate": 0.51,
+          "mae": 54.204419000000016
+        }
+      ]
+    },
+    "T5": {
+      "hit_rate": 0.5,
+      "hit_rate_by_bucket": {
+        "UP": 0.5,
+        "DOWN": 0.5
+      },
+      "mae": 37.9453,
+      "rmse": 47.4558,
+      "mae_by_bucket": {
+        "UP": 39.3506,
+        "DOWN": 36.5401
+      },
+      "rank_ic_overall": 0.043,
+      "rank_ic_up_bucket": -0.03,
+      "rank_ic_down_bucket": 0.189,
+      "star_calibration": [
+        {
+          "star": 2,
+          "count": 23,
+          "hit_rate": 0.4782608695652174,
+          "mae": 36.767360869565216
+        },
+        {
+          "star": 3,
+          "count": 34,
+          "hit_rate": 0.5,
+          "mae": 27.398023529411763
+        },
+        {
+          "star": 4,
+          "count": 33,
+          "hit_rate": 0.48484848484848486,
+          "mae": 53.10898484848486
+        },
+        {
+          "star": 5,
+          "count": 10,
+          "hit_rate": 0.6,
+          "mae": 26.47538000000001
+        }
+      ],
+      "star_reliability_index": 0.75,
+      "context_attribution": [
+        {
+          "regime": "UNKNOWN",
+          "cluster": "UNKNOWN",
+          "drift": "UNKNOWN",
+          "count": 100,
+          "hit_rate": 0.5,
+          "mae": 37.945324
+        }
+      ]
+    },
+    "T10": {
+      "hit_rate": 0.52,
+      "hit_rate_by_bucket": {
+        "UP": 0.52,
+        "DOWN": 0.52
+      },
+      "mae": 31.6568,
+      "rmse": 40.3908,
+      "mae_by_bucket": {
+        "UP": 33.0619,
+        "DOWN": 30.2517
+      },
+      "rank_ic_overall": 0.116,
+      "rank_ic_up_bucket": 0.011,
+      "rank_ic_down_bucket": 0.185,
+      "star_calibration": [
+        {
+          "star": 2,
+          "count": 23,
+          "hit_rate": 0.4782608695652174,
+          "mae": 35.71921304347827
+        },
+        {
+          "star": 3,
+          "count": 34,
+          "hit_rate": 0.5294117647058824,
+          "mae": 28.284838235294117
+        },
+        {
+          "star": 4,
+          "count": 33,
+          "hit_rate": 0.45454545454545453,
+          "mae": 30.852493939393938
+        },
+        {
+          "star": 5,
+          "count": 10,
+          "hit_rate": 0.8,
+          "mae": 36.43209
+        }
+      ],
+      "star_reliability_index": 0.75,
+      "context_attribution": [
+        {
+          "regime": "UNKNOWN",
+          "cluster": "UNKNOWN",
+          "drift": "UNKNOWN",
+          "count": 100,
+          "hit_rate": 0.52,
+          "mae": 31.656796000000007
+        }
+      ]
+    },
+    "T20": {
+      "hit_rate": 0.56,
+      "hit_rate_by_bucket": {
+        "UP": 0.5,
+        "DOWN": 0.62
+      },
+      "mae": 33.7673,
+      "rmse": 44.2061,
+      "mae_by_bucket": {
+        "UP": 35.1614,
+        "DOWN": 32.3733
+      },
+      "rank_ic_overall": 0.199,
+      "rank_ic_up_bucket": -0.071,
+      "rank_ic_down_bucket": 0.42,
+      "star_calibration": [
+        {
+          "star": 2,
+          "count": 23,
+          "hit_rate": 0.4782608695652174,
+          "mae": 28.003404347826084
+        },
+        {
+          "star": 3,
+          "count": 34,
+          "hit_rate": 0.5,
+          "mae": 37.03803235294117
+        },
+        {
+          "star": 4,
+          "count": 33,
+          "hit_rate": 0.6060606060606061,
+          "mae": 32.7939393939394
+        },
+        {
+          "star": 5,
+          "count": 10,
+          "hit_rate": 0.8,
+          "mae": 39.116249999999994
+        }
+      ],
+      "star_reliability_index": 1.0,
+      "context_attribution": [
+        {
+          "regime": "UNKNOWN",
+          "cluster": "UNKNOWN",
+          "drift": "UNKNOWN",
+          "count": 100,
+          "hit_rate": 0.56,
+          "mae": 33.767339000000014
+        }
+      ]
+    },
+    "TM": {
+      "hit_rate": 0.51,
+      "hit_rate_by_bucket": {
+        "UP": 0.42,
+        "DOWN": 0.6
+      },
+      "mae": 34.0817,
+      "rmse": 49.4461,
+      "mae_by_bucket": {
+        "UP": 35.2294,
+        "DOWN": 32.9339
+      },
+      "rank_ic_overall": 0.021,
+      "rank_ic_up_bucket": 0.047,
+      "rank_ic_down_bucket": -0.008,
+      "star_calibration": [
+        {
+          "star": 2,
+          "count": 23,
+          "hit_rate": 0.4782608695652174,
+          "mae": 48.56922173913043
+        },
+        {
+          "star": 3,
+          "count": 34,
+          "hit_rate": 0.5588235294117647,
+          "mae": 25.04812941176471
+        },
+        {
+          "star": 4,
+          "count": 33,
+          "hit_rate": 0.45454545454545453,
+          "mae": 39.19980606060605
+        },
+        {
+          "star": 5,
+          "count": 10,
+          "hit_rate": 0.6,
+          "mae": 14.584320000000002
+        }
+      ],
+      "star_reliability_index": 0.75,
+      "context_attribution": [
+        {
+          "regime": "UNKNOWN",
+          "cluster": "UNKNOWN",
+          "drift": "UNKNOWN",
+          "count": 100,
+          "hit_rate": 0.51,
+          "mae": 34.081653
+        }
+      ]
+    }
+  },
+  "sanity_checks": {
+    "scale_check": {
+      "status": "SUSPECT",
+      "reasons": [
+        "T1: MAE=54.20% exceeds 20% threshold (possible scale mismatch)",
+        "T1: RMSE=70.18% exceeds 30% threshold",
+        "T5: MAE=37.95% exceeds 20% threshold (possible scale mismatch)",
+        "T5: RMSE=47.46% exceeds 30% threshold",
+        "T10: MAE=31.66% exceeds 20% threshold (possible scale mismatch)",
+        "T10: RMSE=40.39% exceeds 30% threshold",
+        "T20: MAE=33.77% exceeds 20% threshold (possible scale mismatch)",
+        "T20: RMSE=44.21% exceeds 30% threshold",
+        "TM: MAE=34.08% exceeds 20% threshold (possible scale mismatch)",
+        "TM: RMSE=49.45% exceeds 30% threshold",
+        "SQLite data present but MAE still high - possible scale mismatch or extreme market volatility"
+      ],
+      "mae_range_by_horizon": {
+        "T1": 54.2044,
+        "T5": 37.9453,
+        "T10": 31.6568,
+        "T20": 33.7673,
+        "TM": 34.0817
+      }
+    },
+    "source_check": {
+      "status": "OK",
+      "reasons": [],
+      "sqlite_ratio_baseline": 0.03,
+      "sqlite_ratio_truth_by_horizon": {
+        "T1": 0.03,
+        "T5": 0.03,
+        "T10": 0.03,
+        "T20": 0.03,
+        "TM": 0.03
+      }
+    }
+  }
+}

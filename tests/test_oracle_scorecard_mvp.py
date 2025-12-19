@@ -69,16 +69,87 @@ def test_grade_prophecy():
     assert scorecard.top_bucket == "UP"
     assert scorecard.rank_in_bucket == 1
     assert scorecard.pred_direction == "UP"
-    assert scorecard.pred_target_return == 2.0
+    assert scorecard.pred_target_return == 2.0  # Percentage
     assert scorecard.pred_star == 3
     assert scorecard.hit_direction is not None
-    assert isinstance(scorecard.abs_error, float)
-    assert isinstance(scorecard.signed_error, float)
+    # abs_error and signed_error should be in percentage scale
+    if scorecard.abs_error is not None:
+        assert isinstance(scorecard.abs_error, float)
+        assert abs(scorecard.abs_error) < 50.0  # Should be reasonable percentage
+    if scorecard.signed_error is not None:
+        assert isinstance(scorecard.signed_error, float)
     assert scorecard.baseline_price > 0
     assert scorecard.baseline_source in ["sqlite", "stub", "none"]
     assert scorecard.truth_price > 0
     assert scorecard.truth_source in ["sqlite", "stub", "none"]
     assert "regime_status" in scorecard.context
+    # Verify realized_return is in percentage
+    if scorecard.realized_return is not None:
+        assert abs(scorecard.realized_return) < 100.0  # Reasonable percentage range
+
+
+def test_scorecard_return_scale_consistency():
+    """Test that return calculations are in percentage scale."""
+    from jgod.oracle.schemas import Prophecy, ForecastHorizon
+    
+    # Create prophecy with known prices
+    forecast_matrix = {
+        "T1": ForecastHorizon(direction="UP", target_return=3.0, star=3, confidence="MED"),
+    }
+    
+    prophecy_dict = {
+        "schema_version": "or-os.v1",
+        "prophecy_id": "test_scale" + "0" * 51,
+        "as_of_date": "2025-12-16",
+        "symbol": "2330",
+        "universe": "TOP50",
+        "t0": {
+            "timestamp": "2025-12-16T14:00:00+08:00",
+            "baseline_price": 100.0,
+            "baseline_source": "stub",
+        },
+        "top_bucket": "UP",
+        "rank_in_bucket": 1,
+        "resonance_tag": "STRONG",
+        "conflict_score": 0.0,
+        "forecast_matrix": {k: v.model_dump() for k, v in forecast_matrix.items()},
+        "decision_footprint": {},
+        "versions": {},
+        "immutable_hash": "0" * 64,
+    }
+    
+    prophecy = Prophecy(**prophecy_dict)
+    
+    # Mock get_baseline_price and get_truth_price to return fixed values
+    import jgod.oracle.scorecard_grader as grader_module
+    original_baseline = grader_module.get_baseline_price
+    original_truth = grader_module.get_truth_price
+    
+    def mock_baseline(symbol, date, db_path=None):
+        return (100.0, "stub", {"reason": "test"})
+    
+    def mock_truth(symbol, date, db_path=None):
+        return (103.0, "stub", {"reason": "test"})  # 3% return
+    
+    grader_module.get_baseline_price = mock_baseline
+    grader_module.get_truth_price = mock_truth
+    
+    try:
+        scorecard = grade_prophecy(prophecy, "T1", db_path=None)
+        
+        # Verify realized_return = ((103/100) - 1) * 100 = 3.0
+        assert scorecard.realized_return is not None
+        assert abs(scorecard.realized_return - 3.0) < 0.01
+        
+        # Verify abs_error = abs(3.0 - 3.0) = 0.0 (or very small)
+        assert scorecard.abs_error is not None
+        assert abs(scorecard.abs_error) < 0.1
+        
+        # Verify pred_target_return and realized_return are same scale
+        assert abs(scorecard.pred_target_return - scorecard.realized_return) < 0.1
+    finally:
+        grader_module.get_baseline_price = original_baseline
+        grader_module.get_truth_price = original_truth
 
 
 def test_grade_archive():

@@ -155,3 +155,66 @@ def test_summary_structure():
             assert "count" in cal
             assert "hit_rate" in cal
             assert "mae" in cal
+        
+        # Sanity checks
+        assert "sanity_checks" in summary
+        assert "scale_check" in summary["sanity_checks"]
+        assert "source_check" in summary["sanity_checks"]
+        assert summary["sanity_checks"]["scale_check"]["status"] in ["OK", "SUSPECT"]
+        assert summary["sanity_checks"]["source_check"]["status"] in ["OK", "SUSPECT"]
+        assert "sqlite_ratio_baseline" in summary["sanity_checks"]["source_check"]
+
+
+def test_summary_sanity_check_scale_suspect():
+    """Test sanity check detects scale issues."""
+    import json
+    import tempfile
+    from pathlib import Path
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        
+        # Create fake scorecard with high MAE (scale issue)
+        scorecard_data = [
+            {
+                "schema_version": "or-os.v1",
+                "score_id": "test1",
+                "prophecy_id": "prop1",
+                "as_of_date": "2025-12-16",
+                "symbol": "2330",
+                "top_bucket": "UP",
+                "rank_in_bucket": 1,
+                "horizon": "T1",
+                "baseline_price": 100.0,
+                "baseline_source": "stub",
+                "truth_price": 102.0,
+                "truth_source": "stub",
+                "pred_direction": "UP",
+                "pred_target_return": 2.0,
+                "pred_star": 3,
+                "pred_confidence": "MED",
+                "realized_return": 2.0,
+                "hit_direction": True,
+                "abs_error": 35.0,  # Artificially high (scale issue)
+                "signed_error": 0.0,
+                "context": {},
+                "explain": {},
+                "attribution_stub": {},
+            },
+        ]
+        
+        scorecard_path = tmp_path / "scorecard_2025-12-16_T1.jsonl"
+        with open(scorecard_path, 'w') as f:
+            for row in scorecard_data:
+                f.write(json.dumps(row) + '\n')
+        
+        summary = calculate_summary(
+            scorecard_paths={"T1": scorecard_path},
+            as_of_date="2025-12-16",
+            universe="TOP50"
+        )
+        
+        # Should detect scale issue
+        scale_check = summary["sanity_checks"]["scale_check"]
+        assert scale_check["status"] == "SUSPECT"
+        assert len(scale_check["reasons"]) > 0

@@ -141,9 +141,15 @@ def calculate_summary(
         hit_count = sum(1 for r in rows if r.get("hit_direction", False))
         hit_rate = hit_count / total if total > 0 else 0.0
         
-        abs_errors = [r.get("abs_error", 0.0) for r in rows]
-        mae = sum(abs_errors) / len(abs_errors) if abs_errors else 0.0
-        rmse = (sum(e ** 2 for e in abs_errors) / len(abs_errors)) ** 0.5 if abs_errors else 0.0
+        # Filter out None values for abs_error
+        abs_errors = [r.get("abs_error") for r in rows if r.get("abs_error") is not None]
+        mae = sum(abs_errors) / len(abs_errors) if abs_errors else None
+        rmse = (sum(e ** 2 for e in abs_errors) / len(abs_errors)) ** 0.5 if abs_errors else None
+        
+        if mae is not None:
+            mae = round(mae, 4)
+        if rmse is not None:
+            rmse = round(rmse, 4)
         
         # By bucket
         up_rows = [r for r in rows if r.get("top_bucket") == "UP"]
@@ -152,21 +158,31 @@ def calculate_summary(
         up_hit_rate = sum(1 for r in up_rows if r.get("hit_direction", False)) / len(up_rows) if up_rows else 0.0
         down_hit_rate = sum(1 for r in down_rows if r.get("hit_direction", False)) / len(down_rows) if down_rows else 0.0
         
-        up_mae = sum(r.get("abs_error", 0.0) for r in up_rows) / len(up_rows) if up_rows else 0.0
-        down_mae = sum(r.get("abs_error", 0.0) for r in down_rows) / len(down_rows) if down_rows else 0.0
+        up_abs_errors = [r.get("abs_error") for r in up_rows if r.get("abs_error") is not None]
+        down_abs_errors = [r.get("abs_error") for r in down_rows if r.get("abs_error") is not None]
+        up_mae = sum(up_abs_errors) / len(up_abs_errors) if up_abs_errors else None
+        down_mae = sum(down_abs_errors) / len(down_abs_errors) if down_abs_errors else None
         
-        # Rank IC
+        if up_mae is not None:
+            up_mae = round(up_mae, 4)
+        if down_mae is not None:
+            down_mae = round(down_mae, 4)
+        
+        # Rank IC (filter out None values)
         pred_returns = [r.get("pred_target_return", 0.0) for r in rows]
-        realized_returns = [r.get("realized_return", 0.0) for r in rows]
-        rank_ic_overall = calculate_spearman_rank_ic(pred_returns, realized_returns)
+        realized_returns = [r.get("realized_return") for r in rows if r.get("realized_return") is not None]
+        # Match lengths
+        if len(realized_returns) < len(pred_returns):
+            pred_returns = [r.get("pred_target_return", 0.0) for r in rows if r.get("realized_return") is not None]
+        rank_ic_overall = calculate_spearman_rank_ic(pred_returns, realized_returns) if len(pred_returns) == len(realized_returns) and len(realized_returns) >= 2 else 0.0
         
-        up_pred = [r.get("pred_target_return", 0.0) for r in up_rows]
-        up_realized = [r.get("realized_return", 0.0) for r in up_rows]
-        rank_ic_up = calculate_spearman_rank_ic(up_pred, up_realized) if up_rows else 0.0
+        up_pred = [r.get("pred_target_return", 0.0) for r in up_rows if r.get("realized_return") is not None]
+        up_realized = [r.get("realized_return") for r in up_rows if r.get("realized_return") is not None]
+        rank_ic_up = calculate_spearman_rank_ic(up_pred, up_realized) if len(up_pred) == len(up_realized) and len(up_realized) >= 2 else 0.0
         
-        down_pred = [r.get("pred_target_return", 0.0) for r in down_rows]
-        down_realized = [r.get("realized_return", 0.0) for r in down_rows]
-        rank_ic_down = calculate_spearman_rank_ic(down_pred, down_realized) if down_rows else 0.0
+        down_pred = [r.get("pred_target_return", 0.0) for r in down_rows if r.get("realized_return") is not None]
+        down_realized = [r.get("realized_return") for r in down_rows if r.get("realized_return") is not None]
+        rank_ic_down = calculate_spearman_rank_ic(down_pred, down_realized) if len(down_pred) == len(down_realized) and len(down_realized) >= 2 else 0.0
         
         # Star calibration
         star_stats = defaultdict(lambda: {"count": 0, "hits": 0, "abs_errors": []})
@@ -224,11 +240,11 @@ def calculate_summary(
                 "UP": round(up_hit_rate, 3),
                 "DOWN": round(down_hit_rate, 3),
             },
-            "mae": round(mae, 3),
-            "rmse": round(rmse, 3),
+            "mae": mae,
+            "rmse": rmse,
             "mae_by_bucket": {
-                "UP": round(up_mae, 3),
-                "DOWN": round(down_mae, 3),
+                "UP": up_mae,
+                "DOWN": down_mae,
             },
             "rank_ic_overall": round(rank_ic_overall, 3),
             "rank_ic_up_bucket": round(rank_ic_up, 3),
@@ -237,6 +253,14 @@ def calculate_summary(
             "star_reliability_index": star_reliability,
             "context_attribution": context_attribution,
         }
+    
+    # Calculate sanity checks
+    sanity_checks = _calculate_sanity_checks(
+        forecast_quality_by_horizon,
+        baseline_source_counts,
+        truth_source_counts_by_horizon,
+        all_rows_by_horizon
+    )
     
     # Build summary
     summary = {
@@ -251,6 +275,69 @@ def calculate_summary(
             "missing_truth_symbols_by_horizon": missing_truth_symbols_by_horizon,
         },
         "forecast_quality_by_horizon": forecast_quality_by_horizon,
+        "sanity_checks": sanity_checks,
     }
     
     return summary
+
+
+def _calculate_sanity_checks(
+    forecast_quality_by_horizon: Dict,
+    baseline_source_counts: Dict,
+    truth_source_counts_by_horizon: Dict,
+    all_rows_by_horizon: Dict
+) -> Dict:
+    """
+    Calculate sanity checks for data quality and scale consistency.
+    
+    Returns:
+        Dict with scale_check and source_check
+    """
+    scale_check = {"status": "OK", "reasons": [], "mae_range_by_horizon": {}}
+    source_check = {"status": "OK", "reasons": [], "sqlite_ratio_baseline": 0.0, "sqlite_ratio_truth_by_horizon": {}}
+    
+    # Calculate SQLite ratios
+    total_baseline = sum(baseline_source_counts.values())
+    sqlite_baseline = baseline_source_counts.get("sqlite", 0)
+    source_check["sqlite_ratio_baseline"] = round(sqlite_baseline / total_baseline, 3) if total_baseline > 0 else 0.0
+    
+    for horizon, source_counts in truth_source_counts_by_horizon.items():
+        total_truth = sum(source_counts.values())
+        sqlite_truth = source_counts.get("sqlite", 0)
+        sqlite_ratio = round(sqlite_truth / total_truth, 3) if total_truth > 0 else 0.0
+        source_check["sqlite_ratio_truth_by_horizon"][horizon] = sqlite_ratio
+    
+    # Scale check: MAE/RMSE should be in reasonable percentage range
+    for horizon, quality in forecast_quality_by_horizon.items():
+        mae = quality.get("mae")
+        rmse = quality.get("rmse")
+        
+        if mae is not None:
+            scale_check["mae_range_by_horizon"][horizon] = mae
+            
+            if mae > 20:
+                scale_check["status"] = "SUSPECT"
+                scale_check["reasons"].append(f"{horizon}: MAE={mae:.2f}% exceeds 20% threshold (possible scale mismatch)")
+        
+        if rmse is not None and rmse > 30:
+            scale_check["status"] = "SUSPECT"
+            scale_check["reasons"].append(f"{horizon}: RMSE={rmse:.2f}% exceeds 30% threshold")
+    
+    # Source check: If all stub, mark as SUSPECT
+    if source_check["sqlite_ratio_baseline"] == 0.0:
+        all_truth_stub = all(
+            ratio == 0.0 
+            for ratio in source_check["sqlite_ratio_truth_by_horizon"].values()
+        )
+        if all_truth_stub:
+            source_check["status"] = "SUSPECT"
+            source_check["reasons"].append("All prices from stub (no SQLite data found). Check DB date range.")
+    
+    # Combined check: If SQLite ratio > 0 but MAE still high, possible scale issue
+    if source_check["sqlite_ratio_baseline"] > 0 and scale_check["status"] == "SUSPECT":
+        scale_check["reasons"].append("SQLite data present but MAE still high - possible scale mismatch or extreme market volatility")
+    
+    return {
+        "scale_check": scale_check,
+        "source_check": source_check,
+    }

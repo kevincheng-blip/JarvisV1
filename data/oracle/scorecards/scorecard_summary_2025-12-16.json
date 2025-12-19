@@ -12,23 +12,29 @@
   ],
   "data_quality": {
     "baseline_source_counts": {
-      "stub": 500
+      "stub": 485,
+      "sqlite": 15
     },
     "truth_source_counts_by_horizon": {
       "T1": {
-        "stub": 100
+        "stub": 97,
+        "sqlite": 3
       },
       "T5": {
-        "stub": 100
+        "stub": 97,
+        "sqlite": 3
       },
       "T10": {
-        "stub": 100
+        "stub": 97,
+        "sqlite": 3
       },
       "T20": {
-        "stub": 100
+        "stub": 97,
+        "sqlite": 3
       },
       "TM": {
-        "stub": 100
+        "stub": 97,
+        "sqlite": 3
       }
     },
     "missing_truth_symbols_by_horizon": {
@@ -41,44 +47,44 @@
   },
   "forecast_quality_by_horizon": {
     "T1": {
-      "hit_rate": 0.5,
+      "hit_rate": 0.44,
       "hit_rate_by_bucket": {
-        "UP": 0.48,
-        "DOWN": 0.52
+        "UP": 0.5,
+        "DOWN": 0.38
       },
-      "mae": 42.372,
-      "rmse": 57.152,
+      "mae": 61.5573,
+      "rmse": 81.407,
       "mae_by_bucket": {
-        "UP": 37.835,
-        "DOWN": 46.91
+        "UP": 60.7543,
+        "DOWN": 62.3603
       },
-      "rank_ic_overall": -0.057,
-      "rank_ic_up_bucket": 0.09,
-      "rank_ic_down_bucket": -0.274,
+      "rank_ic_overall": -0.142,
+      "rank_ic_up_bucket": -0.182,
+      "rank_ic_down_bucket": 0.003,
       "star_calibration": [
         {
           "star": 2,
-          "count": 26,
-          "hit_rate": 0.5384615384615384,
-          "mae": 35.6131923076923
+          "count": 15,
+          "hit_rate": 0.6,
+          "mae": 32.04455333333333
         },
         {
           "star": 3,
-          "count": 40,
-          "hit_rate": 0.475,
-          "mae": 53.54902500000001
+          "count": 38,
+          "hit_rate": 0.47368421052631576,
+          "mae": 109.41963157894739
         },
         {
           "star": 4,
-          "count": 14,
-          "hit_rate": 0.42857142857142855,
-          "mae": 25.82064285714285
+          "count": 26,
+          "hit_rate": 0.34615384615384615,
+          "mae": 31.345815384615392
         },
         {
           "star": 5,
-          "count": 20,
-          "hit_rate": 0.55,
-          "mae": 40.39125
+          "count": 21,
+          "hit_rate": 0.38095238095238093,
+          "mae": 33.43457142857142
         }
       ],
       "star_reliability_index": 0.5,
@@ -88,50 +94,103 @@
           "cluster": "UNKNOWN",
           "drift": "UNKNOWN",
           "count": 100,
-          "hit_rate": 0.5,
-          "mae": 42.37218
+          "hit_rate": 0.44,
+          "mae": 61.557314999999974
         }
       ]
     },
     "T5": {
-      "hit_rate": 0.49,
+      "hit_rate": 0.47,
       "hit_rate_by_bucket": {
-        "UP": 0.42,
-        "DOWN": 0.56
+        "UP": 0.48,
+        "DOWN": 0.46
       },
-      "mae": 31.145,
-      "rmse": 37.06,
+      "mae": 31.2207,
+      "rmse": 42.6329,
       "mae_by_bucket": {
-        "UP": 30.193,
-        "DOWN": 32.096
+        "UP": 32.9459,
+        "DOWN": 29.4955
       },
-      "rank_ic_overall": -0.052,
-      "rank_ic_up_bucket": 0.028,
-      "rank_ic_down_bucket": -0.136,
+      "rank_ic_overall": -0.102,
+      "rank_ic_up_bucket": 0.065,
+      "rank_ic_down_bucket": -0.268,
       "star_calibration": [
         {
           "star": 2,
-          "count": 26,
-          "hit_rate": 0.5,
-          "mae": 27.549269230769237
+          "count": 15,
+          "hit_rate": 0.6,
+          "mae": 26.301260000000003
         },
         {
           "star": 3,
-          "count": 40,
-          "hit_rate": 0.425,
-          "mae": 33.08325000000001
+          "count": 38,
+          "hit_rate": 0.5263157894736842,
+          "mae": 28.26203421052631
         },
         {
           "star": 4,
-          "count": 14,
-          "hit_rate": 0.5,
-          "mae": 29.825214285714285
+          "count": 26,
+          "hit_rate": 0.38461538461538464,
+          "mae": 33.15567307692308
         },
         {
           "star": 5,
-          "count": 20,
-          "hit_rate": 0.6,
-          "mae": 32.86555
+          "count": 21,
+          "hit_rate": 0.38095238095238093,
+          "mae": 37.69261428571429
+        }
+      ],
+      "star_reliability_index": 0.25,
+      "context_attribution": [
+        {
+          "regime": "UNKNOWN",
+          "cluster": "UNKNOWN",
+          "drift": "UNKNOWN",
+          "count": 100,
+          "hit_rate": 0.47,
+          "mae": 31.220685999999986
+        }
+      ]
+    },
+    "T10": {
+      "hit_rate": 0.43,
+      "hit_rate_by_bucket": {
+        "UP": 0.56,
+        "DOWN": 0.3
+      },
+      "mae": 36.3956,
+      "rmse": 46.9996,
+      "mae_by_bucket": {
+        "UP": 34.8407,
+        "DOWN": 37.9505
+      },
+      "rank_ic_overall": -0.086,
+      "rank_ic_up_bucket": 0.051,
+      "rank_ic_down_bucket": 0.037,
+      "star_calibration": [
+        {
+          "star": 2,
+          "count": 15,
+          "hit_rate": 0.3333333333333333,
+          "mae": 47.423700000000004
+        },
+        {
+          "star": 3,
+          "count": 38,
+          "hit_rate": 0.39473684210526316,
+          "mae": 38.548226315789464
+        },
+        {
+          "star": 4,
+          "count": 26,
+          "hit_rate": 0.6153846153846154,
+          "mae": 25.8752846153846
+        },
+        {
+          "star": 5,
+          "count": 21,
+          "hit_rate": 0.3333333333333333,
+          "mae": 37.648219047619044
         }
       ],
       "star_reliability_index": 0.75,
@@ -141,106 +200,53 @@
           "cluster": "UNKNOWN",
           "drift": "UNKNOWN",
           "count": 100,
-          "hit_rate": 0.49,
-          "mae": 31.144750000000002
-        }
-      ]
-    },
-    "T10": {
-      "hit_rate": 0.49,
-      "hit_rate_by_bucket": {
-        "UP": 0.36,
-        "DOWN": 0.62
-      },
-      "mae": 32.012,
-      "rmse": 42.167,
-      "mae_by_bucket": {
-        "UP": 35.185,
-        "DOWN": 28.839
-      },
-      "rank_ic_overall": -0.106,
-      "rank_ic_up_bucket": -0.009,
-      "rank_ic_down_bucket": -0.095,
-      "star_calibration": [
-        {
-          "star": 2,
-          "count": 26,
-          "hit_rate": 0.5,
-          "mae": 37.636115384615394
-        },
-        {
-          "star": 3,
-          "count": 40,
-          "hit_rate": 0.475,
-          "mae": 28.525325
-        },
-        {
-          "star": 4,
-          "count": 14,
-          "hit_rate": 0.5714285714285714,
-          "mae": 25.438285714285712
-        },
-        {
-          "star": 5,
-          "count": 20,
-          "hit_rate": 0.45,
-          "mae": 36.27460000000001
-        }
-      ],
-      "star_reliability_index": 0.5,
-      "context_attribution": [
-        {
-          "regime": "UNKNOWN",
-          "cluster": "UNKNOWN",
-          "drift": "UNKNOWN",
-          "count": 100,
-          "hit_rate": 0.49,
-          "mae": 32.011799999999994
+          "hit_rate": 0.43,
+          "mae": 36.39558100000002
         }
       ]
     },
     "T20": {
       "hit_rate": 0.48,
       "hit_rate_by_bucket": {
-        "UP": 0.5,
-        "DOWN": 0.46
+        "UP": 0.46,
+        "DOWN": 0.5
       },
-      "mae": 24.775,
-      "rmse": 32.355,
+      "mae": 41.8552,
+      "rmse": 57.9651,
       "mae_by_bucket": {
-        "UP": 27.051,
-        "DOWN": 22.499
+        "UP": 38.7758,
+        "DOWN": 44.9346
       },
-      "rank_ic_overall": -0.116,
-      "rank_ic_up_bucket": -0.1,
-      "rank_ic_down_bucket": -0.059,
+      "rank_ic_overall": -0.084,
+      "rank_ic_up_bucket": 0.21,
+      "rank_ic_down_bucket": -0.443,
       "star_calibration": [
         {
           "star": 2,
-          "count": 26,
-          "hit_rate": 0.46153846153846156,
-          "mae": 15.247076923076921
+          "count": 15,
+          "hit_rate": 0.5333333333333333,
+          "mae": 44.295840000000005
         },
         {
           "star": 3,
-          "count": 40,
-          "hit_rate": 0.45,
-          "mae": 32.16715
+          "count": 38,
+          "hit_rate": 0.5,
+          "mae": 51.49633684210525
         },
         {
           "star": 4,
-          "count": 14,
-          "hit_rate": 0.5714285714285714,
-          "mae": 13.8375
+          "count": 26,
+          "hit_rate": 0.46153846153846156,
+          "mae": 33.471976923076916
         },
         {
           "star": 5,
-          "count": 20,
-          "hit_rate": 0.5,
-          "mae": 30.03295
+          "count": 21,
+          "hit_rate": 0.42857142857142855,
+          "mae": 33.04534285714286
         }
       ],
-      "star_reliability_index": 0.5,
+      "star_reliability_index": 0.25,
       "context_attribution": [
         {
           "regime": "UNKNOWN",
@@ -248,49 +254,49 @@
           "drift": "UNKNOWN",
           "count": 100,
           "hit_rate": 0.48,
-          "mae": 24.774939999999987
+          "mae": 41.85522000000002
         }
       ]
     },
     "TM": {
-      "hit_rate": 0.52,
+      "hit_rate": 0.45,
       "hit_rate_by_bucket": {
-        "UP": 0.42,
-        "DOWN": 0.62
+        "UP": 0.52,
+        "DOWN": 0.38
       },
-      "mae": 36.513,
-      "rmse": 47.523,
+      "mae": 31.4079,
+      "rmse": 42.6018,
       "mae_by_bucket": {
-        "UP": 35.102,
-        "DOWN": 37.925
+        "UP": 30.687,
+        "DOWN": 32.1289
       },
-      "rank_ic_overall": -0.165,
-      "rank_ic_up_bucket": -0.098,
-      "rank_ic_down_bucket": -0.287,
+      "rank_ic_overall": -0.141,
+      "rank_ic_up_bucket": -0.128,
+      "rank_ic_down_bucket": -0.062,
       "star_calibration": [
         {
           "star": 2,
-          "count": 26,
-          "hit_rate": 0.6153846153846154,
-          "mae": 36.879115384615396
+          "count": 15,
+          "hit_rate": 0.4,
+          "mae": 32.33826
         },
         {
           "star": 3,
-          "count": 40,
-          "hit_rate": 0.5,
-          "mae": 30.220400000000012
+          "count": 38,
+          "hit_rate": 0.5263157894736842,
+          "mae": 28.277034210526313
         },
         {
           "star": 4,
-          "count": 14,
-          "hit_rate": 0.42857142857142855,
-          "mae": 31.643285714285714
+          "count": 26,
+          "hit_rate": 0.4230769230769231,
+          "mae": 29.984315384615382
         },
         {
           "star": 5,
-          "count": 20,
-          "hit_rate": 0.5,
-          "mae": 52.03165
+          "count": 21,
+          "hit_rate": 0.38095238095238093,
+          "mae": 38.17150476190475
         }
       ],
       "star_reliability_index": 0.5,
@@ -300,10 +306,47 @@
           "cluster": "UNKNOWN",
           "drift": "UNKNOWN",
           "count": 100,
-          "hit_rate": 0.52,
-          "mae": 36.513120000000015
+          "hit_rate": 0.45,
+          "mae": 31.40795
         }
       ]
+    }
+  },
+  "sanity_checks": {
+    "scale_check": {
+      "status": "SUSPECT",
+      "reasons": [
+        "T1: MAE=61.56% exceeds 20% threshold (possible scale mismatch)",
+        "T1: RMSE=81.41% exceeds 30% threshold",
+        "T5: MAE=31.22% exceeds 20% threshold (possible scale mismatch)",
+        "T5: RMSE=42.63% exceeds 30% threshold",
+        "T10: MAE=36.40% exceeds 20% threshold (possible scale mismatch)",
+        "T10: RMSE=47.00% exceeds 30% threshold",
+        "T20: MAE=41.86% exceeds 20% threshold (possible scale mismatch)",
+        "T20: RMSE=57.97% exceeds 30% threshold",
+        "TM: MAE=31.41% exceeds 20% threshold (possible scale mismatch)",
+        "TM: RMSE=42.60% exceeds 30% threshold",
+        "SQLite data present but MAE still high - possible scale mismatch or extreme market volatility"
+      ],
+      "mae_range_by_horizon": {
+        "T1": 61.5573,
+        "T5": 31.2207,
+        "T10": 36.3956,
+        "T20": 41.8552,
+        "TM": 31.4079
+      }
+    },
+    "source_check": {
+      "status": "OK",
+      "reasons": [],
+      "sqlite_ratio_baseline": 0.03,
+      "sqlite_ratio_truth_by_horizon": {
+        "T1": 0.03,
+        "T5": 0.03,
+        "T10": 0.03,
+        "T20": 0.03,
+        "TM": 0.03
+      }
     }
   }
 }

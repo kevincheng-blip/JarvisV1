@@ -78,28 +78,7 @@ def grade_prophecy(
     # Get truth price (T+N) - returns (price, source, explain)
     tN_price, tN_source, tN_explain = get_truth_price(symbol, tN_date, db_path)
     
-    # Calculate realized return (percentage)
-    realized_return = ((tN_price - t0_price) / t0_price) * 100.0
-    
-    # Metrics
-    hit_direction = (
-        (forecast.direction == "UP" and realized_return > 0) or
-        (forecast.direction == "DOWN" and realized_return < 0) or
-        (forecast.direction == "SIDE" and abs(realized_return) < 1.0)  # Within 1% = SIDE
-    )
-    
-    abs_error = abs(forecast.target_return - realized_return)
-    signed_error = forecast.target_return - realized_return
-    
-    # Context (from governance snapshot or UNKNOWN)
-    context = governance_snapshot or {
-        "regime_status": "UNKNOWN",
-        "cluster_status": "UNKNOWN",
-        "drift_status": "UNKNOWN",
-        "execution_confidence": "UNKNOWN",
-    }
-    
-    # Explain dict
+    # Initialize explain dict first (before any conditional logic)
     explain = {
         "baseline_date_used": t0_explain.get("date_used", as_of_date),
         "baseline_exact_match": t0_explain.get("exact_match", True),
@@ -110,6 +89,51 @@ def grade_prophecy(
         explain["baseline_lookback_days"] = t0_explain["lookback_days"]
     if "lookback_days" in tN_explain:
         explain["truth_lookback_days"] = tN_explain["lookback_days"]
+    
+    # Calculate realized return (percentage) - ensure both prices are valid
+    # Note: t0_price and tN_price are already floats (not None) from get_baseline_price/get_truth_price
+    # They return stub price if SQLite fails, so we check for valid positive values
+    if t0_price is None or t0_price <= 0 or tN_price is None or tN_price <= 0:
+        # Invalid prices - set realized_return to None and flag in explain
+        realized_return = None
+    else:
+        # Realized return in percentage: ((p_target / p0) - 1) * 100
+        realized_return = ((tN_price / t0_price) - 1.0) * 100.0
+        realized_return = round(realized_return, 4)  # Round to 4 decimal places
+    
+    # Metrics (only if realized_return is valid)
+    pred_target = forecast.target_return  # Initialize pred_target for ScorecardRow
+    
+    if realized_return is None:
+        hit_direction = False
+        abs_error = None
+        signed_error = None
+    else:
+        hit_direction = (
+            (forecast.direction == "UP" and realized_return > 0) or
+            (forecast.direction == "DOWN" and realized_return < 0) or
+            (forecast.direction == "SIDE" and abs(realized_return) < 1.0)  # Within 1% = SIDE
+        )
+        
+        # pred_target_return should already be in percentage from forecast
+        # Scale check: If pred_target looks like decimal (abs <= 1.5 and star >= 3), convert to percentage
+        # This is for backward compat only - new prophecies should already be in percentage
+        if abs(pred_target) <= 1.5 and forecast.star >= 3:
+            pred_target = pred_target * 100.0
+            explain["scale_fix_applied"] = True
+        
+        abs_error = abs(pred_target - realized_return)
+        signed_error = pred_target - realized_return
+        abs_error = round(abs_error, 4)
+        signed_error = round(signed_error, 4)
+    
+    # Context (from governance snapshot or UNKNOWN)
+    context = governance_snapshot or {
+        "regime_status": "UNKNOWN",
+        "cluster_status": "UNKNOWN",
+        "drift_status": "UNKNOWN",
+        "execution_confidence": "UNKNOWN",
+    }
     
     # Attribution stub
     attribution_stub = {
@@ -129,18 +153,18 @@ def grade_prophecy(
         top_bucket=prophecy.top_bucket,
         rank_in_bucket=prophecy.rank_in_bucket,
         horizon=horizon,
-        baseline_price=t0_price,
+        baseline_price=t0_price if t0_price is not None else 0.0,
         baseline_source=t0_source,
-        truth_price=tN_price,
+        truth_price=tN_price if tN_price is not None else 0.0,
         truth_source=tN_source,
         pred_direction=forecast.direction,
-        pred_target_return=forecast.target_return,
+        pred_target_return=pred_target,  # Use potentially scaled pred_target
         pred_star=forecast.star,
         pred_confidence=forecast.confidence,
         realized_return=realized_return,
         hit_direction=hit_direction,
-        abs_error=round(abs_error, 3),
-        signed_error=round(signed_error, 3),
+        abs_error=abs_error,
+        signed_error=signed_error,
         context=context,
         explain=explain,
         attribution_stub=attribution_stub,
@@ -177,7 +201,8 @@ def grade_archive(
                 continue
             
             row = grade_prophecy(prophecy, horizon, db_path, governance_snapshot)
-            scorecard_rows.append(row)
+            if row:  # Only append if row is valid
+                scorecard_rows.append(row)
         except Exception as e:
             logger.error(f"Error grading prophecy {prophecy.prophecy_id}: {e}", exc_info=True)
             continue

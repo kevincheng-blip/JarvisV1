@@ -4,7 +4,7 @@ OR-OS V1 Schemas (Pydantic models).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -58,7 +58,7 @@ class TruthData(BaseModel):
     """Truth data for scoring."""
     tN_date: str  # YYYY-MM-DD
     tN_price: float
-    realized_return: float  # (tN_price - t0_price) / t0_price * 100
+    realized_return: Optional[float] = None  # (tN_price / t0_price - 1) * 100 (percentage), None if invalid
 
 
 class ScorecardRow(BaseModel):
@@ -79,10 +79,10 @@ class ScorecardRow(BaseModel):
     pred_target_return: float  # Percentage
     pred_star: int
     pred_confidence: Literal["LOW", "MED", "HIGH"]
-    realized_return: float  # Percentage
+    realized_return: Optional[float] = None  # Percentage (None if invalid prices)
     hit_direction: bool
-    abs_error: float
-    signed_error: float
+    abs_error: Optional[float] = None  # None if realized_return is None
+    signed_error: Optional[float] = None  # None if realized_return is None
     context: Dict = Field(default_factory=dict)  # {regime_status, cluster_status, drift_status}
     explain: Dict = Field(default_factory=dict)  # {truth_date_used, baseline_date_used, ...}
     attribution_stub: Dict = Field(default_factory=dict)  # {primary_driver, notes}
